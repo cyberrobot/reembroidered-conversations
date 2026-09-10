@@ -1,0 +1,81 @@
+@import "tailwindcss";
+
+@theme {
+  --font-serif: 'Cormorant Garamond', Georgia, serif;
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --color-linen-base: #FAF8F5;
+  --color-linen-surface: #F5EFE9;
+  --color-linen-card: #FDFCFB;
+  --color-linen-border: #E8DFD5;
+  --color-thread-rose: #A35048;
+  --color-thread-deep: #7D3730;
+  --color-thread-ochre: #C08A3E;
+  --color-charcoal-ink: #282524;
+  --color-charcoal-soft: #4B4643;
+  --color-charcoal-muted: #78716C;
+  --color-sage-soft: #63705C;
+}
+
+/* Custom subtle paper texture & embroidery stitch accents */
+.paper-grain {
+  background-color: #FAF8F5;
+  background-image: radial-gradient(#E8DFC8 0.6px, transparent 0.6px);
+  background-size: 24px 24px;
+}
+
+/* Warm rosy-cream parchment gradient inspired by the novel book jacket */
+.bg-rosy-parchment {
+  background: linear-gradient(180deg, #FBF7F2 0%, #F6EFE8 50%, #FAF7F2 100%);
+}
+
+.bg-rosy-parchment-diagonal {
+  background: linear-gradient(135deg, #FBF7F2 0%, #F8F1EB 50%, #F5EDE4 100%);
+}
+
+/* Tactile book-leaf & deckled paper card treatments */
+.deckled-book-leaf {
+  position: relative;
+  background: #FAF7F3;
+  border: 1px solid #EAE0D5;
+  box-shadow: 
+    0 1px 2px rgba(163, 80, 72, 0.04),
+    0 6px 18px -2px rgba(60, 50, 45, 0.05),
+    0 1px 0 rgba(255, 255, 255, 0.8) inset;
+}
+
+.deckled-book-leaf::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  right: -3px;
+  bottom: -3px;
+  left: 3px;
+  background: #F3EAE0;
+  border: 1px solid #E4D7C8;
+  border-radius: inherit;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.stitch-border-top {
+  border-top: 1.5px dashed #A35048;
+}
+
+.stitch-border-b {
+  border-bottom: 1.5px dashed #A35048;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #FAF8F5;
+}
+::-webkit-scrollbar-thumb {
+  background: #D9CFC4;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #C4B7A9;
+}

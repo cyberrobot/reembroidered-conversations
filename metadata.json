@@ -1,0 +1,6 @@
+{
+  "name": "Re-Embroidered Conversations — One-to-One Listening with Shahd Karaeen",
+  "description": "Private one-to-one listening conversations with Palestinian writer and author Shahd Karaeen, exploring survival, memory, and healing.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
