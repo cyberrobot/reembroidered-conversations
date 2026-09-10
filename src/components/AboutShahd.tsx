@@ -1,11 +1,7 @@
 import React from 'react';
 import laraAboutImg from '../assets/images/shahd_karaeen_portrait.jpeg';
 
-interface AboutShahdProps {
-  onBookClick: () => void;
-}
-
-export const AboutShahd: React.FC<AboutShahdProps> = ({ onBookClick }) => {
+export const AboutShahd: React.FC = () => {
   return (
     <section id="about-shahd" className="py-20 md:py-28 bg-[#FAF8F5] relative overflow-hidden">
       <div className="max-w-5xl mx-auto px-6">
@@ -37,7 +33,7 @@ export const AboutShahd: React.FC<AboutShahdProps> = ({ onBookClick }) => {
               {/* Main Photo Card */}
               <div className="relative rounded-2xl overflow-hidden border border-[#E8DDD2] shadow-sm bg-white">
                 <img
-                  src={laraAboutImg}
+                  src={laraAboutImg.src}
                   alt="Shahd Karaeen in her study with book and notebook"
                   referrerPolicy="no-referrer"
                   className="w-full aspect-[3/4] object-cover object-center"
@@ -71,12 +67,12 @@ export const AboutShahd: React.FC<AboutShahdProps> = ({ onBookClick }) => {
                 <span className="text-[#78716C]">
                   — Shahd Karaeen, Writer & Listener
                 </span>
-                <button
-                  onClick={onBookClick}
+                <a
+                  href="#book-session"
                   className="font-medium text-[#A35048] hover:text-[#8C4038] underline underline-offset-4 cursor-pointer text-left self-start"
                 >
                   Reserve a conversation with Shahd Karaeen →
-                </button>
+                </a>
               </div>
             </div>
           </div>

@@ -58,7 +58,7 @@ export const BookShowcase: React.FC = () => {
 
               <div className="relative rounded-2xl overflow-hidden border border-[#E8DDD2] shadow-sm bg-white">
                 <img
-                  src={bookImg}
+                  src={bookImg.src}
                   alt="Clothbound hardback of Hope: Re-Embroidered with embroidery needle and thread"
                   referrerPolicy="no-referrer"
                   className="w-full aspect-[4/3] object-cover object-center"

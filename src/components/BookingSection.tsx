@@ -1,4 +1,7 @@
+'use client';
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -19,17 +22,17 @@ import { FullCalendarModal } from './FullCalendarModal';
 
 interface BookingSectionProps {
   initialDate?: string;
-  onGoToConfirmation?: (data: BookingConfirmation) => void;
 }
 
-export const BookingSection: React.FC<BookingSectionProps> = ({ onGoToConfirmation }) => {
+export const BookingSection: React.FC<BookingSectionProps> = ({ initialDate }) => {
+  const router = useRouter();
   // Time zone
   const [timeZone, setTimeZone] = useState('Europe/London (GMT/BST)');
 
   // Generate ~36 upcoming realistic days across the next 7-8 weeks starting from tomorrow
   const availableDays: DayAvailability[] = useMemo(() => {
     const days: DayAvailability[] = [];
-    const base = new Date();
+    const base = initialDate ? new Date(`${initialDate}T12:00:00`) : new Date();
     // Start from tomorrow
     base.setDate(base.getDate() + 1);
 
@@ -70,7 +73,7 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ onGoToConfirmati
       });
     }
     return days;
-  }, []);
+  }, [initialDate]);
 
   // Selected date & slot state
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
@@ -195,9 +198,25 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ onGoToConfirmati
     };
 
     setConfirmation(newConf);
-    if (onGoToConfirmation) {
-      onGoToConfirmation(newConf);
+    openConfirmation(newConf);
+  };
+
+  const openConfirmation = (data?: BookingConfirmation) => {
+    const query = new URLSearchParams({
+      payment_success: 'true',
+      booking_id: data?.bookingId ?? 'RC-78421',
+    });
+
+    if (data) {
+      query.set('name', data.clientName);
+      query.set('email', data.clientEmail);
+      query.set('date', data.date);
+      query.set('time', data.time);
+      query.set('format', data.format);
+      query.set('timezone', data.timeZone);
     }
+
+    router.push(`/confirmation?${query.toString()}`);
   };
 
   // Generate .ics file download
@@ -359,15 +378,13 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ onGoToConfirmati
                   Need to book another slot or change your booking?
                 </button>
 
-                {onGoToConfirmation && (
-                  <button
-                    onClick={() => onGoToConfirmation(confirmation)}
-                    className="inline-flex items-center gap-1 text-xs text-[#A35048] hover:text-[#8C4038] font-medium cursor-pointer"
-                  >
-                    <span>Open Fullscreen Confirmation Page</span>
-                    <Sparkles className="w-3 h-3" />
-                  </button>
-                )}
+                <button
+                  onClick={() => openConfirmation(confirmation)}
+                  className="inline-flex items-center gap-1 text-xs text-[#A35048] hover:text-[#8C4038] font-medium cursor-pointer"
+                >
+                  <span>Open Fullscreen Confirmation Page</span>
+                  <Sparkles className="w-3 h-3" />
+                </button>
               </div>
             </div>
           </div>
@@ -760,16 +777,14 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ onGoToConfirmati
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-                  {onGoToConfirmation && (
-                    <button
-                      type="button"
-                      onClick={() => onGoToConfirmation()}
-                      className="text-xs text-[#78716C] hover:text-[#A35048] transition-colors cursor-pointer py-2 px-3 rounded-lg hover:bg-[#F5EFE9] border border-dashed border-[#C4B7A9]"
-                      title="Instant test: Preview how Stripe redirects to the booking confirmation page"
-                    >
-                      Instant Test: Preview Confirmation
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => openConfirmation()}
+                    className="text-xs text-[#78716C] hover:text-[#A35048] transition-colors cursor-pointer py-2 px-3 rounded-lg hover:bg-[#F5EFE9] border border-dashed border-[#C4B7A9]"
+                    title="Instant test: Preview how Stripe redirects to the booking confirmation page"
+                  >
+                    Instant Test: Preview Confirmation
+                  </button>
                   <button
                     id="confirm-booking-button"
                     type="submit"

@@ -2,11 +2,7 @@ import React from 'react';
 import { EXPERIENCE_PILLARS } from '../data/content';
 import { EmbroideredThread } from './EmbroideredThread';
 
-interface ExperienceProps {
-  onBookClick: () => void;
-}
-
-export const Experience: React.FC<ExperienceProps> = ({ onBookClick }) => {
+export const Experience: React.FC = () => {
   return (
     <section id="the-experience" className="py-20 md:py-28 bg-[#F5EFE9]/60 relative">
       <div className="max-w-5xl mx-auto px-6">

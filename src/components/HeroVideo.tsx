@@ -1,5 +1,8 @@
+'use client';
+
 import React, { useState, useEffect, useRef } from 'react';
 import MuxPlayer from '@mux/mux-player-react';
+import type { MuxCSSProperties } from '@mux/mux-player-react';
 import type MuxPlayerElement from '@mux/mux-player';
 import { Play, FileText, Calendar, Clock, ShieldCheck, Video } from 'lucide-react';
 import { HERO_VIDEO_TRANSCRIPT } from '../data/content';
@@ -8,11 +11,7 @@ const laraHeroImg = 'https://image.mux.com/4qvdrc02lmk21KDbxfyWcWyiV7YG9Fljckr5x
 // Verified, active official Mux stream ID
 const DEFAULT_PLAYBACK_ID = '4qvdrc02lmk21KDbxfyWcWyiV7YG9Fljckr5xj5wBzXg';
 
-interface HeroVideoProps {
-  onBookClick: () => void;
-}
-
-export const HeroVideo: React.FC<HeroVideoProps> = ({ onBookClick }) => {
+export const HeroVideo: React.FC = () => {
   const [hasStartedPlaying, setHasStartedPlaying] = useState(false);
   const [, setIsPlaying] = useState(false);
   const [showTranscriptModal, setShowTranscriptModal] = useState(false);
@@ -21,7 +20,7 @@ export const HeroVideo: React.FC<HeroVideoProps> = ({ onBookClick }) => {
 
   // Validate configured Mux Playback ID if an override is provided in env
   useEffect(() => {
-    const rawEnvId = import.meta.env.VITE_MUX_PLAYBACK_ID;
+    const rawEnvId = process.env.NEXT_PUBLIC_MUX_PLAYBACK_ID;
     if (rawEnvId && typeof rawEnvId === 'string') {
       const candidate = rawEnvId.trim().replace(/^["']|["']$/g, '');
       // If it matches default or empty, no need to re-verify
@@ -57,6 +56,10 @@ export const HeroVideo: React.FC<HeroVideoProps> = ({ onBookClick }) => {
     }, 50);
   };
 
+  const scrollToBooking = () => {
+    document.getElementById('book-session')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   return (
     <section id="meet-shahd" className="relative pt-28 pb-20 md:pt-36 md:pb-28 overflow-hidden">
       {/* Background soft ambiance */}
@@ -80,7 +83,7 @@ export const HeroVideo: React.FC<HeroVideoProps> = ({ onBookClick }) => {
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
             <button
               id="hero-book-cta"
-              onClick={onBookClick}
+              onClick={scrollToBooking}
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 bg-[#A35048] hover:bg-[#8C4038] text-[#FAF8F5] text-base font-medium px-8 py-4 rounded-full transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer group active:scale-98"
             >
               <Calendar className="w-4 h-4 stroke-[1.75]" />
@@ -163,7 +166,7 @@ export const HeroVideo: React.FC<HeroVideoProps> = ({ onBookClick }) => {
                   width: '100%',
                   height: '100%',
                   display: 'block',
-                } as React.CSSProperties}
+                } as MuxCSSProperties}
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
                 onError={(event) => {
@@ -311,7 +314,7 @@ export const HeroVideo: React.FC<HeroVideoProps> = ({ onBookClick }) => {
               <button
                 onClick={() => {
                   setShowTranscriptModal(false);
-                  onBookClick();
+                  scrollToBooking();
                 }}
                 className="bg-[#A35048] text-[#FAF8F5] text-xs font-sans font-medium px-4 py-2 rounded-full cursor-pointer hover:bg-[#8C4038]"
               >
