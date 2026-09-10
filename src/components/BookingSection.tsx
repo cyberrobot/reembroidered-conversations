@@ -21,10 +21,10 @@ import { DayAvailability, SessionFormat, BookingConfirmation } from '../types';
 import { FullCalendarModal } from './FullCalendarModal';
 
 interface BookingSectionProps {
-  initialDate?: string;
+  initialAvailabilityDate: string;
 }
 
-export const BookingSection: React.FC<BookingSectionProps> = ({ initialDate }) => {
+export const BookingSection: React.FC<BookingSectionProps> = ({ initialAvailabilityDate }) => {
   const router = useRouter();
   // Time zone
   const [timeZone, setTimeZone] = useState('Europe/London (GMT/BST)');
@@ -32,9 +32,7 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ initialDate }) =
   // Generate ~36 upcoming realistic days across the next 7-8 weeks starting from tomorrow
   const availableDays: DayAvailability[] = useMemo(() => {
     const days: DayAvailability[] = [];
-    const base = initialDate ? new Date(`${initialDate}T12:00:00`) : new Date();
-    // Start from tomorrow
-    base.setDate(base.getDate() + 1);
+    const base = new Date(`${initialAvailabilityDate}T12:00:00Z`);
 
     const monthNames = [
       'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -46,17 +44,17 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ initialDate }) =
     // Generate up to 36 available listening days
     while (days.length < 36 && count < 65) {
       const current = new Date(base);
-      current.setDate(base.getDate() + count);
+      current.setUTCDate(base.getUTCDate() + count);
       count++;
 
-      const dayOfWeekNum = current.getDay();
+      const dayOfWeekNum = current.getUTCDay();
       // Shahd Karaeen listens Tuesday through Saturday (Sunday & Monday off for focused practice)
       if (dayOfWeekNum === 0 || dayOfWeekNum === 1) continue;
 
       const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-      const dateStr = `${current.getFullYear()}-${pad(current.getMonth() + 1)}-${pad(current.getDate())}`;
+      const dateStr = `${current.getUTCFullYear()}-${pad(current.getUTCMonth() + 1)}-${pad(current.getUTCDate())}`;
       const dayOfWeek = dayNames[dayOfWeekNum];
-      const formattedDate = `${dayOfWeek}, ${current.getDate()} ${monthNames[current.getMonth()]}`;
+      const formattedDate = `${dayOfWeek}, ${current.getUTCDate()} ${monthNames[current.getUTCMonth()]}`;
 
       // Morning, afternoon, evening slots
       days.push({
@@ -73,7 +71,7 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ initialDate }) =
       });
     }
     return days;
-  }, [initialDate]);
+  }, [initialAvailabilityDate]);
 
   // Selected date & slot state
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);

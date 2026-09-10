@@ -10,6 +10,7 @@ import { Footer } from '@/components/Footer';
 import { HeroVideo } from '@/components/HeroVideo';
 import { Navigation } from '@/components/Navigation';
 import { ThemeQuestionInterstitial } from '@/components/ThemeQuestionInterstitial';
+import { getTomorrowCalendarDateInTimeZone } from '@/lib/booking-date.mjs';
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -51,7 +52,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
     redirect(query ? `/confirmation?${query}` : '/confirmation');
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const initialAvailabilityDate = getTomorrowCalendarDateInTimeZone(new Date());
 
   return (
     <div className="min-h-screen bg-[#FAF8F5] text-[#282524] font-sans selection:bg-[#F2E5D9] selection:text-[#282524] relative paper-grain">
@@ -75,7 +76,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
         <ThemeQuestionInterstitial />
         <AboutShahd />
         <BookShowcase />
-        <BookingSection initialDate={today} />
+        <BookingSection initialAvailabilityDate={initialAvailabilityDate} />
         <BoundariesSection />
       </main>
 
