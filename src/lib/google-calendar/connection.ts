@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { createHash } from 'node:crypto';
+
 import { GOOGLE_CONNECTION_ID } from './constants.mjs';
 import { decryptRefreshToken } from './token-encryption';
 
@@ -20,6 +22,27 @@ export async function saveGoogleCalendarConnection(input: GoogleCalendarConnecti
     create: { id: GOOGLE_CONNECTION_ID, ...input },
     update: input,
   });
+}
+
+export async function consumeGoogleOAuthState(
+  state: string,
+  expiresAtSeconds: number,
+): Promise<boolean> {
+  const { db } = await import('@/lib/db');
+  const stateHash = createHash('sha256').update(state, 'utf8').digest('hex');
+  const [, inserted] = await db.$transaction([
+    db.googleOAuthStateConsumption.deleteMany({
+      where: { expiresAt: { lt: new Date() } },
+    }),
+    db.googleOAuthStateConsumption.createMany({
+      data: {
+        stateHash,
+        expiresAt: new Date(expiresAtSeconds * 1000),
+      },
+      skipDuplicates: true,
+    }),
+  ]);
+  return inserted.count === 1;
 }
 
 export async function getGoogleCalendarConnection() {

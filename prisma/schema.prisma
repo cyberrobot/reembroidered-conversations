@@ -52,3 +52,14 @@ model GoogleCalendarConnection {
 
   @@map("google_calendar_connections")
 }
+
+/// Short-lived replay ledger for completed or failed Google OAuth callbacks.
+/// Only a SHA-256 digest is stored; raw OAuth state and PKCE material remain absent.
+model GoogleOAuthStateConsumption {
+  stateHash  String   @id @db.Char(64)
+  expiresAt  DateTime @db.Timestamptz(3)
+  consumedAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([expiresAt], map: "google_oauth_state_consumptions_expires_at_idx")
+  @@map("google_oauth_state_consumptions")
+}

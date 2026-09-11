@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { cookies } from 'next/headers';
-import { getAdminSessionSecret } from '@/lib/google-calendar/config';
+import { getAdminSessionSecret } from '../google-calendar/config.ts';
 import {
   ADMIN_SESSION_TTL_SECONDS,
   createAdminSession,

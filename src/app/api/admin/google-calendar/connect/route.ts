@@ -1,6 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server.js';
 
-import { getAdminSessionSecret, getGoogleOAuthConfig } from '@/lib/google-calendar/config';
+import {
+  getAdminSessionSecret,
+  getGoogleOAuthConfig,
+} from '../../../../../lib/google-calendar/config.ts';
 import {
   buildGoogleAuthorizationUrl,
   createCodeChallenge,
@@ -8,11 +11,11 @@ import {
   createOAuthState,
   createOAuthStateEnvelope,
   OAUTH_TRANSACTION_TTL_SECONDS,
-} from '@/lib/google-calendar/oauth.mjs';
+} from '../../../../../lib/google-calendar/oauth.mjs';
 import {
   OAUTH_PKCE_COOKIE,
   OAUTH_STATE_COOKIE,
-} from '@/lib/google-calendar/transaction';
+} from '../../../../../lib/google-calendar/transaction.ts';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

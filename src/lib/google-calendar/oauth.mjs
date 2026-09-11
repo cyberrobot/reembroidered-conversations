@@ -41,18 +41,28 @@ export function validateOAuthStateEnvelope(
   secret,
   now = Date.now(),
 ) {
-  if (!envelope || !returnedState) return false;
+  return readOAuthStateEnvelope(envelope, returnedState, secret, now) !== null;
+}
+
+export function readOAuthStateEnvelope(
+  envelope,
+  returnedState,
+  secret,
+  now = Date.now(),
+) {
+  if (!envelope || !returnedState) return null;
   const parts = envelope.split('.');
-  if (parts.length !== 4 || parts[0] !== 'v1') return false;
+  if (parts.length !== 4 || parts[0] !== 'v1') return null;
   const [version, expiresAtText, state, signature] = parts;
   const value = `${version}.${expiresAtText}.${state}`;
   const expiresAt = Number(expiresAtText);
-  return (
+  const valid = (
     Number.isSafeInteger(expiresAt) &&
     expiresAt > Math.floor(now / 1000) &&
     safeEqual(signature, sign(value, secret)) &&
     safeEqual(state, returnedState)
   );
+  return valid ? { state, expiresAt } : null;
 }
 
 export function isValidCodeVerifier(verifier) {

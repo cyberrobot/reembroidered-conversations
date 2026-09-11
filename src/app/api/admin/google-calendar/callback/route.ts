@@ -1,27 +1,36 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server.js';
 
 import {
   ADMIN_SESSION_COOKIE,
   adminSessionCookieOptions,
   issueAdminSession,
-} from '@/lib/admin/session';
-import { saveGoogleCalendarConnection } from '@/lib/google-calendar/connection';
-import { getAdminSessionSecret, getGoogleOAuthConfig } from '@/lib/google-calendar/config';
-import { completeGoogleOAuth, OAuthFlowError } from '@/lib/google-calendar/flow.mjs';
+} from '../../../../../lib/admin/session.ts';
+import {
+  consumeGoogleOAuthState,
+  saveGoogleCalendarConnection,
+} from '../../../../../lib/google-calendar/connection.ts';
+import {
+  getAdminSessionSecret,
+  getGoogleOAuthConfig,
+} from '../../../../../lib/google-calendar/config.ts';
+import {
+  completeGoogleOAuth,
+  OAuthFlowError,
+} from '../../../../../lib/google-calendar/flow.mjs';
 import {
   discoverPrimaryCalendar,
   exchangeAuthorizationCode,
-} from '@/lib/google-calendar/google-api.mjs';
-import { verifyGoogleIdentityToken } from '@/lib/google-calendar/identity.mjs';
+} from '../../../../../lib/google-calendar/google-api.mjs';
+import { verifyGoogleIdentityToken } from '../../../../../lib/google-calendar/identity.mjs';
 import {
   isValidCodeVerifier,
-  validateOAuthStateEnvelope,
-} from '@/lib/google-calendar/oauth.mjs';
-import { encryptRefreshToken } from '@/lib/google-calendar/token-encryption';
+  readOAuthStateEnvelope,
+} from '../../../../../lib/google-calendar/oauth.mjs';
+import { encryptRefreshToken } from '../../../../../lib/google-calendar/token-encryption.ts';
 import {
   OAUTH_PKCE_COOKIE,
   OAUTH_STATE_COOKIE,
-} from '@/lib/google-calendar/transaction';
+} from '../../../../../lib/google-calendar/transaction.ts';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -63,14 +72,28 @@ export async function GET(request: NextRequest) {
   const returnedState = request.nextUrl.searchParams.get('state');
   const stateEnvelope = request.cookies.get(OAUTH_STATE_COOKIE)?.value;
   const codeVerifier = request.cookies.get(OAUTH_PKCE_COOKIE)?.value;
-  if (
-    !validateOAuthStateEnvelope(
-      stateEnvelope,
-      returnedState,
-      getAdminSessionSecret(),
-    ) ||
-    !isValidCodeVerifier(codeVerifier)
-  ) {
+  const transaction = readOAuthStateEnvelope(
+    stateEnvelope,
+    returnedState,
+    getAdminSessionSecret(),
+  );
+  if (!transaction) {
+    return resultResponse(config.redirectUri, undefined, 'authorization_expired');
+  }
+
+  try {
+    const consumed = await consumeGoogleOAuthState(
+      transaction.state,
+      transaction.expiresAt,
+    );
+    if (!consumed) {
+      return resultResponse(config.redirectUri, undefined, 'authorization_expired');
+    }
+  } catch {
+    return resultResponse(config.redirectUri, undefined, 'connection_failed');
+  }
+
+  if (!isValidCodeVerifier(codeVerifier)) {
     return resultResponse(config.redirectUri, undefined, 'authorization_expired');
   }
 

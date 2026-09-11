@@ -26,7 +26,8 @@
     "allowJs": true,
     "strict": false,
     "esModuleInterop": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true
   },
   "include": [
     "next-env.d.ts",

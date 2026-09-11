@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { getTokenEncryptionKey } from './config';
+import { getTokenEncryptionKey } from './config.ts';
 import {
   decryptRefreshToken as decrypt,
   encryptRefreshToken as encrypt,
