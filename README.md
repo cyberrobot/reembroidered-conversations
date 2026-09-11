@@ -25,3 +25,24 @@ npm run start
 The application does not require `GEMINI_API_KEY` or `APP_URL`; neither variable
 is used by the migrated application. The booking and confirmation experiences are
 client-side prototypes and do not create real bookings or payments.
+
+## Verification
+
+Run the deterministic date tests and TypeScript check:
+
+```bash
+npm test
+npm run lint
+```
+
+The migration-focused browser suite builds and starts the production application,
+then verifies routes, responsive layouts, and critical prototype interactions in
+Chromium:
+
+```bash
+npx playwright install chromium
+npm run test:browser
+```
+
+The browser run writes its inspectable HTML report and screenshot attachments to
+`playwright-report/`.

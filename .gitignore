@@ -3,6 +3,8 @@ build/
 .next/
 out/
 coverage/
+playwright-report/
+test-results/
 .DS_Store
 *.log
 *.tsbuildinfo
