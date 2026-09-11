@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState } from 'react';
 import { ShieldCheck, HeartHandshake, HelpCircle, ChevronDown } from 'lucide-react';
 import { FREQUENT_QUESTIONS } from '../data/content';

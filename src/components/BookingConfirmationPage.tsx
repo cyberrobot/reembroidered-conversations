@@ -1,4 +1,7 @@
-import React, { useState, useEffect } from 'react';
+'use client';
+
+import React, { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   CheckCircle2,
   Calendar,
@@ -19,72 +22,43 @@ import {
   ExternalLink,
   CreditCard,
 } from 'lucide-react';
-import { BookingConfirmation, SessionFormat } from '../types';
+import { SessionFormat } from '../types';
 
-interface BookingConfirmationPageProps {
-  onBackToHome: () => void;
-  initialConfirmation?: BookingConfirmation | null;
-}
-
-export const BookingConfirmationPage: React.FC<BookingConfirmationPageProps> = ({
-  onBackToHome,
-  initialConfirmation,
-}) => {
+export const BookingConfirmationPage: React.FC = () => {
+  const router = useRouter();
+  const params = useSearchParams();
   const [copiedId, setCopiedId] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [showTestBar, setShowTestBar] = useState(true);
 
-  // Parse URL parameters
-  const [params, setParams] = useState(() => {
-    const search = typeof window !== 'undefined' ? window.location.search : '';
-    return new URLSearchParams(search);
-  });
-
-  useEffect(() => {
-    const handlePopState = () => {
-      setParams(new URLSearchParams(window.location.search));
-    };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
-
-  // Derive booking details from URL or initialConfirmation, with realistic defaults
+  // Derive booking details from URL parameters, with realistic prototype defaults.
   const bookingId =
     params.get('booking_id') ||
     params.get('id') ||
-    initialConfirmation?.bookingId ||
     'RC-78421';
 
   const clientName =
     params.get('name') ||
     params.get('clientName') ||
-    initialConfirmation?.clientName ||
     'Sarah Jenkins';
 
   const clientEmail =
     params.get('email') ||
     params.get('clientEmail') ||
-    initialConfirmation?.clientEmail ||
     'sarah.j@example.com';
 
   const date =
-    params.get('date') ||
-    initialConfirmation?.date ||
-    'Thursday, 24 September 2026';
+    params.get('date') || 'Thursday, 24 September 2026';
 
   const time =
-    params.get('time') ||
-    initialConfirmation?.time ||
-    '14:00 - 14:55';
+    params.get('time') || '14:00 - 14:55';
 
-  const rawFormat = (params.get('format') || initialConfirmation?.format || 'video').toLowerCase();
+  const rawFormat = (params.get('format') || 'video').toLowerCase();
   const format: SessionFormat = rawFormat === 'audio' || rawFormat === 'phone' ? 'audio' : 'video';
 
   const timeZone =
     params.get('timezone') ||
-    params.get('tz') ||
-    initialConfirmation?.timeZone ||
-    'BST (London Time)';
+    params.get('tz') || 'BST (London Time)';
 
   const sessionId =
     params.get('session_id') ||
@@ -153,8 +127,11 @@ export const BookingConfirmationPage: React.FC<BookingConfirmationPageProps> = (
   };
 
   const applyUrlPreset = (query: string) => {
-    window.history.pushState({}, '', `${window.location.pathname}?${query}`);
-    setParams(new URLSearchParams(`?${query}`));
+    router.push(`/confirmation?${query}`);
+  };
+
+  const handleBackToHome = () => {
+    router.push('/');
   };
 
   return (
@@ -230,7 +207,7 @@ export const BookingConfirmationPage: React.FC<BookingConfirmationPageProps> = (
       <header className="border-b border-[#E8DFD5] bg-[#FAF8F5]/90 backdrop-blur-md sticky top-0 z-30 print:hidden">
         <div className="max-w-5xl mx-auto px-6 h-18 flex items-center justify-between">
           <button
-            onClick={onBackToHome}
+            onClick={handleBackToHome}
             className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-[#78716C] hover:text-[#282524] transition-colors cursor-pointer font-medium"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -458,7 +435,7 @@ export const BookingConfirmationPage: React.FC<BookingConfirmationPageProps> = (
           <div className="mt-10 pt-6 border-t border-[#E8DFD5] text-center space-y-3">
             <button
               type="button"
-              onClick={onBackToHome}
+              onClick={handleBackToHome}
               className="inline-flex items-center justify-center gap-2 bg-[#282524] hover:bg-[#3D3835] text-[#FAF8F5] px-6 py-3 rounded-full text-xs font-sans font-medium transition-colors cursor-pointer shadow-xs"
             >
               <ArrowLeft className="w-4 h-4" />
