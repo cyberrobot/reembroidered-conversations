@@ -194,6 +194,21 @@ test('configuration validation rejects invalid business rules', () => {
   }
 });
 
+test('timezone validation never falls back to the machine timezone', () => {
+  for (const timezone of [undefined, null, '', 0, false, {}, []]) {
+    assert.throws(
+      () => validateProviderAvailabilityConfig(config({ timezone })),
+      { name: 'TypeError', message: 'timezone must be a non-empty IANA timezone identifier.' },
+    );
+  }
+
+  assert.throws(
+    () => validateProviderAvailabilityConfig(config({ timezone: 'Not/A_Timezone' })),
+    { name: 'RangeError', message: 'Invalid IANA timezone: Not/A_Timezone' },
+  );
+  assert.doesNotThrow(() => validateProviderAvailabilityConfig(config({ timezone: 'Europe/London' })));
+});
+
 test('independent notice, horizon, hours, and days-off edits remain valid', () => {
   for (const overrides of [
     { minimumNoticeMinutes: 15 },

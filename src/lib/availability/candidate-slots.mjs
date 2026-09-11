@@ -58,6 +58,10 @@ function requireWholeMinutes(value, name, positive = false) {
  * @param {import('./provider-config.mjs').ProviderAvailabilityConfig} config
  */
 export function validateProviderAvailabilityConfig(config) {
+  if (typeof config.timezone !== 'string' || config.timezone.length === 0) {
+    throw new TypeError('timezone must be a non-empty IANA timezone identifier.');
+  }
+
   try {
     new Intl.DateTimeFormat('en-GB', { timeZone: config.timezone }).format();
   } catch {
