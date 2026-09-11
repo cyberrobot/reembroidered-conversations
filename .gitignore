@@ -8,5 +8,6 @@ test-results/
 .DS_Store
 *.log
 *.tsbuildinfo
+src/generated/prisma/
 .env*
 !.env.example
