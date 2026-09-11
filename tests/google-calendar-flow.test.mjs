@@ -4,7 +4,12 @@ import test from 'node:test';
 import { completeGoogleOAuth } from '../src/lib/google-calendar/flow.mjs';
 import { discoverPrimaryCalendar } from '../src/lib/google-calendar/google-api.mjs';
 
-const input = { code: 'code', codeVerifier: 'verifier', adminEmail: 'admin@example.com' };
+const input = {
+  code: 'code',
+  codeVerifier: 'verifier',
+  adminEmail: 'admin@example.com',
+  state: 'oauth-state',
+};
 
 function successfulDependencies(overrides = {}) {
   return {

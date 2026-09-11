@@ -14,7 +14,7 @@ export async function completeGoogleOAuth(input, dependencies) {
     const claims = await dependencies.verifyIdentity(tokens.idToken);
     const identity = authorizeAdminIdentity(claims, input.adminEmail);
     const calendar = await dependencies.discoverCalendar(tokens.accessToken);
-    const encryptedRefreshToken = dependencies.encryptToken(tokens.refreshToken);
+    const encryptedRefreshToken = dependencies.encryptToken(tokens.refreshToken, input.state);
     await dependencies.persistConnection({
       googleSubject: identity.subject,
       googleEmail: identity.email,

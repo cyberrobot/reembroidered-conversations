@@ -31,7 +31,7 @@ test(
       const migrationCount = await admin.query(
         `SELECT COUNT(*)::int AS count FROM "${schema}"."_prisma_migrations" WHERE finished_at IS NOT NULL`,
       );
-      assert.equal(migrationCount.rows[0].count, 3);
+      assert.equal(migrationCount.rows[0].count, 2);
 
       const columns = await admin.query(
         `SELECT column_name, is_nullable
@@ -91,25 +91,6 @@ test(
       );
       assert.equal(bookingConstraint.rowCount, 1);
 
-      const replayTable = await admin.query(
-        `SELECT to_regclass($1) AS table_name`,
-        [`${schema}.google_oauth_state_consumptions`],
-      );
-      assert.ok(replayTable.rows[0].table_name);
-      const stateHash = 'a'.repeat(64);
-      await admin.query(
-        `INSERT INTO "${schema}"."google_oauth_state_consumptions"
-          ("stateHash", "expiresAt") VALUES ($1, CURRENT_TIMESTAMP + INTERVAL '10 minutes')`,
-        [stateHash],
-      );
-      await assert.rejects(
-        () => admin.query(
-          `INSERT INTO "${schema}"."google_oauth_state_consumptions"
-            ("stateHash", "expiresAt") VALUES ($1, CURRENT_TIMESTAMP + INTERVAL '10 minutes')`,
-          [stateHash],
-        ),
-        (error) => error.constraint === 'google_oauth_state_consumptions_pkey',
-      );
     } finally {
       await admin.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
       await admin.end();

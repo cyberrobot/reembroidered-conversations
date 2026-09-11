@@ -6,7 +6,7 @@ import {
   issueAdminSession,
 } from '../../../../../lib/admin/session.ts';
 import {
-  consumeGoogleOAuthState,
+  isGoogleOAuthStateConsumed,
   saveGoogleCalendarConnection,
 } from '../../../../../lib/google-calendar/connection.ts';
 import {
@@ -82,11 +82,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const consumed = await consumeGoogleOAuthState(
-      transaction.state,
-      transaction.expiresAt,
-    );
-    if (!consumed) {
+    if (await isGoogleOAuthStateConsumed(transaction.state)) {
       return resultResponse(config.redirectUri, undefined, 'authorization_expired');
     }
   } catch {
@@ -115,6 +111,7 @@ export async function GET(request: NextRequest) {
         code,
         codeVerifier,
         adminEmail: config.adminEmail,
+        state: transaction.state,
       },
       {
         exchangeCode: () =>

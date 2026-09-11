@@ -69,7 +69,7 @@ export async function verifyGoogleIdentityToken(
     !validAudience ||
     !validAuthorizedParty ||
     !Number.isFinite(claims.exp) ||
-    claims.exp < Math.floor(now / 1000)
+    claims.exp <= Math.floor(now / 1000)
   ) {
     throw new Error('Invalid Google identity token.');
   }

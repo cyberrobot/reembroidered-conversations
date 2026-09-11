@@ -4,8 +4,11 @@ import { mock, test } from 'node:test';
 
 import { NextRequest } from 'next/server.js';
 
-import { decryptRefreshToken } from '../src/lib/google-calendar/token-encryption.mjs';
-import { encryptRefreshToken } from '../src/lib/google-calendar/token-encryption.mjs';
+import {
+  decryptRefreshToken,
+  encryptRefreshToken,
+  encryptedRefreshTokenContainsOAuthState,
+} from '../src/lib/google-calendar/token-encryption.mjs';
 import {
   createCodeVerifier,
   createOAuthStateEnvelope,
@@ -23,24 +26,30 @@ const encryptionModule = new URL(
 ).href;
 
 let consumedStates = new Set();
-let consumeCalls = 0;
+let pendingStates = new Set();
+let replayChecks = 0;
 let persistedConnection = null;
 let persistenceError = null;
 let eventOrder = [];
 
 await mock.module(connectionModule, {
   exports: {
-    consumeGoogleOAuthState: async (state) => {
-      consumeCalls += 1;
-      if (consumedStates.has(state)) return false;
-      consumedStates.add(state);
-      eventOrder.push('state-consumed');
-      return true;
+    isGoogleOAuthStateConsumed: async (state) => {
+      replayChecks += 1;
+      eventOrder.push('replay-checked');
+      return consumedStates.has(state);
     },
     saveGoogleCalendarConnection: async (connection) => {
       eventOrder.push('persistence-started');
       if (persistenceError) throw persistenceError;
       persistedConnection = connection;
+      for (const state of pendingStates) {
+        if (encryptedRefreshTokenContainsOAuthState(
+          connection.refreshTokenEncrypted,
+          process.env.GOOGLE_TOKEN_ENCRYPTION_KEY,
+          state,
+        )) consumedStates.add(state);
+      }
       eventOrder.push('persistence-complete');
       return connection;
     },
@@ -83,8 +92,14 @@ await mock.module(sessionModule, {
 
 await mock.module(encryptionModule, {
   exports: {
-    encryptRefreshToken: (token) =>
-      encryptRefreshToken(token, process.env.GOOGLE_TOKEN_ENCRYPTION_KEY),
+    encryptRefreshToken: (token, state) => {
+      pendingStates.add(state);
+      return encryptRefreshToken(
+        token,
+        process.env.GOOGLE_TOKEN_ENCRYPTION_KEY,
+        state,
+      );
+    },
   },
 });
 
@@ -122,7 +137,8 @@ function createIdentityToken(email = 'admin@example.com', overrides = {}) {
 
 function resetRouteState() {
   consumedStates = new Set();
-  consumeCalls = 0;
+  pendingStates = new Set();
+  replayChecks = 0;
   persistedConnection = null;
   persistenceError = null;
   eventOrder = [];
@@ -239,7 +255,7 @@ test('connect route emits the exact secure authorization request without persist
   assert.match(setCookies, /rec_google_oauth_pkce=.*HttpOnly/i);
   assert.match(setCookies, /Max-Age=600/i);
   assert.match(setCookies, /Secure/i);
-  assert.equal(consumeCalls, 0);
+  assert.equal(replayChecks, 0);
   assert.equal(persistedConnection, null);
 
   const developmentResponse = await connectRoute();
@@ -255,8 +271,8 @@ test('callback route completes the real orchestration and rejects replay before 
   assert.equal(calls.filter(({ url }) => url.toString() === 'https://oauth2.googleapis.com/token').length, 1);
   const tokenBody = calls.find(({ url }) => url.toString() === 'https://oauth2.googleapis.com/token').init.body;
   assert.equal(tokenBody.get('code_verifier'), transaction.pkceCookie);
-  assert.equal(consumeCalls, 1);
-  assert.equal(eventOrder.indexOf('state-consumed') < eventOrder.indexOf('persistence-started'), true);
+  assert.equal(replayChecks, 1);
+  assert.equal(eventOrder.indexOf('replay-checked') < eventOrder.indexOf('persistence-started'), true);
   assert.equal(persistedConnection.googleSubject, 'route-test-google-subject');
   assert.equal(persistedConnection.googleEmail, 'admin@example.com');
   assert.equal(persistedConnection.calendarId, 'primary@example.com');
@@ -300,7 +316,8 @@ test('callback route rejects invalid transaction inputs before token exchange', 
     assertSanitizedFailure(response, 'authorization_expired');
     assert.equal(calls.length, 0, scenario);
     assert.equal(persistedConnection, null, scenario);
-    if (scenario === 'missing-pkce' || scenario === 'invalid-pkce') assert.equal(consumeCalls, 1);
+    if (scenario === 'missing-pkce' || scenario === 'invalid-pkce') assert.equal(replayChecks, 1);
+    assert.equal(consumedStates.size, 0, scenario);
   }
 });
 
@@ -328,7 +345,8 @@ test('callback route sanitizes every specified provider, identity, calendar, cry
     const response = await callbackRoute(callbackRequest(transaction, setup.query));
     assertSanitizedFailure(response, expectedCode);
     assert.equal(persistedConnection, existing, name);
-    assert.equal(consumeCalls, 1, name);
+    assert.equal(replayChecks, 1, name);
+    assert.equal(consumedStates.size, 0, name);
     if (name === 'access denied' || name === 'missing code') assert.equal(calls.length, 0, name);
   }
 });

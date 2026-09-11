@@ -57,8 +57,10 @@ test('Google identity token validation verifies signature, issuer, audience, and
 
   const claims = await verifyGoogleIdentityToken(createToken(), 'client-id', mockFetch, now);
   assert.equal(claims.sub, 'subject');
+  assert.equal(claims.exp > Math.floor(now / 1000), true);
   await assert.rejects(() => verifyGoogleIdentityToken(createToken({ iss: 'https://attacker.invalid' }), 'client-id', mockFetch, now));
   await assert.rejects(() => verifyGoogleIdentityToken(createToken({ aud: 'other-client' }), 'client-id', mockFetch, now));
+  await assert.rejects(() => verifyGoogleIdentityToken(createToken({ exp: Math.floor(now / 1000) }), 'client-id', mockFetch, now));
   await assert.rejects(() => verifyGoogleIdentityToken(createToken({ exp: Math.floor(now / 1000) - 1 }), 'client-id', mockFetch, now));
 
   const otherKeys = generateKeyPairSync('rsa', { modulusLength: 2048 });

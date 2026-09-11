@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   decryptRefreshToken,
   encryptRefreshToken,
+  encryptedRefreshTokenContainsOAuthState,
   parseEncryptionKey,
 } from '../src/lib/google-calendar/token-encryption.mjs';
 
@@ -18,6 +19,18 @@ test('refresh-token encryption round trips with randomized authenticated ciphert
   assert.equal(first.includes(plaintext), false);
   assert.equal(decryptRefreshToken(first, key), plaintext);
   assert.equal(decryptRefreshToken(second, key), plaintext);
+});
+
+test('encrypted credential binds a successful OAuth state without exposing it', () => {
+  const state = 'state-that-must-not-remain-in-plaintext';
+  const encrypted = encryptRefreshToken('fixture-token', key, state);
+  assert.equal(encrypted.includes(state), false);
+  assert.equal(decryptRefreshToken(encrypted, key), 'fixture-token');
+  assert.equal(encryptedRefreshTokenContainsOAuthState(encrypted, key, state), true);
+  assert.equal(
+    encryptedRefreshTokenContainsOAuthState(encrypted, key, 'different-state'),
+    false,
+  );
 });
 
 test('refresh-token decryption fails closed for wrong keys, tampering, and malformed values', () => {
