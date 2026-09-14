@@ -33,7 +33,7 @@ let persistenceError = null;
 let eventOrder = [];
 
 await mock.module(connectionModule, {
-  exports: {
+  namedExports: {
     isGoogleOAuthStateConsumed: async (state) => {
       replayChecks += 1;
       eventOrder.push('replay-checked');
@@ -57,7 +57,7 @@ await mock.module(connectionModule, {
 });
 
 await mock.module(configModule, {
-  exports: {
+  namedExports: {
     getAdminSessionSecret: () => process.env.ADMIN_SESSION_SECRET,
     getGoogleOAuthConfig: () => ({
       clientId: process.env.GOOGLE_OAUTH_CLIENT_ID,
@@ -75,7 +75,7 @@ await mock.module(configModule, {
 });
 
 await mock.module(sessionModule, {
-  exports: {
+  namedExports: {
     ADMIN_SESSION_COOKIE: 'rec_admin_session',
     adminSessionCookieOptions: () => ({
       httpOnly: true,
@@ -92,7 +92,7 @@ await mock.module(sessionModule, {
 });
 
 await mock.module(encryptionModule, {
-  exports: {
+  namedExports: {
     encryptRefreshToken: (token, state) => {
       pendingStates.add(state);
       return encryptRefreshToken(
