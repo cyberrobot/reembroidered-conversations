@@ -25,11 +25,11 @@ export const FullCalendarModal: React.FC<FullCalendarModalProps> = ({
   const [viewDate, setViewDate] = useState<Date>(() => {
     if (selectedDate) {
       const parts = selectedDate.split('-').map(Number);
-      return new Date(parts[0], parts[1] - 1, 1);
+      return new Date(Date.UTC(parts[0], parts[1] - 1, 1));
     }
     if (availableDays.length > 0) {
       const parts = availableDays[0].date.split('-').map(Number);
-      return new Date(parts[0], parts[1] - 1, 1);
+      return new Date(Date.UTC(parts[0], parts[1] - 1, 1));
     }
     return new Date();
   });
@@ -40,31 +40,31 @@ export const FullCalendarModal: React.FC<FullCalendarModalProps> = ({
   ];
   const dayHeaders = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-  const year = viewDate.getFullYear();
-  const month = viewDate.getMonth();
+  const year = viewDate.getUTCFullYear();
+  const month = viewDate.getUTCMonth();
 
   // Find min and max dates in availableDays to disable prev/next if out of range
   const minDate = availableDays.length > 0 ? new Date(availableDays[0].date) : new Date();
   const maxDate = availableDays.length > 0 ? new Date(availableDays[availableDays.length - 1].date) : new Date();
 
-  const isPrevDisabled = (year < minDate.getFullYear()) ||
-    (year === minDate.getFullYear() && month <= minDate.getMonth());
-  const isNextDisabled = (year > maxDate.getFullYear()) ||
-    (year === maxDate.getFullYear() && month >= maxDate.getMonth());
+  const isPrevDisabled = (year < minDate.getUTCFullYear()) ||
+    (year === minDate.getUTCFullYear() && month <= minDate.getUTCMonth());
+  const isNextDisabled = (year > maxDate.getUTCFullYear()) ||
+    (year === maxDate.getUTCFullYear() && month >= maxDate.getUTCMonth());
 
   const handlePrevMonth = () => {
     if (isPrevDisabled) return;
-    setViewDate(new Date(year, month - 1, 1));
+    setViewDate(new Date(Date.UTC(year, month - 1, 1)));
   };
 
   const handleNextMonth = () => {
     if (isNextDisabled) return;
-    setViewDate(new Date(year, month + 1, 1));
+    setViewDate(new Date(Date.UTC(year, month + 1, 1)));
   };
 
   // Calendar cells generation
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const firstDayIndex = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const firstDayIndex = new Date(Date.UTC(year, month, 1)).getUTCDay();
   // Adjust so Monday is 0, Sunday is 6
   const startingDayOffset = (firstDayIndex + 6) % 7;
 
@@ -119,7 +119,7 @@ export const FullCalendarModal: React.FC<FullCalendarModalProps> = ({
               Select a specific date
             </h3>
             <p className="text-xs text-[#78716C] font-sans font-light mt-0.5">
-              Available Tuesdays to Saturdays across the upcoming 8 weeks.
+              Dates shown here have at least one currently available time.
             </p>
           </div>
           <button

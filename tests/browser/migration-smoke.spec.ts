@@ -42,16 +42,51 @@ function firstExpectedAvailabilityDate(now = new Date()) {
   const date = new Date(`${values.year}-${values.month}-${values.day}T12:00:00Z`);
 
   date.setUTCDate(date.getUTCDate() + 1);
-  while (date.getUTCDay() === 0 || date.getUTCDay() === 1) {
+  while (date.getUTCDay() === 0 || date.getUTCDay() === 6) {
     date.setUTCDate(date.getUTCDate() + 1);
   }
 
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const formattedDate = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/London', day: 'numeric', month: 'short',
+  }).format(date);
   return {
     weekday: dayNames[date.getUTCDay()],
-    date: `${date.getUTCDate()} ${monthNames[date.getUTCMonth()]}`,
+    date: formattedDate,
   };
+}
+
+function availabilityFixture(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(now);
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  const date = new Date(`${values.year}-${values.month}-${values.day}T12:00:00Z`);
+  const days = [];
+  while (days.length < 36) {
+    date.setUTCDate(date.getUTCDate() + 1);
+    if (date.getUTCDay() === 0 || date.getUTCDay() === 6) continue;
+    const day = date.toISOString().slice(0, 10);
+    days.push({
+      date: day,
+      slots: [9, 9.9166667, 13, 13.9166667, 14.8333333, 16].map((hour) => {
+        const minutes = Math.round(hour * 60);
+        const start = new Date(`${day}T00:00:00.000Z`);
+        start.setUTCMinutes(minutes);
+        const end = new Date(start.getTime() + 55 * 60_000);
+        return { startAt: start.toISOString(), endAt: end.toISOString() };
+      }),
+    });
+  }
+  return { timezone: 'Europe/London', days };
+}
+
+async function mockAvailability(page: Page, body: unknown = availabilityFixture(), status = 200) {
+  await page.route('**/api/availability?**', (route) => route.fulfill({
+    status,
+    contentType: 'application/json',
+    body: JSON.stringify(body),
+  }));
 }
 
 async function attachScreenshot(page: Page, testInfo: TestInfo, name: string) {
@@ -94,6 +129,7 @@ test('production routes and root confirmation entries remain compatible', async 
 test('homepage, navigation, Mux fallback, and transcript work without browser errors', async ({ page, request }) => {
   const failures = collectBrowserFailures(page);
   await page.setViewportSize({ width: 1280, height: 720 });
+  await mockAvailability(page);
   await openHomeWithMuxFallback(page);
 
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Sometimes, you just need someone to listen.');
@@ -139,6 +175,7 @@ test('homepage, navigation, Mux fallback, and transcript work without browser er
 test('mobile navigation opens, closes, and navigates', async ({ page }) => {
   const failures = collectBrowserFailures(page);
   await page.setViewportSize({ width: 390, height: 844 });
+  await mockAvailability(page);
   await openHomeWithMuxFallback(page);
 
   const toggle = page.locator('#mobile-nav-toggle');
@@ -159,6 +196,7 @@ test('mobile navigation opens, closes, and navigates', async ({ page }) => {
 test('booking prototype preserves availability, validation, calendar, and confirmation flow', async ({ page }, testInfo) => {
   const failures = collectBrowserFailures(page);
   await page.setViewportSize({ width: 1280, height: 720 });
+  await mockAvailability(page);
   await openHomeWithMuxFallback(page);
   await page.locator('#book-session').scrollIntoViewIfNeeded();
 
@@ -170,7 +208,7 @@ test('booking prototype preserves availability, validation, calendar, and confir
   const dayPrefixes = await dateCards.evaluateAll((buttons) =>
     buttons.map((button) => (button.textContent || '').trim().slice(0, 3)),
   );
-  expect(new Set(dayPrefixes)).toEqual(new Set(['Tue', 'Wed', 'Thu', 'Fri', 'Sat']));
+  expect(new Set(dayPrefixes)).toEqual(new Set(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']));
 
   await dateCards.nth(1).click();
   await expect(dateCards.nth(1)).toHaveClass(/bg-\[#A35048\]/);
@@ -178,7 +216,7 @@ test('booking prototype preserves availability, validation, calendar, and confir
   await page.getByRole('button', { name: 'morning', exact: true }).click();
   await expect(page.getByRole('button', { name: /AM$/ })).toHaveCount(2);
   await page.getByRole('button', { name: 'afternoon', exact: true }).click();
-  await expect(page.getByRole('button', { name: /PM$/ })).toHaveCount(2);
+  await expect(page.getByRole('button', { name: /PM$/ })).toHaveCount(3);
   await page.getByRole('button', { name: 'evening', exact: true }).click();
   await expect(page.getByRole('button', { name: '5:00 PM' })).toBeVisible();
   await page.getByRole('button', { name: '5:00 PM' }).click();
@@ -231,6 +269,26 @@ test('booking prototype preserves availability, validation, calendar, and confir
   expect(failures).toEqual([]);
 });
 
+test('booking availability distinguishes loading, empty, and recoverable service errors', async ({ page }) => {
+  let releaseLoading: (() => void) | undefined;
+  await page.route('**/api/availability?**', async (route) => {
+    await new Promise<void>((resolve) => { releaseLoading = resolve; });
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ timezone: 'Europe/London', days: [] }) });
+  });
+  await page.goto('/');
+  await expect(page.getByText('Checking current availability…')).toBeVisible();
+  releaseLoading?.();
+  await expect(page.getByText('There are no available session times in the current booking window.')).toBeVisible();
+  await expect(page.locator('#confirm-booking-button')).toBeDisabled();
+
+  await page.unroute('**/api/availability?**');
+  await mockAvailability(page, { error: { code: 'availability_unavailable' } }, 503);
+  await page.reload();
+  await expect(page.getByRole('alert').filter({ hasText: 'We could not load' })).toContainText('We could not load availability just now');
+  await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
+  await expect(page.locator('#confirm-booking-button')).toBeDisabled();
+});
+
 test('confirmation parameters and prototype utilities remain usable', async ({ page, context }, testInfo) => {
   const failures = collectBrowserFailures(page);
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
@@ -263,7 +321,7 @@ test('confirmation parameters and prototype utilities remain usable', async ({ p
   await attachScreenshot(page, testInfo, 'desktop-confirmation');
 
   await page.getByRole('button', { name: /Return to Re-Embroidered$/ }).click();
-  await expect(page).toHaveURL('http://127.0.0.1:3000/');
+  await expect(page).toHaveURL('/');
   expect(failures).toEqual([]);
 });
 
@@ -277,6 +335,7 @@ test('responsive visual tokens and layouts remain intact', async ({ page }, test
   await page.route(`https://stream.mux.com/${invalidPlaybackId}.m3u8`, (route) =>
     route.fulfill({ status: 404, contentType: 'application/vnd.apple.mpegurl', body: '' }),
   );
+  await mockAvailability(page);
 
   for (const viewport of viewports) {
     await page.setViewportSize(viewport);

@@ -2,9 +2,10 @@ export type SessionFormat = 'video' | 'audio';
 
 export interface TimeSlot {
   id: string;
-  time: string; // e.g. "10:00 AM"
+  startAt: string;
+  endAt: string;
+  time: string;
   period: 'morning' | 'afternoon' | 'evening';
-  available: boolean;
 }
 
 export interface DayAvailability {
@@ -12,6 +13,14 @@ export interface DayAvailability {
   dayOfWeek: string; // "Tuesday", etc.
   formattedDate: string; // "Tuesday, 14 October"
   slots: TimeSlot[];
+}
+
+export interface AvailabilityResponse {
+  timezone: string;
+  days: Array<{
+    date: string;
+    slots: Array<{ startAt: string; endAt: string }>;
+  }>;
 }
 
 export interface BookingFormData {
