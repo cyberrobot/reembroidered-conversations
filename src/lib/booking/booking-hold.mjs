@@ -27,10 +27,31 @@ export class HoldAvailabilityError extends Error {
 /** @param {unknown} error */
 export function isActiveSlotUniqueConflict(error) {
   if (!error || typeof error !== 'object') return false;
-  const candidate = /** @type {{ code?: unknown, meta?: unknown, cause?: unknown }} */ (error);
-  if (candidate.code === 'P2002') return true;
-  if (candidate.code === '23505') return true;
-  return isActiveSlotUniqueConflict(candidate.meta) || isActiveSlotUniqueConflict(candidate.cause);
+  const candidate = /** @type {{ code?: unknown, originalCode?: unknown, constraint?: unknown, meta?: unknown, cause?: unknown, driverAdapterError?: unknown }} */ (error);
+  const constraint = typeof candidate.constraint === 'string'
+    ? candidate.constraint
+    : candidate.constraint && typeof candidate.constraint === 'object' &&
+        'index' in candidate.constraint && typeof candidate.constraint.index === 'string'
+      ? candidate.constraint.index
+      : null;
+  const isUniqueViolation = candidate.code === 'P2002' || candidate.code === '23505' || candidate.originalCode === '23505';
+  if (isUniqueViolation && constraint === 'bookings_active_start_at_key') return true;
+
+  if (candidate.code === 'P2002') {
+    return hasActiveSlotConstraint(candidate.meta);
+  }
+  return false;
+}
+
+/** @param {unknown} value */
+function hasActiveSlotConstraint(value) {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = /** @type {{ constraint?: unknown, target?: unknown, cause?: unknown, driverAdapterError?: unknown }} */ (value);
+  if (candidate.target === 'bookings_active_start_at_key') return true;
+  if (candidate.constraint === 'bookings_active_start_at_key') return true;
+  if (candidate.constraint && typeof candidate.constraint === 'object' &&
+      'index' in candidate.constraint && candidate.constraint.index === 'bookings_active_start_at_key') return true;
+  return hasActiveSlotConstraint(candidate.driverAdapterError) || hasActiveSlotConstraint(candidate.cause);
 }
 
 /** @param {{ $transaction: (callback: (transaction: any) => Promise<any>) => Promise<any> }} database */

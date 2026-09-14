@@ -5,6 +5,7 @@ const testPort = process.env.PLAYWRIGHT_PORT ?? '3000';
 
 export default defineConfig({
   testDir: './tests/browser',
+  snapshotPathTemplate: '{testDir}/{testFilePath}-snapshots/{arg}{ext}',
   fullyParallel: false,
   workers: 1,
   timeout: 30_000,

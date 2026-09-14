@@ -53,11 +53,17 @@ jobs:
       - name: Apply database migrations
         run: npm run db:migrate:deploy
 
+      - name: Validate Prisma schema
+        run: npm run db:validate
+
       - name: Run Node tests
         run: npm test
 
       - name: Run type checking
         run: npm run lint
+
+      - name: Build production application
+        run: npm run build
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium

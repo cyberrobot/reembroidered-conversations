@@ -281,6 +281,37 @@ test('booking flow preserves availability and creates an honest temporary hold',
   expect(failures).toEqual([]);
 });
 
+test('temporary hold card has deterministic visual regression coverage', async ({ page }) => {
+  const startAt = '2099-01-02T10:00:00.000Z';
+  const endAt = '2099-01-02T10:55:00.000Z';
+  const expiresAt = '2099-01-01T12:15:00.000Z';
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await mockAvailability(page, {
+    timezone: 'Europe/London',
+    days: [{ date: '2099-01-02', slots: [{ startAt, endAt }] }],
+  });
+  await page.route('**/api/bookings/hold', (route) => route.fulfill({
+    status: 201,
+    contentType: 'application/json',
+    body: JSON.stringify({ hold: {
+      id: '5a449655-7be3-432c-a124-b769e10b50ef', startAt, endAt,
+      timezone: 'Europe/London', expiresAt,
+    } }),
+  }));
+  await page.goto('/');
+  await page.locator('#client-name').fill('Visual Test');
+  await page.locator('#client-email').fill('visual@example.com');
+  await page.locator('#boundaries-checkbox').check();
+  await page.locator('#confirm-booking-button').click();
+
+  const holdCard = page.getByText('Your selected time is temporarily held.').locator('..').locator('..').locator('..');
+  await expect(holdCard).toBeVisible();
+  await expect(holdCard).toHaveScreenshot('temporary-hold-card.png', {
+    animations: 'disabled',
+    maxDiffPixelRatio: 0.02,
+  });
+});
+
 test('lost-slot and temporary hold failures preserve form state and allow recovery', async ({ page }) => {
   let availabilityRequests = 0;
   await page.route('**/api/availability*', (route) => {

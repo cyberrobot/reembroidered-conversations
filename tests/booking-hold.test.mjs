@@ -81,12 +81,35 @@ test('availability failures are distinguished and prevent persistence', async ()
   assert.equal(persisted, false);
 });
 
-test('database uniqueness races become slot conflicts', async () => {
-  for (const error of [{ code: 'P2002', meta: { target: 'bookings_active_start_at_key' } }, { cause: { code: '23505' } }]) {
+test('only the active-slot constraint becomes a slot conflict', async () => {
+  const slotErrors = [
+    { code: 'P2002', meta: { target: 'bookings_active_start_at_key' } },
+    { code: 'P2002', meta: { driverAdapterError: { cause: {
+      originalCode: '23505', constraint: { index: 'bookings_active_start_at_key' },
+    } } } },
+    { code: '23505', constraint: 'bookings_active_start_at_key' },
+  ];
+  for (const error of slotErrors) {
     await assert.rejects(() => createBookingHold(
       { name: 'Sarah', email: 'a@example.com', startAt }, now,
       dependencies({ persist: async () => { throw error; } }),
     ), SlotUnavailableError);
+  }
+
+  for (const error of [
+    { code: 'P2002', meta: { target: 'bookings_calendar_event_id_key' } },
+    { code: 'P2002', meta: { driverAdapterError: { cause: {
+      originalCode: '23505', constraint: { index: 'some_other_unique_constraint' },
+    } } } },
+    { code: '23505', constraint: 'some_other_unique_constraint' },
+  ]) {
+    await assert.rejects(
+      () => createBookingHold(
+        { name: 'Sarah', email: 'a@example.com', startAt }, now,
+        dependencies({ persist: async () => { throw error; } }),
+      ),
+      (thrown) => thrown === error,
+    );
   }
 });
 
