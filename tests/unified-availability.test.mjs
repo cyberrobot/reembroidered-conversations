@@ -52,6 +52,23 @@ test('Google overlap removes occupancy but a boundary-touching period does not',
   ), false);
 });
 
+test('full-day Google busy period removes every slot for that provider-local date', async () => {
+  const deps = await realDependencies({
+    getCalendarBusyPeriods: async () => [{
+      startAt: '2026-09-06T23:00:00.000Z',
+      endAt: '2026-09-07T23:00:00.000Z',
+    }],
+  });
+
+  const result = await getAvailableSlots({
+    fromDate: '2026-09-07',
+    toDate: '2026-09-07',
+    now,
+  }, deps);
+
+  assert.deepEqual(result, []);
+});
+
 test('CONFIRMED, PAID, and active HOLD block while expired or released bookings do not', async () => {
   const cases = [
     ['CONFIRMED', new Date('2026-09-01T00:00:00Z'), true],

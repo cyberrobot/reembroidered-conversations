@@ -23,6 +23,18 @@ export interface AvailabilityResponse {
   }>;
 }
 
+export interface BookingHold {
+  id: string;
+  startAt: string;
+  endAt: string;
+  timezone: string;
+  expiresAt: string;
+}
+
+export interface BookingHoldResponse {
+  hold: BookingHold;
+}
+
 export interface BookingFormData {
   date: string;
   time: string;

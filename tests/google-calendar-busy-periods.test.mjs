@@ -192,6 +192,29 @@ test('FreeBusy sends one persisted calendar and maps normalized, sorted periods'
   ]);
 });
 
+test('FreeBusy accepts and normalizes a full London BST day busy interval', async () => {
+  const result = await queryGoogleFreeBusy({
+    accessToken: 'temporary-access-token',
+    calendarId: 'primary@example.com',
+    from: new Date('2026-09-06T23:00:00.000Z'),
+    to: new Date('2026-09-07T23:00:00.000Z'),
+  }, async () => Response.json({
+    calendars: {
+      'primary@example.com': {
+        busy: [{
+          start: '2026-09-06T23:00:00Z',
+          end: '2026-09-07T23:00:00Z',
+        }],
+      },
+    },
+  }));
+
+  assert.deepEqual(result, [{
+    startAt: '2026-09-06T23:00:00.000Z',
+    endAt: '2026-09-07T23:00:00.000Z',
+  }]);
+});
+
 test('FreeBusy returns an empty array only for a valid empty calendar result', async () => {
   const result = await queryGoogleFreeBusy({
     accessToken: 'token', calendarId: 'primary@example.com', from, to,

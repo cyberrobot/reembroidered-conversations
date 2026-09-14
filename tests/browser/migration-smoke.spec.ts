@@ -192,10 +192,22 @@ test('mobile navigation opens, closes, and navigates', async ({ page }) => {
   expect(failures).toEqual([]);
 });
 
-test('booking prototype preserves availability, validation, calendar, and confirmation flow', async ({ page }, testInfo) => {
+test('booking flow preserves availability and creates an honest temporary hold', async ({ page }, testInfo) => {
   const failures = collectBrowserFailures(page);
   await page.setViewportSize({ width: 1280, height: 720 });
   await mockAvailability(page);
+  let releaseHold: (() => void) | undefined;
+  let submittedHold: Record<string, unknown> | undefined;
+  await page.route('**/api/bookings/hold', async (route) => {
+    submittedHold = route.request().postDataJSON();
+    await new Promise<void>((resolve) => { releaseHold = resolve; });
+    await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ hold: {
+      id: '5a449655-7be3-432c-a124-b769e10b50ef',
+      startAt: submittedHold!.startAt,
+      endAt: new Date(Date.parse(String(submittedHold!.startAt)) + 55 * 60_000).toISOString(),
+      timezone: 'Europe/London', expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+    } }) });
+  });
   await openHomeWithMuxFallback(page);
   await page.locator('#book-session').scrollIntoViewIfNeeded();
 
@@ -256,16 +268,113 @@ test('booking prototype preserves availability, validation, calendar, and confir
   await expect(page.getByText(/Please confirm that you understand/)).toBeVisible();
   await page.locator('#boundaries-checkbox').check();
   await page.locator('#confirm-booking-button').click();
-
-  await expect(page).toHaveURL(/\/confirmation\?/);
-  const confirmationUrl = new URL(page.url());
-  expect(confirmationUrl.searchParams.get('name')).toBe('Browser Smoke');
-  expect(confirmationUrl.searchParams.get('email')).toBe('browser.smoke@example.com');
-  expect(confirmationUrl.searchParams.get('time')).toBe('5:00 PM');
-  expect(confirmationUrl.searchParams.get('format')).toBe('audio');
-  expect(confirmationUrl.searchParams.get('timezone')).toBe('Europe/London (GMT/BST)');
-  expect(confirmationUrl.searchParams.get('booking_id')).toMatch(/^RC-\d{5}$/);
+  await expect(page.locator('#confirm-booking-button')).toBeDisabled();
+  await expect(page.locator('#confirm-booking-button')).toHaveText('Reserving your time…');
+  expect(submittedHold).toEqual({
+    name: 'Browser Smoke', email: 'browser.smoke@example.com', startAt: expect.any(String),
+  });
+  releaseHold?.();
+  await expect(page.getByText('Your selected time is temporarily held.')).toBeVisible();
+  await expect(page.getByText('This is not yet paid or confirmed.')).toBeVisible();
+  await expect(page.getByText(/Held until/)).toBeVisible();
+  expect(page.url()).not.toContain('/confirmation');
   expect(failures).toEqual([]);
+});
+
+test('temporary hold card has deterministic visual regression coverage', async ({ page }) => {
+  const now = new Date('2099-01-01T12:00:00.000Z');
+  const startAt = '2099-01-02T10:00:00.000Z';
+  const endAt = '2099-01-02T10:55:00.000Z';
+  const expiresAt = '2099-01-01T12:15:00.000Z';
+  expect(Date.parse(expiresAt) - now.getTime()).toBe(15 * 60_000);
+  await page.clock.install({ time: now });
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await mockAvailability(page, {
+    timezone: 'Europe/London',
+    days: [{ date: '2099-01-02', slots: [{ startAt, endAt }] }],
+  });
+  await page.route('**/api/bookings/hold', (route) => route.fulfill({
+    status: 201,
+    contentType: 'application/json',
+    body: JSON.stringify({ hold: {
+      id: '5a449655-7be3-432c-a124-b769e10b50ef', startAt, endAt,
+      timezone: 'Europe/London', expiresAt,
+    } }),
+  }));
+  await page.goto('/');
+  await page.locator('#client-name').fill('Visual Test');
+  await page.locator('#client-email').fill('visual@example.com');
+  await page.locator('#boundaries-checkbox').check();
+  await page.locator('#confirm-booking-button').click();
+
+  const holdCard = page.getByText('Your selected time is temporarily held.').locator('..').locator('..').locator('..');
+  await expect(holdCard).toBeVisible();
+  await expect(holdCard).toHaveScreenshot('temporary-hold-card.png', {
+    animations: 'disabled',
+    maxDiffPixelRatio: 0.02,
+  });
+});
+
+test('lost-slot and temporary hold failures preserve form state and allow recovery', async ({ page }) => {
+  let availabilityRequests = 0;
+  await page.route('**/api/availability*', (route) => {
+    availabilityRequests += 1;
+    const fixture = availabilityFixture();
+    if (availabilityRequests > 1) fixture.days[0].slots.shift();
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(fixture) });
+  });
+  let holdRequests = 0;
+  await page.route('**/api/bookings/hold', (route) => {
+    holdRequests += 1;
+    return route.fulfill({
+      status: holdRequests === 1 ? 409 : 503,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: { code: holdRequests === 1 ? 'slot_unavailable' : 'hold_unavailable' } }),
+    });
+  });
+  await page.goto('/');
+  await page.locator('#book-session').scrollIntoViewIfNeeded();
+  await page.locator('#client-name').fill('Preserved Name');
+  await page.locator('#client-email').fill('preserved@example.com');
+  await page.locator('#boundaries-checkbox').check();
+  await page.locator('#confirm-booking-button').click();
+  await expect(page.getByRole('alert').filter({ hasText: 'just become unavailable' })).toBeVisible();
+  await expect.poll(() => availabilityRequests).toBeGreaterThan(1);
+  await expect(page.locator('#client-name')).toHaveValue('Preserved Name');
+  await expect(page.locator('#client-email')).toHaveValue('preserved@example.com');
+  await expect(page.locator('#confirm-booking-button')).toBeDisabled();
+
+  await page.getByRole('button', { name: /AM$/ }).first().click();
+  await page.locator('#confirm-booking-button').click();
+  await expect(page.getByRole('alert').filter({ hasText: 'has not yet been reserved' })).toBeVisible();
+  await expect(page.locator('#client-name')).toHaveValue('Preserved Name');
+  await expect(page.locator('#confirm-booking-button')).toBeEnabled();
+  expect(page.url()).not.toContain('/confirmation');
+});
+
+test('locally expired hold clears ownership and refreshes availability', async ({ page }) => {
+  let availabilityRequests = 0;
+  await page.route('**/api/availability*', (route) => {
+    availabilityRequests += 1;
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(availabilityFixture()) });
+  });
+  await page.route('**/api/bookings/hold', (route) => {
+    const submitted = route.request().postDataJSON();
+    return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ hold: {
+      id: 'expiring-hold', startAt: submitted.startAt,
+      endAt: new Date(Date.parse(submitted.startAt) + 55 * 60_000).toISOString(),
+      timezone: 'Europe/London', expiresAt: new Date(Date.now() + 250).toISOString(),
+    } }) });
+  });
+  await page.goto('/');
+  await page.locator('#client-name').fill('Expiry Test');
+  await page.locator('#client-email').fill('expiry@example.com');
+  await page.locator('#boundaries-checkbox').check();
+  await page.locator('#confirm-booking-button').click();
+  await expect(page.getByText('Your selected time is temporarily held.')).toBeVisible();
+  await expect(page.getByRole('alert').filter({ hasText: 'temporary hold has expired' })).toBeVisible();
+  await expect.poll(() => availabilityRequests).toBeGreaterThan(1);
+  await expect(page.getByText('Your selected time is temporarily held.')).toBeHidden();
 });
 
 test('booking availability distinguishes loading, empty, and recoverable service errors', async ({ page }) => {

@@ -8,16 +8,12 @@ import {
   Video,
   Phone,
   CheckCircle,
-  Download,
-  CalendarPlus,
   ShieldCheck,
-  Coffee,
   AlertCircle,
   ChevronLeft,
   ChevronRight,
-  Sparkles,
 } from 'lucide-react';
-import { AvailabilityResponse, DayAvailability, SessionFormat, BookingConfirmation } from '../types';
+import { AvailabilityResponse, BookingHold, BookingHoldResponse, DayAvailability, SessionFormat } from '../types';
 import { FullCalendarModal } from './FullCalendarModal';
 
 function presentAvailability(response: AvailabilityResponse): DayAvailability[] {
@@ -95,6 +91,7 @@ export const BookingSection: React.FC = () => {
   // Selected date & slot state
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
   const [selectedSlot, setSelectedSlot] = useState<string>('');
+  const [requiresFreshSelection, setRequiresFreshSelection] = useState(false);
   const [periodFilter, setPeriodFilter] = useState<'all' | 'morning' | 'afternoon' | 'evening'>('all');
   const [sessionFormat, setSessionFormat] = useState<SessionFormat>('video');
 
@@ -154,9 +151,8 @@ export const BookingSection: React.FC = () => {
   const [optionalNote, setOptionalNote] = useState('');
   const [acceptedBoundaries, setAcceptedBoundaries] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-
-  // Confirmation state
-  const [confirmation, setConfirmation] = useState<BookingConfirmation | null>(null);
+  const [holdStatus, setHoldStatus] = useState<'idle' | 'creating' | 'created'>('idle');
+  const [hold, setHold] = useState<BookingHold | null>(null);
 
   const activeDay = availableDays[selectedDayIndex] || availableDays[0];
   const selectedSlotData = activeDay?.slots.find((slot) => slot.id === selectedSlot);
@@ -166,10 +162,10 @@ export const BookingSection: React.FC = () => {
       setSelectedSlot('');
       return;
     }
-    if (!activeDay.slots.some((slot) => slot.id === selectedSlot)) {
+    if (!requiresFreshSelection && !activeDay.slots.some((slot) => slot.id === selectedSlot)) {
       setSelectedSlot(activeDay.slots[0]?.id ?? '');
     }
-  }, [activeDay, selectedSlot]);
+  }, [activeDay, selectedSlot, requiresFreshSelection]);
 
   const filteredSlots = useMemo(() => {
     if (!activeDay) return [];
@@ -178,7 +174,7 @@ export const BookingSection: React.FC = () => {
   }, [activeDay, periodFilter]);
 
   // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       setErrorMsg('Please provide your name.');
@@ -198,78 +194,55 @@ export const BookingSection: React.FC = () => {
     }
 
     setErrorMsg('');
-    const bookingId = `RC-${Math.floor(10000 + Math.random() * 90000)}`;
-
-    // Create google calendar link
-    const title = encodeURIComponent('One-to-One Listening Session with Shahd Karaeen');
-    const details = encodeURIComponent(
-      `Private listening session with Shahd Karaeen (Re-Embroidered Conversations).\nFormat: ${
-        sessionFormat === 'video' ? 'Private Video (link in email)' : 'Audio-only call'
-      }\nBooking ID: ${bookingId}`
-    );
-    const googleLink = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}`;
-
-    const newConf: BookingConfirmation = {
-      bookingId,
-      createdAt: new Date().toISOString(),
-      date: activeDay.formattedDate,
-      time: selectedSlotData.time,
-      format: sessionFormat,
-      clientName: name,
-      clientEmail: email,
-      clientPhone: phone,
-      timeZone,
-      optionalNote,
-      confirmedBoundaries: true,
-      calendarLinkGoogle: googleLink,
-      calendarLinkIcs: '',
-    };
-
-    setConfirmation(newConf);
-    openConfirmation(newConf);
+    setHoldStatus('creating');
+    try {
+      const response = await fetch('/api/bookings/hold', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, startAt: selectedSlotData.startAt }),
+      });
+      const body = await response.json() as BookingHoldResponse | { error?: { code?: string } };
+      if (!response.ok) {
+        if (response.status === 409) {
+          setSelectedSlot('');
+          setRequiresFreshSelection(true);
+          setErrorMsg('That time has just become unavailable. Please choose another available time.');
+          setAvailabilityRequest((request) => request + 1);
+        } else {
+          setErrorMsg('Your time has not yet been reserved. Please try again.');
+        }
+        setHoldStatus('idle');
+        return;
+      }
+      setHold((body as BookingHoldResponse).hold);
+      setHoldStatus('created');
+    } catch {
+      setErrorMsg('Your time has not yet been reserved. Please try again.');
+      setHoldStatus('idle');
+    }
   };
 
-  const openConfirmation = (data?: BookingConfirmation) => {
+  const openConfirmation = () => {
     const query = new URLSearchParams({
       payment_success: 'true',
-      booking_id: data?.bookingId ?? 'RC-78421',
+      booking_id: 'RC-78421',
     });
-
-    if (data) {
-      query.set('name', data.clientName);
-      query.set('email', data.clientEmail);
-      query.set('date', data.date);
-      query.set('time', data.time);
-      query.set('format', data.format);
-      query.set('timezone', data.timeZone);
-    }
-
     router.push(`/confirmation?${query.toString()}`);
   };
 
-  // Generate .ics file download
-  const handleDownloadIcs = () => {
-    if (!confirmation) return;
-    const icsContent = [
-      'BEGIN:VCALENDAR',
-      'VERSION:2.0',
-      'PRODID:-//Re-Embroidered Conversations//Listening Session//EN',
-      'BEGIN:VEVENT',
-      `SUMMARY:Listening Session with Shahd Karaeen · Re-Embroidered Conversations`,
-      `DESCRIPTION:Private listening conversation with Shahd Karaeen.\\nBooking ID: ${confirmation.bookingId}\\nFormat: ${confirmation.format}`,
-      `STATUS:CONFIRMED`,
-      'END:VEVENT',
-      'END:VCALENDAR',
-    ].join('\r\n');
-
-    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `listening-session-shahd-karaeen-${confirmation.bookingId}.ics`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+  useEffect(() => {
+    if (!hold) return;
+    const delay = Math.max(0, Date.parse(hold.expiresAt) - Date.now());
+    const timer = window.setTimeout(() => {
+      setHold(null);
+      setHoldStatus('idle');
+      setSelectedSlot('');
+      setRequiresFreshSelection(true);
+      setErrorMsg('Your temporary hold has expired. Please choose an available time again.');
+      setAvailabilityRequest((request) => request + 1);
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [hold]);
 
   return (
     <section id="book-session" className="py-20 md:py-28 bg-[#FAF8F5] relative">
@@ -305,8 +278,8 @@ export const BookingSection: React.FC = () => {
           </div>
         </div>
 
-        {/* If Confirmation is Active, show Confirmation Card */}
-        {confirmation ? (
+        {/* A hold is deliberately not a payment or confirmed booking. */}
+        {holdStatus === 'created' && hold ? (
           <div className="bg-[#FDFCFB] border border-[#E8DFD5] rounded-2xl p-8 sm:p-12 shadow-md relative overflow-hidden animate-fadeIn">
             <div className="h-1.5 w-full bg-[#A35048] absolute top-0 left-0" />
 
@@ -317,102 +290,22 @@ export const BookingSection: React.FC = () => {
 
               <div>
                 <span className="text-xs uppercase tracking-widest font-sans text-[#A35048] font-medium">
-                  Your Space Is Reserved
+                  Temporary Hold Created
                 </span>
                 <h3 className="font-serif text-3xl sm:text-4xl text-[#282524] font-medium mt-1">
-                  We will see you on {confirmation.date}
+                  Your selected time is temporarily held.
                 </h3>
                 <p className="font-sans text-sm text-[#78716C] mt-2">
-                  Reference: <span className="font-mono text-[#282524]">{confirmation.bookingId}</span>
+                  Held until{' '}
+                  <time dateTime={hold.expiresAt} className="font-medium text-[#282524]">
+                    {new Intl.DateTimeFormat('en-GB', {
+                      timeZone: hold.timezone, dateStyle: 'medium', timeStyle: 'short',
+                    }).format(new Date(hold.expiresAt))}
+                  </time>
                 </p>
               </div>
-
-              {/* Session Details Box */}
-              <div className="bg-[#FAF8F5] p-5 rounded-xl border border-[#E8DFD5] text-left text-sm space-y-2.5 font-sans">
-                <div className="flex justify-between pb-2 border-b border-[#E8DFD5]">
-                  <span className="text-[#78716C]">Time:</span>
-                  <span className="font-medium text-[#282524]">
-                    {confirmation.time} ({confirmation.timeZone.split(' ')[0]}) · 55 minutes
-                  </span>
-                </div>
-                <div className="flex justify-between pb-2 border-b border-[#E8DFD5]">
-                  <span className="text-[#78716C]">Format:</span>
-                  <span className="font-medium text-[#282524] capitalize flex items-center gap-1.5">
-                    {confirmation.format === 'video' ? (
-                      <>
-                        <Video className="w-3.5 h-3.5 text-[#A35048]" /> Video Call (Link sent to email)
-                      </>
-                    ) : (
-                      <>
-                        <Phone className="w-3.5 h-3.5 text-[#A35048]" /> Audio-Only Phone Call
-                      </>
-                    )}
-                  </span>
-                </div>
-                <div className="flex justify-between pb-2 border-b border-[#E8DFD5]">
-                  <span className="text-[#78716C]">Client:</span>
-                  <span className="font-medium text-[#282524]">{confirmation.clientName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#78716C]">Confirmation sent to:</span>
-                  <span className="font-medium text-[#282524]">{confirmation.clientEmail}</span>
-                </div>
-              </div>
-
-              {/* A gentle note from Shahd Karaeen on preparation with deckled book leaf styling */}
-              <div className="relative text-left my-1">
-                <div className="absolute inset-0 translate-x-1 translate-y-1 bg-[#F1E7DD] rounded-xl border border-[#E3D5C5] -z-10" />
-                <div className="p-5 sm:p-6 rounded-xl bg-gradient-to-br from-[#FDFBF8] via-[#FAF6F1] to-[#F5EEE6] border border-[#EAE0D5] border-l-3 border-l-[#A35048] shadow-[0_4px_16px_-2px_rgba(163,80,72,0.05),0_1px_2px_rgba(40,37,36,0.04)]">
-                  <div className="flex items-center gap-2 text-xs font-serif text-[#A35048] uppercase tracking-wider mb-2">
-                    <Coffee className="w-4 h-4 text-[#A35048]" />
-                    <span>A quiet note before our conversation</span>
-                  </div>
-                  <p className="font-serif italic text-base sm:text-lg text-[#3E3A37] leading-relaxed">
-                    “When the time comes, simply find a quiet chair where you won’t be interrupted, make a cup of tea or pour a glass of water, and click the link. You don’t need notes. I am looking forward to meeting you.”
-                  </p>
-                  <span className="block text-xs font-sans text-[#78716C] mt-2.5 text-right font-medium">
-                    — Shahd Karaeen
-                  </span>
-                </div>
-              </div>
-
-              {/* Action Buttons: Calendar Sync */}
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-                <a
-                  href={confirmation.calendarLinkGoogle}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-[#FAF8F5] hover:bg-white text-[#282524] border border-[#E8DFD5] text-xs font-sans font-medium px-4 py-3 rounded-full shadow-xs cursor-pointer transition-all"
-                >
-                  <CalendarPlus className="w-4 h-4 text-[#A35048]" />
-                  <span>Add to Google Calendar</span>
-                </a>
-
-                <button
-                  onClick={handleDownloadIcs}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-[#FAF8F5] hover:bg-white text-[#282524] border border-[#E8DFD5] text-xs font-sans font-medium px-4 py-3 rounded-full shadow-xs cursor-pointer transition-all"
-                >
-                  <Download className="w-4 h-4 text-[#A35048]" />
-                  <span>Download .ics file (Apple / Outlook)</span>
-                </button>
-              </div>
-
-              {/* Reset or Open Dedicated Page */}
-              <div className="pt-4 border-t border-[#E8DFD5] flex flex-col sm:flex-row items-center justify-between gap-3">
-                <button
-                  onClick={() => setConfirmation(null)}
-                  className="text-xs text-[#78716C] hover:text-[#A35048] underline underline-offset-4 cursor-pointer"
-                >
-                  Need to book another slot or change your booking?
-                </button>
-
-                <button
-                  onClick={() => openConfirmation(confirmation)}
-                  className="inline-flex items-center gap-1 text-xs text-[#A35048] hover:text-[#8C4038] font-medium cursor-pointer"
-                >
-                  <span>Open Fullscreen Confirmation Page</span>
-                  <Sparkles className="w-3 h-3" />
-                </button>
+              <div role="status" className="bg-[#FAF8F5] p-5 rounded-xl border border-[#E8DFD5] text-sm text-[#4B4643]">
+                This is not yet paid or confirmed. Payment will be added in the next step of the booking flow.
               </div>
             </div>
           </div>
@@ -573,6 +466,7 @@ export const BookingSection: React.FC = () => {
                             setSelectedDayIndex(idx);
                             if (day.slots.length > 0) {
                               setSelectedSlot(day.slots[0].id);
+                              setRequiresFreshSelection(false);
                             }
                           }}
                           className={`shrink-0 px-4 py-3 rounded-xl border text-left cursor-pointer transition-all duration-150 min-w-[104px] ${
@@ -655,7 +549,7 @@ export const BookingSection: React.FC = () => {
                     <button
                       key={slot.id}
                       type="button"
-                      onClick={() => setSelectedSlot(slot.id)}
+                      onClick={() => { setSelectedSlot(slot.id); setRequiresFreshSelection(false); }}
                       className={`py-2.5 px-3 rounded-xl border text-sm font-sans font-medium transition-all cursor-pointer text-center ${
                         selectedSlot === slot.id
                           ? 'bg-[#282524] text-white border-[#282524] shadow-xs ring-2 ring-[#A35048]/30'
@@ -816,7 +710,7 @@ export const BookingSection: React.FC = () => {
 
               {/* Error Message */}
               {errorMsg && (
-                <div className="p-3 mb-6 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-center gap-2">
+                <div role="alert" className="p-3 mb-6 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   <span>{errorMsg}</span>
                 </div>
@@ -837,7 +731,7 @@ export const BookingSection: React.FC = () => {
                 <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
                   <button
                     type="button"
-                    onClick={() => openConfirmation()}
+                    onClick={openConfirmation}
                     className="text-xs text-[#78716C] hover:text-[#A35048] transition-colors cursor-pointer py-2 px-3 rounded-lg hover:bg-[#F5EFE9] border border-dashed border-[#C4B7A9]"
                     title="Instant test: Preview how Stripe redirects to the booking confirmation page"
                   >
@@ -846,10 +740,11 @@ export const BookingSection: React.FC = () => {
                   <button
                     id="confirm-booking-button"
                     type="submit"
-                    disabled={availabilityStatus !== 'ready' || !selectedSlotData}
+                    disabled={availabilityStatus !== 'ready' || !selectedSlotData || holdStatus === 'creating'}
+                    aria-busy={holdStatus === 'creating'}
                     className="w-full sm:w-auto bg-[#A35048] hover:bg-[#8C4038] text-[#FAF8F5] text-sm font-medium px-8 py-3.5 rounded-full transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Reserve Conversation
+                    {holdStatus === 'creating' ? 'Reserving your time…' : 'Reserve Conversation'}
                   </button>
                 </div>
               </div>
