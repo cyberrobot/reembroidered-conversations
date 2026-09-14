@@ -282,9 +282,12 @@ test('booking flow preserves availability and creates an honest temporary hold',
 });
 
 test('temporary hold card has deterministic visual regression coverage', async ({ page }) => {
+  const now = new Date('2099-01-01T12:00:00.000Z');
   const startAt = '2099-01-02T10:00:00.000Z';
   const endAt = '2099-01-02T10:55:00.000Z';
   const expiresAt = '2099-01-01T12:15:00.000Z';
+  expect(Date.parse(expiresAt) - now.getTime()).toBe(15 * 60_000);
+  await page.clock.install({ time: now });
   await page.setViewportSize({ width: 1280, height: 720 });
   await mockAvailability(page, {
     timezone: 'Europe/London',
