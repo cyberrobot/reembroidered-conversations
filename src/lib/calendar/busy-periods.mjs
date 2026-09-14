@@ -1,5 +1,7 @@
 // @ts-check
 
+import 'server-only';
+
 import { GOOGLE_FREEBUSY_SCOPE } from '../google-calendar/constants.mjs';
 import { GoogleApiError } from '../google-calendar/google-api.mjs';
 
