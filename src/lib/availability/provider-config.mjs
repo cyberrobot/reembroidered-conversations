@@ -3,7 +3,7 @@
 import { BOOKING_TIME_ZONE } from '../booking-date.mjs';
 
 /** @typedef {{ start: string, end: string }} WorkingWindow */
-/** @typedef {Record<'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday', WorkingWindow[]>} WorkingHours */
+/** @typedef {Record<'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday', readonly WorkingWindow[]>} WorkingHours */
 /**
  * @typedef {object} ProviderAvailabilityConfig
  * @property {string} timezone
@@ -13,7 +13,7 @@ import { BOOKING_TIME_ZONE } from '../booking-date.mjs';
  * @property {number} minimumNoticeMinutes
  * @property {number} maximumBookingHorizonDays
  * @property {WorkingHours} weeklyWorkingHours
- * @property {string[]} daysOff
+ * @property {readonly string[]} daysOff
  */
 
 const WEEKDAY_HOURS = Object.freeze([

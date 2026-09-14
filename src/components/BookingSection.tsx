@@ -17,65 +17,84 @@ import {
   ChevronRight,
   Sparkles,
 } from 'lucide-react';
-import { DayAvailability, SessionFormat, BookingConfirmation } from '../types';
+import { AvailabilityResponse, DayAvailability, SessionFormat, BookingConfirmation } from '../types';
 import { FullCalendarModal } from './FullCalendarModal';
 
-interface BookingSectionProps {
-  initialAvailabilityDate: string;
+function presentAvailability(response: AvailabilityResponse): DayAvailability[] {
+  const dateFormatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: response.timezone,
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short',
+  });
+  const timeFormatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: response.timezone,
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+  const hourFormatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: response.timezone,
+    hour: 'numeric',
+    hourCycle: 'h23',
+  });
+
+  return response.days.filter((day) => day.slots.length > 0).map((day) => {
+    const dateInstant = new Date(`${day.date}T12:00:00.000Z`);
+    const dateParts = Object.fromEntries(
+      dateFormatter.formatToParts(dateInstant).map(({ type, value }) => [type, value]),
+    );
+    const formattedDate = `${dateParts.weekday}, ${dateParts.day} ${dateParts.month}`;
+    return {
+      date: day.date,
+      dayOfWeek: dateParts.weekday,
+      formattedDate,
+      slots: day.slots.map((slot) => {
+        const hour = Number(hourFormatter.format(new Date(slot.startAt)));
+        return {
+          id: slot.startAt,
+          startAt: slot.startAt,
+          endAt: slot.endAt,
+          time: timeFormatter.format(new Date(slot.startAt)).replace('am', 'AM').replace('pm', 'PM'),
+          period: hour < 12 ? 'morning' as const : hour < 17 ? 'afternoon' as const : 'evening' as const,
+        };
+      }),
+    };
+  });
 }
 
-export const BookingSection: React.FC<BookingSectionProps> = ({ initialAvailabilityDate }) => {
+export const BookingSection: React.FC = () => {
   const router = useRouter();
-  // Time zone
   const [timeZone, setTimeZone] = useState('Europe/London (GMT/BST)');
+  const [availableDays, setAvailableDays] = useState<DayAvailability[]>([]);
+  const [availabilityStatus, setAvailabilityStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [availabilityRequest, setAvailabilityRequest] = useState(0);
 
-  // Generate ~36 upcoming realistic days across the next 7-8 weeks starting from tomorrow
-  const availableDays: DayAvailability[] = useMemo(() => {
-    const days: DayAvailability[] = [];
-    const base = new Date(`${initialAvailabilityDate}T12:00:00Z`);
-
-    const monthNames = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-    ];
-    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-    let count = 0;
-    // Generate up to 36 available listening days
-    while (days.length < 36 && count < 65) {
-      const current = new Date(base);
-      current.setUTCDate(base.getUTCDate() + count);
-      count++;
-
-      const dayOfWeekNum = current.getUTCDay();
-      // Shahd Karaeen listens Tuesday through Saturday (Sunday & Monday off for focused practice)
-      if (dayOfWeekNum === 0 || dayOfWeekNum === 1) continue;
-
-      const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-      const dateStr = `${current.getUTCFullYear()}-${pad(current.getUTCMonth() + 1)}-${pad(current.getUTCDate())}`;
-      const dayOfWeek = dayNames[dayOfWeekNum];
-      const formattedDate = `${dayOfWeek}, ${current.getUTCDate()} ${monthNames[current.getUTCMonth()]}`;
-
-      // Morning, afternoon, evening slots
-      days.push({
-        date: dateStr,
-        dayOfWeek,
-        formattedDate,
-        slots: [
-          { id: `${dateStr}-1000`, time: '10:00 AM', period: 'morning', available: true },
-          { id: `${dateStr}-1130`, time: '11:30 AM', period: 'morning', available: true },
-          { id: `${dateStr}-1400`, time: '2:00 PM', period: 'afternoon', available: true },
-          { id: `${dateStr}-1530`, time: '3:30 PM', period: 'afternoon', available: dayOfWeekNum !== 6 },
-          { id: `${dateStr}-1700`, time: '5:00 PM', period: 'evening', available: true },
-        ],
-      });
-    }
-    return days;
-  }, [initialAvailabilityDate]);
+  useEffect(() => {
+    const controller = new AbortController();
+    setAvailabilityStatus('loading');
+    fetch('/api/availability', {
+      cache: 'no-store',
+      signal: controller.signal,
+    }).then(async (response) => {
+      if (!response.ok) throw new Error('availability request failed');
+      return response.json() as Promise<AvailabilityResponse>;
+    }).then((response) => {
+      setAvailableDays(presentAvailability(response));
+      setTimeZone(`${response.timezone} (GMT/BST)`);
+      setSelectedDayIndex(0);
+      setAvailabilityStatus('ready');
+    }).catch((error) => {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      setAvailableDays([]);
+      setAvailabilityStatus('error');
+    });
+    return () => controller.abort();
+  }, [availabilityRequest]);
 
   // Selected date & slot state
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
-  const [selectedSlot, setSelectedSlot] = useState<string>('10:00 AM');
+  const [selectedSlot, setSelectedSlot] = useState<string>('');
   const [periodFilter, setPeriodFilter] = useState<'all' | 'morning' | 'afternoon' | 'evening'>('all');
   const [sessionFormat, setSessionFormat] = useState<SessionFormat>('video');
 
@@ -114,7 +133,7 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ initialAvailabil
     if (idx !== -1) {
       setSelectedDayIndex(idx);
       if (availableDays[idx].slots.length > 0) {
-        setSelectedSlot(availableDays[idx].slots[0].time);
+        setSelectedSlot(availableDays[idx].slots[0].id);
       }
       setTimeout(() => {
         if (dateStripRef.current) {
@@ -140,6 +159,17 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ initialAvailabil
   const [confirmation, setConfirmation] = useState<BookingConfirmation | null>(null);
 
   const activeDay = availableDays[selectedDayIndex] || availableDays[0];
+  const selectedSlotData = activeDay?.slots.find((slot) => slot.id === selectedSlot);
+
+  useEffect(() => {
+    if (!activeDay) {
+      setSelectedSlot('');
+      return;
+    }
+    if (!activeDay.slots.some((slot) => slot.id === selectedSlot)) {
+      setSelectedSlot(activeDay.slots[0]?.id ?? '');
+    }
+  }, [activeDay, selectedSlot]);
 
   const filteredSlots = useMemo(() => {
     if (!activeDay) return [];
@@ -158,7 +188,7 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ initialAvailabil
       setErrorMsg('Please provide a valid email address so we can send you the session link.');
       return;
     }
-    if (!selectedSlot) {
+    if (!activeDay || !selectedSlotData) {
       setErrorMsg('Please choose a time slot for your session.');
       return;
     }
@@ -183,7 +213,7 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ initialAvailabil
       bookingId,
       createdAt: new Date().toISOString(),
       date: activeDay.formattedDate,
-      time: selectedSlot,
+      time: selectedSlotData.time,
       format: sessionFormat,
       clientName: name,
       clientEmail: email,
@@ -405,6 +435,34 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ initialAvailabil
                 </div>
               </div>
 
+              {availabilityStatus === 'loading' && (
+                <div role="status" className="mb-6 rounded-xl border border-[#E8DFD5] bg-[#FAF8F5] p-5 text-sm text-[#68635F]">
+                  Checking current availability…
+                </div>
+              )}
+
+              {availabilityStatus === 'error' && (
+                <div role="alert" className="mb-6 rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+                  <p>We could not load availability just now. No times can be selected until the calendar is checked.</p>
+                  <button
+                    type="button"
+                    onClick={() => setAvailabilityRequest((request) => request + 1)}
+                    className="mt-3 font-medium underline underline-offset-4"
+                  >
+                    Try again
+                  </button>
+                </div>
+              )}
+
+              {availabilityStatus === 'ready' && availableDays.length === 0 && (
+                <div role="status" className="mb-6 rounded-xl border border-[#E8DFD5] bg-[#FAF8F5] p-5 text-sm text-[#68635F]">
+                  There are no available session times in the current booking window.
+                </div>
+              )}
+
+              {availabilityStatus === 'ready' && availableDays.length > 0 && (
+                <>
+
               {/* Date Selection Header & Controls */}
               <div className="mb-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
@@ -506,7 +564,7 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ initialAvailabil
                   >
                     {availableDays.map((day, idx) => {
                       const isSelected = selectedDayIndex === idx;
-                      const availableCount = day.slots.filter((s) => s.available).length;
+                      const availableCount = day.slots.length;
                       return (
                         <button
                           key={day.date}
@@ -514,7 +572,7 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ initialAvailabil
                           onClick={() => {
                             setSelectedDayIndex(idx);
                             if (day.slots.length > 0) {
-                              setSelectedSlot(day.slots[0].time);
+                              setSelectedSlot(day.slots[0].id);
                             }
                           }}
                           className={`shrink-0 px-4 py-3 rounded-xl border text-left cursor-pointer transition-all duration-150 min-w-[104px] ${
@@ -597,9 +655,9 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ initialAvailabil
                     <button
                       key={slot.id}
                       type="button"
-                      onClick={() => setSelectedSlot(slot.time)}
+                      onClick={() => setSelectedSlot(slot.id)}
                       className={`py-2.5 px-3 rounded-xl border text-sm font-sans font-medium transition-all cursor-pointer text-center ${
-                        selectedSlot === slot.time
+                        selectedSlot === slot.id
                           ? 'bg-[#282524] text-white border-[#282524] shadow-xs ring-2 ring-[#A35048]/30'
                           : 'bg-[#FAF8F5] text-[#4B4643] border-[#E8DFD5] hover:border-[#A35048]'
                       }`}
@@ -609,6 +667,8 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ initialAvailabil
                   ))}
                 </div>
               </div>
+                </>
+              )}
             </div>
 
             {/* Step 2: Format & Basic Details */}
@@ -786,7 +846,8 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ initialAvailabil
                   <button
                     id="confirm-booking-button"
                     type="submit"
-                    className="w-full sm:w-auto bg-[#A35048] hover:bg-[#8C4038] text-[#FAF8F5] text-sm font-medium px-8 py-3.5 rounded-full transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer active:scale-98"
+                    disabled={availabilityStatus !== 'ready' || !selectedSlotData}
+                    className="w-full sm:w-auto bg-[#A35048] hover:bg-[#8C4038] text-[#FAF8F5] text-sm font-medium px-8 py-3.5 rounded-full transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Reserve Conversation
                   </button>

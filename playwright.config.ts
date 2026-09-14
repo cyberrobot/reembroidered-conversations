@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const invalidPlaybackId = 'invalid-playback-id-for-browser-smoke';
+const testPort = process.env.PLAYWRIGHT_PORT ?? '3000';
 
 export default defineConfig({
   testDir: './tests/browser',
@@ -16,15 +17,15 @@ export default defineConfig({
     ['html', { open: 'never', outputFolder: 'playwright-report' }],
   ],
   use: {
-    baseURL: 'http://127.0.0.1:3000',
+    baseURL: `http://127.0.0.1:${testPort}`,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     ...devices['Desktop Chrome'],
   },
   webServer: {
-    command: 'npm run build && npm run start',
-    url: 'http://127.0.0.1:3000',
+    command: `npm run build && ./node_modules/.bin/next start --hostname 0.0.0.0 --port ${testPort}`,
+    url: `http://127.0.0.1:${testPort}`,
     reuseExistingServer: false,
     timeout: 120_000,
     gracefulShutdown: { signal: 'SIGTERM', timeout: 5_000 },
