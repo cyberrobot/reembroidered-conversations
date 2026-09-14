@@ -18,6 +18,7 @@ test(
         startAt: '2030-01-01T10:00:00.000Z',
         endAt: '2030-01-01T10:55:00.000Z',
         timezone: 'Europe/London',
+        status: 'HOLD',
         expiresAt: '2029-12-31T10:15:00.000Z',
         createdAt: '2029-12-31T10:00:00.000Z',
         ...overrides,
@@ -25,10 +26,10 @@ test(
 
       return client.query(
         `INSERT INTO bookings
-          (id, name, email, "startAt", "endAt", timezone, "expiresAt", "createdAt",
+          (id, name, email, "startAt", "endAt", timezone, status, "expiresAt", "createdAt",
            "stripeCheckoutSessionId", "stripePaymentIntentId", "calendarEventId")
          VALUES
-          (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          RETURNING id, status`,
         [
           defaults.name,
@@ -36,6 +37,7 @@ test(
           defaults.startAt,
           defaults.endAt,
           defaults.timezone,
+          defaults.status,
           defaults.expiresAt,
           defaults.createdAt,
           defaults.stripeCheckoutSessionId ?? null,
@@ -69,6 +71,13 @@ test(
         () => insertBooking(),
         'bookings_active_start_at_key',
       );
+
+      for (const status of ['PAID', 'CONFIRMED']) {
+        await rejectsConstraint(
+          () => insertBooking({ status }),
+          'bookings_active_start_at_key',
+        );
+      }
 
       await client.query('UPDATE bookings SET status = \'CANCELLED\' WHERE id = $1', [
         first.rows[0].id,
