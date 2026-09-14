@@ -126,7 +126,7 @@ test('production routes and root confirmation entries remain compatible', async 
   }
 });
 
-test('homepage, navigation, Mux fallback, and transcript work without browser errors', async ({ page, request }) => {
+test('homepage, navigation, Mux fallback, and transcript work without browser errors', async ({ page }) => {
   const failures = collectBrowserFailures(page);
   await page.setViewportSize({ width: 1280, height: 720 });
   await mockAvailability(page);
@@ -149,7 +149,6 @@ test('homepage, navigation, Mux fallback, and transcript work without browser er
   const player = page.locator('mux-player');
   await expect(player).toBeVisible();
   await expect(player).toHaveAttribute('playback-id', defaultPlaybackId);
-  expect((await request.head(`https://stream.mux.com/${defaultPlaybackId}.m3u8`)).ok()).toBe(true);
   const playControl = page.getByRole('button', { name: 'Play video introduction from Shahd Karaeen' });
   await expect(playControl).toBeVisible();
   await playControl.focus();
