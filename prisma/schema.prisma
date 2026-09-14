@@ -37,3 +37,18 @@ model Booking {
   @@index([status, expiresAt], map: "bookings_status_expires_at_idx")
   @@map("bookings")
 }
+
+model GoogleCalendarConnection {
+  id                    String   @id
+  googleSubject         String
+  googleEmail           String
+  calendarId            String
+  calendarSummary       String
+  calendarTimeZone      String?
+  refreshTokenEncrypted String   @db.Text
+  grantedScopes         String[]
+  connectedAt           DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime @updatedAt @db.Timestamptz(3)
+
+  @@map("google_calendar_connections")
+}
