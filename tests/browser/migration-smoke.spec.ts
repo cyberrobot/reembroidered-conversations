@@ -82,7 +82,7 @@ function availabilityFixture(now = new Date()) {
 }
 
 async function mockAvailability(page: Page, body: unknown = availabilityFixture(), status = 200) {
-  await page.route('**/api/availability?**', (route) => route.fulfill({
+  await page.route('**/api/availability*', (route) => route.fulfill({
     status,
     contentType: 'application/json',
     body: JSON.stringify(body),
@@ -271,7 +271,7 @@ test('booking prototype preserves availability, validation, calendar, and confir
 
 test('booking availability distinguishes loading, empty, and recoverable service errors', async ({ page }) => {
   let releaseLoading: (() => void) | undefined;
-  await page.route('**/api/availability?**', async (route) => {
+  await page.route('**/api/availability*', async (route) => {
     await new Promise<void>((resolve) => { releaseLoading = resolve; });
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ timezone: 'Europe/London', days: [] }) });
   });
@@ -281,7 +281,7 @@ test('booking availability distinguishes loading, empty, and recoverable service
   await expect(page.getByText('There are no available session times in the current booking window.')).toBeVisible();
   await expect(page.locator('#confirm-booking-button')).toBeDisabled();
 
-  await page.unroute('**/api/availability?**');
+  await page.unroute('**/api/availability*');
   await mockAvailability(page, { error: { code: 'availability_unavailable' } }, 503);
   await page.reload();
   await expect(page.getByRole('alert').filter({ hasText: 'We could not load' })).toContainText('We could not load availability just now');

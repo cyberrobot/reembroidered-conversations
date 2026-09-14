@@ -13,14 +13,20 @@ function isCalendarDate(value: string | null): value is string {
 
 type AvailabilityService = typeof getAvailableSlots;
 
-export function createAvailabilityHandler(service: AvailabilityService) {
+export function createAvailabilityHandler(
+  service: AvailabilityService,
+  config = PROVIDER_AVAILABILITY_CONFIG,
+  getNow = () => new Date(),
+) {
   return async function availabilityHandler(request: Request) {
-    const now = new Date();
+    const now = getNow();
     const url = new URL(request.url);
-    const fromDate = url.searchParams.get('from');
-    const toDate = url.searchParams.get('to');
-    const today = getCalendarDateInTimeZone(now, PROVIDER_AVAILABILITY_CONFIG.timezone);
-    const horizon = addCalendarDays(today, PROVIDER_AVAILABILITY_CONFIG.maximumBookingHorizonDays);
+    const today = getCalendarDateInTimeZone(now, config.timezone);
+    const horizon = addCalendarDays(today, config.maximumBookingHorizonDays);
+    const hasFrom = url.searchParams.has('from');
+    const hasTo = url.searchParams.has('to');
+    const fromDate = hasFrom ? url.searchParams.get('from') : today;
+    const toDate = hasTo ? url.searchParams.get('to') : horizon;
 
     if (
       !isCalendarDate(fromDate) || !isCalendarDate(toDate) ||
@@ -33,7 +39,7 @@ export function createAvailabilityHandler(service: AvailabilityService) {
     }
 
     try {
-      const slots = await service({ fromDate, toDate, now });
+      const slots = await service({ fromDate, toDate, now, config });
       const grouped = new Map<string, Array<{ startAt: string; endAt: string }>>();
       for (const { date, startAt, endAt } of slots) {
         const daySlots = grouped.get(date) ?? [];
@@ -42,7 +48,7 @@ export function createAvailabilityHandler(service: AvailabilityService) {
       }
       return NextResponse.json(
         {
-          timezone: PROVIDER_AVAILABILITY_CONFIG.timezone,
+          timezone: config.timezone,
           days: [...grouped].map(([date, daySlots]) => ({ date, slots: daySlots })),
         },
         { headers: { 'Cache-Control': 'no-store' } },

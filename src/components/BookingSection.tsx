@@ -20,16 +20,6 @@ import {
 import { AvailabilityResponse, DayAvailability, SessionFormat, BookingConfirmation } from '../types';
 import { FullCalendarModal } from './FullCalendarModal';
 
-interface BookingSectionProps {
-  initialAvailabilityDate: string;
-}
-
-function addCalendarDays(date: string, days: number) {
-  const instant = new Date(`${date}T12:00:00.000Z`);
-  instant.setUTCDate(instant.getUTCDate() + days);
-  return instant.toISOString().slice(0, 10);
-}
-
 function presentAvailability(response: AvailabilityResponse): DayAvailability[] {
   const dateFormatter = new Intl.DateTimeFormat('en-GB', {
     timeZone: response.timezone,
@@ -73,7 +63,7 @@ function presentAvailability(response: AvailabilityResponse): DayAvailability[] 
   });
 }
 
-export const BookingSection: React.FC<BookingSectionProps> = ({ initialAvailabilityDate }) => {
+export const BookingSection: React.FC = () => {
   const router = useRouter();
   const [timeZone, setTimeZone] = useState('Europe/London (GMT/BST)');
   const [availableDays, setAvailableDays] = useState<DayAvailability[]>([]);
@@ -83,7 +73,7 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ initialAvailabil
   useEffect(() => {
     const controller = new AbortController();
     setAvailabilityStatus('loading');
-    fetch(`/api/availability?from=${initialAvailabilityDate}&to=${addCalendarDays(initialAvailabilityDate, 55)}`, {
+    fetch('/api/availability', {
       cache: 'no-store',
       signal: controller.signal,
     }).then(async (response) => {
@@ -100,7 +90,7 @@ export const BookingSection: React.FC<BookingSectionProps> = ({ initialAvailabil
       setAvailabilityStatus('error');
     });
     return () => controller.abort();
-  }, [initialAvailabilityDate, availabilityRequest]);
+  }, [availabilityRequest]);
 
   // Selected date & slot state
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
