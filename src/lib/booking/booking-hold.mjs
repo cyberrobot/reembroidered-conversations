@@ -59,7 +59,12 @@ export function createHoldPersistence(database) {
   return async function persist({ name, email, startAt, endAt, timezone, expiresAt, now }) {
     return database.$transaction(async (transaction) => {
       await transaction.booking.updateMany({
-        where: { startAt, status: 'HOLD', expiresAt: { lte: now } },
+        where: {
+          startAt,
+          status: 'HOLD',
+          expiresAt: { lte: now },
+          stripeCheckoutSessionId: null,
+        },
         data: { status: 'CANCELLED' },
       });
       return transaction.booking.create({

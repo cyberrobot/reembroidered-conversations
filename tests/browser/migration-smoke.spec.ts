@@ -1,4 +1,6 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import 'dotenv/config';
+import pg from 'pg';
 import { invalidPlaybackId } from '../../playwright.config';
 
 const defaultPlaybackId = '4qvdrc02lmk21KDbxfyWcWyiV7YG9Fljckr5xj5wBzXg';
@@ -433,16 +435,46 @@ test('booking availability distinguishes loading, empty, and recoverable service
   await expect(page.locator('#confirm-booking-button')).toBeDisabled();
 });
 
-test('URL parameters cannot manufacture paid or confirmed state', async ({ page }) => {
+test('payment return requires matching booking and Checkout Session identifiers', async ({ page }) => {
   const failures = collectBrowserFailures(page);
-  await page.goto('/payment?payment_success=true&success=true&booking_id=not-a-booking&session_id=fake');
-  await expect(page.getByText('Payment is being processed.')).toBeVisible();
-  await expect(page.getByText(/does not confirm your booking yet/)).toBeVisible();
-  await expect(page.getByText(/Payment received|Reservation Confirmed|fully confirmed/i)).toHaveCount(0);
+  const paidId = '5a449655-7be3-432c-a124-b769e10b50c1';
+  const holdId = '5a449655-7be3-432c-a124-b769e10b50c2';
+  const paidSession = 'cs_test_browser_paid';
+  const holdSession = 'cs_test_browser_hold';
+  const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
+  await client.connect();
+  try {
+    await client.query(`
+      INSERT INTO bookings
+        (id, name, email, "startAt", "endAt", timezone, status, "stripeCheckoutSessionId", "stripePaymentIntentId", "expiresAt", "createdAt")
+      VALUES
+        ($1, 'Browser Paid', 'paid@example.com', '2039-01-03T10:00:00Z', '2039-01-03T10:55:00Z', 'Europe/London', 'PAID', $2, 'pi_test_browser_paid', '2039-01-02T10:31:00Z', '2039-01-02T10:00:00Z'),
+        ($3, 'Browser Hold', 'hold@example.com', '2039-01-03T12:00:00Z', '2039-01-03T12:55:00Z', 'Europe/London', 'HOLD', $4, NULL, '2039-01-02T10:31:00Z', '2039-01-02T10:00:00Z')
+    `, [paidId, paidSession, holdId, holdSession]);
 
-  await page.goto('/confirmation?payment_success=true&booking_id=RC-12345');
-  await expect(page).toHaveURL('/payment');
-  await expect(page.getByText('Payment is being processed.')).toBeVisible();
+    await page.goto(`/payment?booking_id=${paidId}`);
+    await expect(page.getByText('Payment is being processed.')).toBeVisible();
+    await expect(page.getByText('Payment received.')).toHaveCount(0);
+
+    await page.goto(`/payment?payment_success=true&success=true&booking_id=${paidId}&session_id=cs_test_wrong`);
+    await expect(page.getByText('Payment is being processed.')).toBeVisible();
+    await expect(page.getByText('Payment received.')).toHaveCount(0);
+
+    await page.goto(`/payment?booking_id=${paidId}&session_id=${paidSession}`);
+    await expect(page.getByText('Payment received.')).toBeVisible();
+    await expect(page.getByText(/booking is being finalised/)).toBeVisible();
+
+    await page.goto(`/payment?booking_id=${holdId}&session_id=${holdSession}`);
+    await expect(page.getByText('Payment is being processed.')).toBeVisible();
+    await expect(page.getByText('Payment received.')).toHaveCount(0);
+
+    await page.goto('/confirmation?payment_success=true&success=true');
+    await expect(page).toHaveURL('/payment');
+    await expect(page.getByText('Payment is being processed.')).toBeVisible();
+  } finally {
+    await client.query('DELETE FROM bookings WHERE id = ANY($1::uuid[])', [[paidId, holdId]]);
+    await client.end();
+  }
   expect(failures).toEqual([]);
 });
 

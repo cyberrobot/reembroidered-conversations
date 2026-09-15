@@ -6,10 +6,17 @@ export const dynamic = 'force-dynamic';
 export default async function PaymentReturn({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
   const bookingId = typeof params.booking_id === 'string' ? params.booking_id : '';
-  const booking = /^[0-9a-f-]{36}$/i.test(bookingId)
-    ? await db.booking.findUnique({ where: { id: bookingId }, select: { status: true } })
+  const sessionId = typeof params.session_id === 'string' ? params.session_id : '';
+  const validBookingId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(bookingId);
+  const validSessionId = /^cs_[A-Za-z0-9_]+$/.test(sessionId);
+  const booking = validBookingId && validSessionId
+    ? await db.booking.findUnique({
+      where: { id: bookingId },
+      select: { status: true, stripeCheckoutSessionId: true },
+    })
     : null;
-  const paid = booking?.status === 'PAID' || booking?.status === 'CONFIRMED';
+  const sessionMatches = booking?.stripeCheckoutSessionId === sessionId;
+  const paid = sessionMatches && (booking.status === 'PAID' || booking.status === 'CONFIRMED');
 
   return (
     <main className="min-h-screen bg-[#FAF8F5] px-6 py-24 text-[#282524] paper-grain">

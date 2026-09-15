@@ -8,4 +8,6 @@ export const SESSION_PRODUCT = Object.freeze({
   name: '55-minute private listening session',
 });
 
-export const STRIPE_CHECKOUT_MINUTES = 30;
+// Stripe requires at least 30 minutes from the instant its API processes the
+// request. The extra minute absorbs request/network latency.
+export const STRIPE_CHECKOUT_MINUTES = 31;

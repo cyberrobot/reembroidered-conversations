@@ -31,6 +31,18 @@ test('completed paid Checkout moves HOLD to PAID and duplicate delivery is idemp
   assert.equal(p.get().stripePaymentIntentId, 'pi_test_one');
 });
 
+test('completed payment after local Checkout expiry still moves unresolved HOLD to PAID', async () => {
+  const p = persistence({
+    status: 'HOLD',
+    expiresAt: new Date('2026-09-15T11:59:59.000Z'),
+    stripeCheckoutSessionId: 'cs_test_one',
+    stripePaymentIntentId: null,
+  });
+  await processStripeWebhookEvent(event('checkout.session.completed'), p);
+  assert.equal(p.get().status, 'PAID');
+  assert.equal(p.get().stripePaymentIntentId, 'pi_test_one');
+});
+
 test('completed webhook validates amount, currency, correlation, Session, and payment state', async () => {
   const bad = [
     { amount_total: 1 }, { currency: 'usd' }, { payment_status: 'unpaid' }, { mode: 'subscription' },

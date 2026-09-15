@@ -14,7 +14,9 @@ const bookingId = '5a449655-7be3-432c-a124-b769e10b50ef';
 function fixture(overrides = {}) {
   const booking = { id: bookingId, email: 'customer@example.com', status: 'HOLD', expiresAt: new Date(now.getTime() + 15 * 60_000), stripeCheckoutSessionId: null, ...overrides };
   let attached;
-  const session = { id: 'cs_test_one', object: 'checkout.session', status: 'open', url: 'https://checkout.stripe.com/c/pay/test', expires_at: Math.floor(now.getTime() / 1000) + 1800 };
+  // Stripe's response is deliberately later than the requested expiry so the
+  // test proves the returned value, not the requested value, is persisted.
+  const session = { id: 'cs_test_one', object: 'checkout.session', status: 'open', url: 'https://checkout.stripe.com/c/pay/test', expires_at: Math.floor(now.getTime() / 1000) + 1920 };
   const calls = [];
   const persistence = {
     findBooking: async () => attached ? { ...booking, ...attached } : booking,
@@ -37,7 +39,7 @@ test('active hold creates and persists a correlated card-only Checkout Session',
   const result = await createBookingCheckout({ bookingId, amount: 1, currency: 'usd' }, now, { ...f, appUrl: 'https://example.test', getNow: () => now });
   assert.equal(result.url, f.session.url);
   assert.equal(f.getAttached().stripeCheckoutSessionId, f.session.id);
-  assert.equal(f.getAttached().expiresAt.toISOString(), '2026-09-15T12:30:00.000Z');
+  assert.equal(f.getAttached().expiresAt.toISOString(), '2026-09-15T12:32:00.000Z');
   const { input, options } = f.calls[0];
   assert.equal(input.line_items[0].price_data.unit_amount, 5500);
   assert.equal(input.line_items[0].price_data.currency, 'gbp');
@@ -46,6 +48,8 @@ test('active hold creates and persists a correlated card-only Checkout Session',
   assert.equal(input.metadata.bookingId, bookingId);
   assert.equal(input.payment_intent_data.metadata.bookingId, bookingId);
   assert.equal(input.customer_email, 'customer@example.com');
+  assert.equal(input.expires_at, Math.floor(now.getTime() / 1000) + 31 * 60);
+  assert.ok(input.expires_at > Math.floor(now.getTime() / 1000) + 30 * 60);
   assert.equal(options.idempotencyKey, `booking-checkout:${bookingId}`);
 });
 

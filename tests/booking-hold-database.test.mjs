@@ -3,7 +3,7 @@ import test from 'node:test';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/generated/prisma/client.ts';
 
-import { isActiveSlotUniqueConflict } from '../src/lib/booking/booking-hold.mjs';
+import { createHoldPersistence, isActiveSlotUniqueConflict } from '../src/lib/booking/booking-hold.mjs';
 import { createStripeWebhookPersistence, processStripeWebhookEvent } from '../src/lib/booking/stripe-webhook.mjs';
 
 const connectionString = process.env.DATABASE_SCHEMA_TEST_URL;
@@ -41,6 +41,82 @@ test(
         },
       );
     } finally {
+      await db.$disconnect();
+    }
+  },
+);
+
+test(
+  'expired Checkout-backed HOLD cannot be reclaimed before Stripe resolves payment',
+  { skip: connectionString ? false : 'DATABASE_SCHEMA_TEST_URL is not configured' },
+  async () => {
+    const db = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+    const originalId = '5a449655-7be3-432c-a124-b769e10b50b1';
+    const startAt = new Date('2038-01-04T10:00:00.000Z');
+    const endAt = new Date('2038-01-04T10:55:00.000Z');
+    const now = new Date('2038-01-03T11:00:00.000Z');
+    try {
+      await db.booking.create({ data: {
+        id: originalId, name: 'Paid Race', email: 'paid-race@example.com', startAt, endAt,
+        timezone: 'Europe/London', status: 'HOLD', stripeCheckoutSessionId: 'cs_db_race',
+        expiresAt: new Date('2038-01-03T10:59:00.000Z'), createdAt: new Date('2038-01-03T10:00:00.000Z'),
+      } });
+
+      await assert.rejects(
+        createHoldPersistence(db)({
+          name: 'Second Customer', email: 'second@example.com', startAt, endAt,
+          timezone: 'Europe/London', expiresAt: new Date('2038-01-03T11:15:00.000Z'), now,
+        }),
+        (error) => isActiveSlotUniqueConflict(error),
+      );
+      assert.equal((await db.booking.findUnique({ where: { id: originalId } })).status, 'HOLD');
+
+      await processStripeWebhookEvent({ type: 'checkout.session.completed', data: { object: {
+        object: 'checkout.session', id: 'cs_db_race', client_reference_id: originalId,
+        metadata: { bookingId: originalId }, mode: 'payment', payment_status: 'paid',
+        amount_total: 5500, currency: 'gbp', payment_intent: 'pi_db_race',
+      } } }, createStripeWebhookPersistence(db));
+      const paid = await db.booking.findUnique({ where: { id: originalId } });
+      assert.equal(paid.status, 'PAID');
+      assert.equal(paid.stripePaymentIntentId, 'pi_db_race');
+      await assert.rejects(db.booking.create({ data: {
+        name: 'Third Customer', email: 'third@example.com', startAt, endAt,
+        timezone: 'Europe/London', status: 'HOLD', expiresAt: new Date('2038-01-03T11:15:00.000Z'),
+      } }), (error) => isActiveSlotUniqueConflict(error));
+    } finally {
+      await db.booking.deleteMany({ where: { startAt } });
+      await db.$disconnect();
+    }
+  },
+);
+
+test(
+  'authoritative Checkout expiry releases an expired Checkout-backed HOLD',
+  { skip: connectionString ? false : 'DATABASE_SCHEMA_TEST_URL is not configured' },
+  async () => {
+    const db = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+    const originalId = '5a449655-7be3-432c-a124-b769e10b50b2';
+    const startAt = new Date('2038-01-04T12:00:00.000Z');
+    const endAt = new Date('2038-01-04T12:55:00.000Z');
+    const now = new Date('2038-01-03T11:00:00.000Z');
+    try {
+      await db.booking.create({ data: {
+        id: originalId, name: 'Expired Checkout', email: 'expired-checkout@example.com', startAt, endAt,
+        timezone: 'Europe/London', status: 'HOLD', stripeCheckoutSessionId: 'cs_db_release',
+        expiresAt: new Date('2038-01-03T10:59:00.000Z'), createdAt: new Date('2038-01-03T10:00:00.000Z'),
+      } });
+      await processStripeWebhookEvent({ type: 'checkout.session.expired', data: { object: {
+        object: 'checkout.session', id: 'cs_db_release', client_reference_id: originalId,
+        metadata: { bookingId: originalId }, payment_status: 'unpaid',
+      } } }, createStripeWebhookPersistence(db));
+      assert.equal((await db.booking.findUnique({ where: { id: originalId } })).status, 'CANCELLED');
+      const replacement = await createHoldPersistence(db)({
+        name: 'Replacement', email: 'replacement@example.com', startAt, endAt,
+        timezone: 'Europe/London', expiresAt: new Date('2038-01-03T11:15:00.000Z'), now,
+      });
+      assert.ok(replacement.id);
+    } finally {
+      await db.booking.deleteMany({ where: { startAt } });
       await db.$disconnect();
     }
   },

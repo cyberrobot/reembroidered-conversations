@@ -71,20 +71,22 @@ test('full-day Google busy period removes every slot for that provider-local dat
 
 test('CONFIRMED, PAID, and active HOLD block while expired or released bookings do not', async () => {
   const cases = [
-    ['CONFIRMED', new Date('2026-09-01T00:00:00Z'), true],
-    ['PAID', new Date('2026-09-01T00:00:00Z'), true],
-    ['HOLD', new Date('2026-09-01T00:00:01Z'), true],
-    ['HOLD', new Date('2026-09-01T00:00:00Z'), false],
-    ['CANCELLED', new Date('2026-09-01T00:00:01Z'), false],
-    ['REFUNDED', new Date('2026-09-01T00:00:01Z'), false],
+    ['CONFIRMED', new Date('2026-09-01T00:00:00Z'), null, true],
+    ['PAID', new Date('2026-09-01T00:00:00Z'), null, true],
+    ['HOLD', new Date('2026-09-01T00:00:01Z'), null, true],
+    ['HOLD', new Date('2026-09-01T00:00:00Z'), null, false],
+    ['HOLD', new Date('2026-09-01T00:00:00Z'), 'cs_unresolved', true],
+    ['CANCELLED', new Date('2026-09-01T00:00:01Z'), 'cs_expired', false],
+    ['REFUNDED', new Date('2026-09-01T00:00:01Z'), null, false],
   ];
-  for (const [status, expiresAt, blocks] of cases) {
+  for (const [status, expiresAt, stripeCheckoutSessionId, blocks] of cases) {
     const deps = await realDependencies({
       getBookingConflicts: async () => [{
         startAt: new Date('2026-09-07T09:00:00Z'),
         endAt: new Date('2026-09-07T09:55:00Z'),
         status,
         expiresAt,
+        stripeCheckoutSessionId,
       }],
     });
     const result = await getAvailableSlots({ fromDate: date, toDate: date, now }, deps);
