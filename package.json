@@ -28,7 +28,8 @@
     "pg": "^8.23.0",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
-    "server-only": "^0.0.1"
+    "server-only": "^0.0.1",
+    "stripe": "^22.6.2"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

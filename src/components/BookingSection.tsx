@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -13,7 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
-import { AvailabilityResponse, BookingHold, BookingHoldResponse, DayAvailability, SessionFormat } from '../types';
+import { AvailabilityResponse, BookingCheckoutResponse, BookingHold, BookingHoldResponse, DayAvailability, SessionFormat } from '../types';
 import { FullCalendarModal } from './FullCalendarModal';
 
 function presentAvailability(response: AvailabilityResponse): DayAvailability[] {
@@ -60,7 +59,6 @@ function presentAvailability(response: AvailabilityResponse): DayAvailability[] 
 }
 
 export const BookingSection: React.FC = () => {
-  const router = useRouter();
   const [timeZone, setTimeZone] = useState('Europe/London (GMT/BST)');
   const [availableDays, setAvailableDays] = useState<DayAvailability[]>([]);
   const [availabilityStatus, setAvailabilityStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -153,6 +151,8 @@ export const BookingSection: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState('');
   const [holdStatus, setHoldStatus] = useState<'idle' | 'creating' | 'created'>('idle');
   const [hold, setHold] = useState<BookingHold | null>(null);
+  const [checkoutStatus, setCheckoutStatus] = useState<'idle' | 'starting' | 'redirecting'>('idle');
+  const [checkoutError, setCheckoutError] = useState('');
 
   const activeDay = availableDays[selectedDayIndex] || availableDays[0];
   const selectedSlotData = activeDay?.slots.find((slot) => slot.id === selectedSlot);
@@ -222,12 +222,39 @@ export const BookingSection: React.FC = () => {
     }
   };
 
-  const openConfirmation = () => {
-    const query = new URLSearchParams({
-      payment_success: 'true',
-      booking_id: 'RC-78421',
-    });
-    router.push(`/confirmation?${query.toString()}`);
+  const startCheckout = async () => {
+    if (!hold || checkoutStatus !== 'idle') return;
+    setCheckoutError('');
+    setCheckoutStatus('starting');
+    try {
+      const response = await fetch('/api/bookings/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingId: hold.id }),
+      });
+      const body = await response.json() as BookingCheckoutResponse | { error?: { code?: string } };
+      if (!response.ok) {
+        if ('error' in body && body.error?.code === 'hold_unavailable') {
+          setHold(null);
+          setHoldStatus('idle');
+          setSelectedSlot('');
+          setRequiresFreshSelection(true);
+          setErrorMsg('Your temporary hold is no longer reserved. Please choose an available time again.');
+          setAvailabilityRequest((request) => request + 1);
+        } else {
+          setCheckoutError('Secure payment could not be started. Your time is still held, so please try again.');
+        }
+        setCheckoutStatus('idle');
+        return;
+      }
+      const checkout = (body as BookingCheckoutResponse).checkout;
+      setHold((current) => current ? { ...current, expiresAt: checkout.expiresAt } : current);
+      setCheckoutStatus('redirecting');
+      window.location.assign(checkout.url);
+    } catch {
+      setCheckoutError('Secure payment could not be started. Your time is still held, so please try again.');
+      setCheckoutStatus('idle');
+    }
   };
 
   useEffect(() => {
@@ -305,8 +332,18 @@ export const BookingSection: React.FC = () => {
                 </p>
               </div>
               <div role="status" className="bg-[#FAF8F5] p-5 rounded-xl border border-[#E8DFD5] text-sm text-[#4B4643]">
-                This is not yet paid or confirmed. Payment will be added in the next step of the booking flow.
+                This is not yet paid or confirmed. Secure your £55 payment through Stripe to continue.
               </div>
+              {checkoutError && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{checkoutError}</div>}
+              <button
+                type="button"
+                onClick={startCheckout}
+                disabled={checkoutStatus !== 'idle'}
+                aria-busy={checkoutStatus !== 'idle'}
+                className="w-full rounded-full bg-[#A35048] px-8 py-3.5 text-sm font-medium text-[#FAF8F5] shadow-sm transition-colors hover:bg-[#8C4038] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {checkoutStatus === 'starting' ? 'Starting secure payment…' : checkoutStatus === 'redirecting' ? 'Redirecting to Stripe…' : 'Continue to secure payment · £55'}
+              </button>
             </div>
           </div>
         ) : (
@@ -729,14 +766,6 @@ export const BookingSection: React.FC = () => {
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-                  <button
-                    type="button"
-                    onClick={openConfirmation}
-                    className="text-xs text-[#78716C] hover:text-[#A35048] transition-colors cursor-pointer py-2 px-3 rounded-lg hover:bg-[#F5EFE9] border border-dashed border-[#C4B7A9]"
-                    title="Instant test: Preview how Stripe redirects to the booking confirmation page"
-                  >
-                    Instant Test: Preview Confirmation
-                  </button>
                   <button
                     id="confirm-booking-button"
                     type="submit"

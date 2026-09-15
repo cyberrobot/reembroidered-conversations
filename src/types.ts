@@ -35,6 +35,10 @@ export interface BookingHoldResponse {
   hold: BookingHold;
 }
 
+export interface BookingCheckoutResponse {
+  checkout: { url: string; expiresAt: string };
+}
+
 export interface BookingFormData {
   date: string;
   time: string;

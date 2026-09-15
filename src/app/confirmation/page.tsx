@@ -1,10 +1,5 @@
-import { Suspense } from 'react';
-import { BookingConfirmationPage } from '@/components/BookingConfirmationPage';
+import { redirect } from 'next/navigation';
 
 export default function ConfirmationPage() {
-  return (
-    <Suspense>
-      <BookingConfirmationPage />
-    </Suspense>
-  );
+  redirect('/payment');
 }
