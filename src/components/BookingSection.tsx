@@ -152,6 +152,8 @@ export const BookingSection: React.FC = () => {
   const [checkoutStatus, setCheckoutStatus] = useState<'idle' | 'processing' | 'redirecting'>('idle');
   const [checkoutError, setCheckoutError] = useState('');
   const checkoutInFlightRef = useRef(false);
+  const nextCheckoutOperationIdRef = useRef(0);
+  const activeCheckoutOperationRef = useRef<{ id: number; controller: AbortController } | null>(null);
 
   const activeDay = availableDays[selectedDayIndex] || availableDays[0];
   const selectedSlotData = activeDay?.slots.find((slot) => slot.id === selectedSlot);
@@ -197,6 +199,17 @@ export const BookingSection: React.FC = () => {
     setCheckoutError('');
     checkoutInFlightRef.current = true;
     setCheckoutStatus('processing');
+    const operationId = ++nextCheckoutOperationIdRef.current;
+    const controller = new AbortController();
+    activeCheckoutOperationRef.current = { id: operationId, controller };
+    const isCurrentOperation = () => activeCheckoutOperationRef.current?.id === operationId;
+    const finishCurrentOperation = () => {
+      if (!isCurrentOperation()) return false;
+      activeCheckoutOperationRef.current = null;
+      checkoutInFlightRef.current = false;
+      setCheckoutStatus('idle');
+      return true;
+    };
     let reusableHold = hold;
     try {
       if (!reusableHold) {
@@ -204,8 +217,10 @@ export const BookingSection: React.FC = () => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, email, startAt: selectedSlotData.startAt }),
+          signal: controller.signal,
         });
         const body = await response.json() as BookingHoldResponse | { error?: { code?: string } };
+        if (!isCurrentOperation()) return;
         if (!response.ok) {
           if (response.status === 409) {
             setSelectedSlot('');
@@ -215,8 +230,7 @@ export const BookingSection: React.FC = () => {
           } else {
             setErrorMsg('Your time has not yet been reserved. Please try again.');
           }
-          checkoutInFlightRef.current = false;
-          setCheckoutStatus('idle');
+          finishCurrentOperation();
           return;
         }
         reusableHold = (body as BookingHoldResponse).hold;
@@ -227,8 +241,10 @@ export const BookingSection: React.FC = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bookingId: reusableHold.id }),
+        signal: controller.signal,
       });
       const body = await response.json() as BookingCheckoutResponse | { error?: { code?: string } };
+      if (!isCurrentOperation()) return;
       if (!response.ok) {
         if ('error' in body && body.error?.code === 'hold_unavailable') {
           setHold(null);
@@ -239,8 +255,7 @@ export const BookingSection: React.FC = () => {
         } else {
           setCheckoutError('Secure payment could not be started. Your time is still held, so please try again.');
         }
-        checkoutInFlightRef.current = false;
-        setCheckoutStatus('idle');
+        finishCurrentOperation();
         return;
       }
       const checkout = (body as BookingCheckoutResponse).checkout;
@@ -248,13 +263,13 @@ export const BookingSection: React.FC = () => {
       setCheckoutStatus('redirecting');
       window.location.assign(checkout.url);
     } catch {
+      if (!isCurrentOperation()) return;
       if (reusableHold) {
         setCheckoutError('Secure payment could not be started. Your time is still held, so please try again.');
       } else {
         setErrorMsg('Your time has not yet been reserved. Please try again.');
       }
-      checkoutInFlightRef.current = false;
-      setCheckoutStatus('idle');
+      finishCurrentOperation();
     }
   };
 
@@ -262,6 +277,11 @@ export const BookingSection: React.FC = () => {
     if (!hold) return;
     const delay = Math.max(0, Date.parse(hold.expiresAt) - Date.now());
     const timer = window.setTimeout(() => {
+      const activeOperation = activeCheckoutOperationRef.current;
+      if (activeOperation) {
+        activeCheckoutOperationRef.current = null;
+        activeOperation.controller.abort();
+      }
       setHold(null);
       checkoutInFlightRef.current = false;
       setCheckoutStatus('idle');

@@ -413,6 +413,73 @@ test('locally expired hold clears ownership and refreshes availability', async (
   await expect(page.locator('#client-name')).toBeEnabled();
 });
 
+test('a pending Checkout response cannot affect state after its hold expires', async ({ page }) => {
+  let availabilityRequests = 0;
+  await page.route('**/api/availability*', (route) => {
+    availabilityRequests += 1;
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(availabilityFixture()) });
+  });
+
+  let holdRequests = 0;
+  await page.route('**/api/bookings/hold', (route) => {
+    holdRequests += 1;
+    const submitted = route.request().postDataJSON();
+    return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ hold: {
+      id: holdRequests === 1 ? 'stale-expiring-hold' : 'fresh-hold',
+      startAt: submitted.startAt,
+      endAt: new Date(Date.parse(submitted.startAt) + 55 * 60_000).toISOString(),
+      timezone: 'Europe/London',
+      expiresAt: new Date(Date.now() + (holdRequests === 1 ? 750 : 15 * 60_000)).toISOString(),
+    } }) });
+  });
+
+  let checkoutRequests = 0;
+  let releaseStaleCheckout: (() => void) | undefined;
+  await page.route('**/api/bookings/checkout', async (route) => {
+    checkoutRequests += 1;
+    if (checkoutRequests === 1) {
+      await new Promise<void>((resolve) => { releaseStaleCheckout = resolve; });
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ checkout: {
+        url: '/payment?booking_id=stale-expiring-hold',
+        expiresAt: new Date(Date.now() + 30 * 60_000).toISOString(),
+      } }) }).catch(() => undefined);
+      return;
+    }
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ checkout: {
+      url: '/payment?booking_id=fresh-hold',
+      expiresAt: new Date(Date.now() + 30 * 60_000).toISOString(),
+    } }) });
+  });
+
+  await page.goto('/');
+  await page.locator('#client-name').fill('Expiry Race');
+  await page.locator('#client-email').fill('expiry-race@example.com');
+  await page.locator('#boundaries-checkbox').check();
+  await page.locator('#confirm-booking-button').click();
+  await expect.poll(() => checkoutRequests).toBe(1);
+  await expect(page.locator('#confirm-booking-button')).toHaveText('Securing your time…');
+
+  const expiredAlert = page.getByRole('alert').filter({ hasText: 'temporary hold has expired' });
+  await expect(expiredAlert).toBeVisible();
+  await expect.poll(() => availabilityRequests).toBeGreaterThan(1);
+  await expect(page.locator('#confirm-booking-button')).toBeDisabled();
+  await page.getByRole('button', { name: /AM$/ }).first().click();
+  await expect(page.locator('#confirm-booking-button')).toBeEnabled();
+  expect(holdRequests).toBe(1);
+  expect(checkoutRequests).toBe(1);
+
+  releaseStaleCheckout?.();
+  await page.waitForTimeout(100);
+  await expect(page).not.toHaveURL(/stale-expiring-hold/);
+  await expect(expiredAlert).toBeVisible();
+  await expect(page.getByRole('alert').filter({ hasText: 'still held' })).toHaveCount(0);
+
+  await page.locator('#confirm-booking-button').click();
+  await expect.poll(() => holdRequests).toBe(2);
+  await expect.poll(() => checkoutRequests).toBe(2);
+  await expect(page).toHaveURL(/\/payment\?booking_id=fresh-hold/);
+});
+
 test('booking availability distinguishes loading, empty, and recoverable service errors', async ({ page }) => {
   let releaseLoading: (() => void) | undefined;
   await page.route('**/api/availability*', async (route) => {
