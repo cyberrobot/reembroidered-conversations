@@ -38,10 +38,10 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           # The repository has no Node version pin; Node 22 is the stable line matching @types/node.
           node-version: 22
@@ -73,7 +73,7 @@ jobs:
 
       - name: Upload Playwright failure diagnostics
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: playwright-diagnostics
           path: |
