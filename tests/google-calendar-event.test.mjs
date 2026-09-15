@@ -5,6 +5,7 @@ import {
   buildBookingCalendarEvent,
   CalendarFinalizationError,
   googleEventIdForBooking,
+  isUsableGoogleMeetUrl,
   meetRequestIdForBooking,
   reconcileBookingCalendarEvent,
   validateBookingCalendarEvent,
@@ -77,6 +78,14 @@ test('valid response extracts only a Google-provided Meet URL', () => {
     calendarEventId: googleEventIdForBooking(booking.id),
     meetingUrl: 'https://meet.google.com/abc-defg-hij',
   });
+});
+
+test('stored Meet URL validation accepts only usable Google Meet HTTPS URLs', () => {
+  assert.equal(isUsableGoogleMeetUrl('https://meet.google.com/abc-defg-hij'), true);
+  assert.equal(isUsableGoogleMeetUrl('http://meet.google.com/abc-defg-hij'), false);
+  assert.equal(isUsableGoogleMeetUrl('https://meet.google.com.example/abc'), false);
+  assert.equal(isUsableGoogleMeetUrl('not-a-url'), false);
+  assert.equal(isUsableGoogleMeetUrl(null), false);
 });
 
 test('pending, failed, malformed, and mismatched events fail closed', () => {

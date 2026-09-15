@@ -54,6 +54,15 @@ export function buildBookingCalendarEvent(booking) {
   };
 }
 
+export function isUsableGoogleMeetUrl(candidate) {
+  try {
+    const url = new URL(candidate);
+    return url.protocol === 'https:' && url.hostname === 'meet.google.com';
+  } catch {
+    return false;
+  }
+}
+
 function meetUrl(event) {
   const candidates = [
     event?.hangoutLink,
@@ -61,9 +70,7 @@ function meetUrl(event) {
       ? event.conferenceData.entryPoints.filter((entry) => entry?.entryPointType === 'video').map((entry) => entry?.uri)
       : []),
   ];
-  return candidates.find((candidate) => {
-    try { const url = new URL(candidate); return url.protocol === 'https:' && url.hostname === 'meet.google.com'; } catch { return false; }
-  });
+  return candidates.find(isUsableGoogleMeetUrl);
 }
 
 export function validateBookingCalendarEvent(event, booking, expectedEventId = googleEventIdForBooking(booking.id)) {

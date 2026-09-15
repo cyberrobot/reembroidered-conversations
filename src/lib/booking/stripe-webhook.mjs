@@ -1,6 +1,10 @@
 // @ts-check
 
 import 'server-only';
+import {
+  googleEventIdForBooking,
+  isUsableGoogleMeetUrl,
+} from '../calendar/booking-event.mjs';
 import { SESSION_PRODUCT } from './session-product.mjs';
 
 export class StripeWebhookReconciliationError extends Error {
@@ -64,17 +68,27 @@ export async function processStripeWebhookEvent(event, persistence, finalizeCale
       throw new StripeWebhookReconciliationError();
     }
     if (booking.status === 'CONFIRMED') {
-      if (!booking.calendarEventId || !booking.meetingUrl) throw new StripeWebhookReconciliationError();
+      let expectedEventId;
+      try { expectedEventId = googleEventIdForBooking(booking.id); }
+      catch { throw new StripeWebhookReconciliationError(); }
+      if (booking.calendarEventId !== expectedEventId || !isUsableGoogleMeetUrl(booking.meetingUrl)) {
+        throw new StripeWebhookReconciliationError();
+      }
       return;
     }
     if (!finalizeCalendar) return;
     let google;
     try { google = await finalizeCalendar(booking); } catch { throw new StripeWebhookReconciliationError('Calendar finalization is pending.'); }
     if (!google?.calendarEventId || !google?.meetingUrl) throw new StripeWebhookReconciliationError('Calendar finalization is pending.');
-    const confirmed = await persistence.confirm({
-      bookingId, sessionId: session.id, paymentIntentId: session.payment_intent,
-      calendarEventId: google.calendarEventId, meetingUrl: google.meetingUrl,
-    });
+    let confirmed;
+    try {
+      confirmed = await persistence.confirm({
+        bookingId, sessionId: session.id, paymentIntentId: session.payment_intent,
+        calendarEventId: google.calendarEventId, meetingUrl: google.meetingUrl,
+      });
+    } catch {
+      throw new StripeWebhookReconciliationError('Calendar finalization persistence is pending.');
+    }
     if (confirmed.count === 1) return;
     const current = await persistence.findBooking(bookingId);
     if (current?.status === 'CONFIRMED' && current.stripeCheckoutSessionId === session.id &&
