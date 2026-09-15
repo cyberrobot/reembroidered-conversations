@@ -6,7 +6,6 @@ import {
   Clock,
   Video,
   Phone,
-  CheckCircle,
   ShieldCheck,
   AlertCircle,
   ChevronLeft,
@@ -149,10 +148,10 @@ export const BookingSection: React.FC = () => {
   const [optionalNote, setOptionalNote] = useState('');
   const [acceptedBoundaries, setAcceptedBoundaries] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  const [holdStatus, setHoldStatus] = useState<'idle' | 'creating' | 'created'>('idle');
   const [hold, setHold] = useState<BookingHold | null>(null);
-  const [checkoutStatus, setCheckoutStatus] = useState<'idle' | 'starting' | 'redirecting'>('idle');
+  const [checkoutStatus, setCheckoutStatus] = useState<'idle' | 'processing' | 'redirecting'>('idle');
   const [checkoutError, setCheckoutError] = useState('');
+  const checkoutInFlightRef = useRef(false);
 
   const activeDay = availableDays[selectedDayIndex] || availableDays[0];
   const selectedSlotData = activeDay?.slots.find((slot) => slot.id === selectedSlot);
@@ -176,6 +175,7 @@ export const BookingSection: React.FC = () => {
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (checkoutInFlightRef.current) return;
     if (!name.trim()) {
       setErrorMsg('Please provide your name.');
       return;
@@ -194,49 +194,44 @@ export const BookingSection: React.FC = () => {
     }
 
     setErrorMsg('');
-    setHoldStatus('creating');
-    try {
-      const response = await fetch('/api/bookings/hold', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, startAt: selectedSlotData.startAt }),
-      });
-      const body = await response.json() as BookingHoldResponse | { error?: { code?: string } };
-      if (!response.ok) {
-        if (response.status === 409) {
-          setSelectedSlot('');
-          setRequiresFreshSelection(true);
-          setErrorMsg('That time has just become unavailable. Please choose another available time.');
-          setAvailabilityRequest((request) => request + 1);
-        } else {
-          setErrorMsg('Your time has not yet been reserved. Please try again.');
-        }
-        setHoldStatus('idle');
-        return;
-      }
-      setHold((body as BookingHoldResponse).hold);
-      setHoldStatus('created');
-    } catch {
-      setErrorMsg('Your time has not yet been reserved. Please try again.');
-      setHoldStatus('idle');
-    }
-  };
-
-  const startCheckout = async () => {
-    if (!hold || checkoutStatus !== 'idle') return;
     setCheckoutError('');
-    setCheckoutStatus('starting');
+    checkoutInFlightRef.current = true;
+    setCheckoutStatus('processing');
+    let reusableHold = hold;
     try {
+      if (!reusableHold) {
+        const response = await fetch('/api/bookings/hold', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, startAt: selectedSlotData.startAt }),
+        });
+        const body = await response.json() as BookingHoldResponse | { error?: { code?: string } };
+        if (!response.ok) {
+          if (response.status === 409) {
+            setSelectedSlot('');
+            setRequiresFreshSelection(true);
+            setErrorMsg('That time has just become unavailable. Please choose another available time.');
+            setAvailabilityRequest((request) => request + 1);
+          } else {
+            setErrorMsg('Your time has not yet been reserved. Please try again.');
+          }
+          checkoutInFlightRef.current = false;
+          setCheckoutStatus('idle');
+          return;
+        }
+        reusableHold = (body as BookingHoldResponse).hold;
+        setHold(reusableHold);
+      }
+
       const response = await fetch('/api/bookings/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingId: hold.id }),
+        body: JSON.stringify({ bookingId: reusableHold.id }),
       });
       const body = await response.json() as BookingCheckoutResponse | { error?: { code?: string } };
       if (!response.ok) {
         if ('error' in body && body.error?.code === 'hold_unavailable') {
           setHold(null);
-          setHoldStatus('idle');
           setSelectedSlot('');
           setRequiresFreshSelection(true);
           setErrorMsg('Your temporary hold is no longer reserved. Please choose an available time again.');
@@ -244,6 +239,7 @@ export const BookingSection: React.FC = () => {
         } else {
           setCheckoutError('Secure payment could not be started. Your time is still held, so please try again.');
         }
+        checkoutInFlightRef.current = false;
         setCheckoutStatus('idle');
         return;
       }
@@ -252,7 +248,12 @@ export const BookingSection: React.FC = () => {
       setCheckoutStatus('redirecting');
       window.location.assign(checkout.url);
     } catch {
-      setCheckoutError('Secure payment could not be started. Your time is still held, so please try again.');
+      if (reusableHold) {
+        setCheckoutError('Secure payment could not be started. Your time is still held, so please try again.');
+      } else {
+        setErrorMsg('Your time has not yet been reserved. Please try again.');
+      }
+      checkoutInFlightRef.current = false;
       setCheckoutStatus('idle');
     }
   };
@@ -262,9 +263,11 @@ export const BookingSection: React.FC = () => {
     const delay = Math.max(0, Date.parse(hold.expiresAt) - Date.now());
     const timer = window.setTimeout(() => {
       setHold(null);
-      setHoldStatus('idle');
+      checkoutInFlightRef.current = false;
+      setCheckoutStatus('idle');
       setSelectedSlot('');
       setRequiresFreshSelection(true);
+      setCheckoutError('');
       setErrorMsg('Your temporary hold has expired. Please choose an available time again.');
       setAvailabilityRequest((request) => request + 1);
     }, delay);
@@ -305,49 +308,7 @@ export const BookingSection: React.FC = () => {
           </div>
         </div>
 
-        {/* A hold is deliberately not a payment or confirmed booking. */}
-        {holdStatus === 'created' && hold ? (
-          <div className="bg-[#FDFCFB] border border-[#E8DFD5] rounded-2xl p-8 sm:p-12 shadow-md relative overflow-hidden animate-fadeIn">
-            <div className="h-1.5 w-full bg-[#A35048] absolute top-0 left-0" />
-
-            <div className="max-w-xl mx-auto text-center space-y-6">
-              <div className="w-14 h-14 rounded-full bg-[#F5EFE9] text-[#A35048] flex items-center justify-center mx-auto border border-[#E8DFD5]">
-                <CheckCircle className="w-8 h-8 stroke-[1.5]" />
-              </div>
-
-              <div>
-                <span className="text-xs uppercase tracking-widest font-sans text-[#A35048] font-medium">
-                  Temporary Hold Created
-                </span>
-                <h3 className="font-serif text-3xl sm:text-4xl text-[#282524] font-medium mt-1">
-                  Your selected time is temporarily held.
-                </h3>
-                <p className="font-sans text-sm text-[#78716C] mt-2">
-                  Held until{' '}
-                  <time dateTime={hold.expiresAt} className="font-medium text-[#282524]">
-                    {new Intl.DateTimeFormat('en-GB', {
-                      timeZone: hold.timezone, dateStyle: 'medium', timeStyle: 'short',
-                    }).format(new Date(hold.expiresAt))}
-                  </time>
-                </p>
-              </div>
-              <div role="status" className="bg-[#FAF8F5] p-5 rounded-xl border border-[#E8DFD5] text-sm text-[#4B4643]">
-                This is not yet paid or confirmed. Secure your £55 payment through Stripe to continue.
-              </div>
-              {checkoutError && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{checkoutError}</div>}
-              <button
-                type="button"
-                onClick={startCheckout}
-                disabled={checkoutStatus !== 'idle'}
-                aria-busy={checkoutStatus !== 'idle'}
-                className="w-full rounded-full bg-[#A35048] px-8 py-3.5 text-sm font-medium text-[#FAF8F5] shadow-sm transition-colors hover:bg-[#8C4038] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {checkoutStatus === 'starting' ? 'Starting secure payment…' : checkoutStatus === 'redirecting' ? 'Redirecting to Stripe…' : 'Continue to secure payment · £55'}
-              </button>
-            </div>
-          </div>
-        ) : (
-          /* Interactive Booking Form */
+        {/* Interactive Booking Form */}
           <form
             onSubmit={handleSubmit}
             className="bg-[#FDFCFB] border border-[#E8DFD5] rounded-2xl p-6 sm:p-10 shadow-sm"
@@ -412,6 +373,7 @@ export const BookingSection: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setShowFullCalendar(true)}
+                      disabled={Boolean(hold)}
                       className="inline-flex items-center gap-1.5 text-xs text-[#A35048] hover:text-[#8C4038] font-medium underline underline-offset-4 decoration-[#A35048]/40 hover:decoration-[#A35048] transition-colors cursor-pointer"
                     >
                       <CalendarIcon className="w-3.5 h-3.5 stroke-[1.75]" />
@@ -506,6 +468,7 @@ export const BookingSection: React.FC = () => {
                               setRequiresFreshSelection(false);
                             }
                           }}
+                          disabled={Boolean(hold)}
                           className={`shrink-0 px-4 py-3 rounded-xl border text-left cursor-pointer transition-all duration-150 min-w-[104px] ${
                             isSelected
                               ? 'bg-[#A35048] text-[#FAF8F5] border-[#A35048] shadow-xs'
@@ -544,6 +507,7 @@ export const BookingSection: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setShowFullCalendar(true)}
+                      disabled={Boolean(hold)}
                       className="shrink-0 px-4 py-3 rounded-xl border border-dashed border-[#C4B7A9] hover:border-[#A35048] text-left cursor-pointer transition-all duration-150 bg-[#FAF8F5]/80 hover:bg-[#F5EFE9] flex flex-col justify-center items-center min-w-[110px] group"
                       title="Open full calendar to select any date across the next 8 weeks"
                     >
@@ -587,6 +551,7 @@ export const BookingSection: React.FC = () => {
                       key={slot.id}
                       type="button"
                       onClick={() => { setSelectedSlot(slot.id); setRequiresFreshSelection(false); }}
+                      disabled={Boolean(hold)}
                       className={`py-2.5 px-3 rounded-xl border text-sm font-sans font-medium transition-all cursor-pointer text-center ${
                         selectedSlot === slot.id
                           ? 'bg-[#282524] text-white border-[#282524] shadow-xs ring-2 ring-[#A35048]/30'
@@ -666,6 +631,7 @@ export const BookingSection: React.FC = () => {
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
+                    disabled={Boolean(hold)}
                     placeholder="e.g. Sarah"
                     className="w-full bg-[#FAF8F5] border border-[#E8DFD5] rounded-xl px-4 py-2.5 text-sm text-[#282524] placeholder-[#A8A29E] focus:outline-none focus:border-[#A35048]"
                   />
@@ -681,6 +647,7 @@ export const BookingSection: React.FC = () => {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    disabled={Boolean(hold)}
                     placeholder="sarah@example.com"
                     className="w-full bg-[#FAF8F5] border border-[#E8DFD5] rounded-xl px-4 py-2.5 text-sm text-[#282524] placeholder-[#A8A29E] focus:outline-none focus:border-[#A35048]"
                   />
@@ -752,6 +719,12 @@ export const BookingSection: React.FC = () => {
                   <span>{errorMsg}</span>
                 </div>
               )}
+              {checkoutError && (
+                <div role="alert" className="p-3 mb-6 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{checkoutError}</span>
+                </div>
+              )}
 
               {/* Submit CTA */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
@@ -769,17 +742,16 @@ export const BookingSection: React.FC = () => {
                   <button
                     id="confirm-booking-button"
                     type="submit"
-                    disabled={availabilityStatus !== 'ready' || !selectedSlotData || holdStatus === 'creating'}
-                    aria-busy={holdStatus === 'creating'}
+                    disabled={availabilityStatus !== 'ready' || !selectedSlotData || checkoutStatus !== 'idle'}
+                    aria-busy={checkoutStatus !== 'idle'}
                     className="w-full sm:w-auto bg-[#A35048] hover:bg-[#8C4038] text-[#FAF8F5] text-sm font-medium px-8 py-3.5 rounded-full transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {holdStatus === 'creating' ? 'Reserving your time…' : 'Reserve Conversation'}
+                    {checkoutStatus !== 'idle' ? 'Securing your time…' : 'Book & pay £55'}
                   </button>
                 </div>
               </div>
             </div>
           </form>
-        )}
         {/* Full Month Calendar Modal */}
         <FullCalendarModal
           isOpen={showFullCalendar}
