@@ -1,6 +1,10 @@
 // @ts-check
 
 import 'server-only';
+import {
+  googleEventIdForBooking,
+  isUsableGoogleMeetUrl,
+} from '../calendar/booking-event.mjs';
 import { SESSION_PRODUCT } from './session-product.mjs';
 
 export class StripeWebhookReconciliationError extends Error {
@@ -19,7 +23,18 @@ export function createStripeWebhookPersistence(database) {
     }),
     findBooking: (bookingId) => database.booking.findUnique({
       where: { id: bookingId },
-      select: { status: true, stripeCheckoutSessionId: true, stripePaymentIntentId: true },
+      select: {
+        id: true, email: true, startAt: true, endAt: true, timezone: true, status: true,
+        stripeCheckoutSessionId: true, stripePaymentIntentId: true,
+        calendarEventId: true, meetingUrl: true,
+      },
+    }),
+    confirm: ({ bookingId, sessionId, paymentIntentId, calendarEventId, meetingUrl }) => database.booking.updateMany({
+      where: {
+        id: bookingId, status: 'PAID', stripeCheckoutSessionId: sessionId,
+        stripePaymentIntentId: paymentIntentId,
+      },
+      data: { status: 'CONFIRMED', calendarEventId, meetingUrl },
     }),
   };
 }
@@ -32,7 +47,7 @@ function correlation(session) {
   return metadataId;
 }
 
-export async function processStripeWebhookEvent(event, persistence) {
+export async function processStripeWebhookEvent(event, persistence, finalizeCalendar) {
   if (event?.type !== 'checkout.session.completed' && event?.type !== 'checkout.session.expired') return;
   const session = event?.data?.object;
   if (!session || session.object !== 'checkout.session' || typeof session.id !== 'string') {
@@ -46,11 +61,39 @@ export async function processStripeWebhookEvent(event, persistence) {
         typeof session.payment_intent !== 'string') {
       throw new StripeWebhookReconciliationError('Unexpected payment details.');
     }
-    const result = await persistence.markPaid({ bookingId, sessionId: session.id, paymentIntentId: session.payment_intent });
-    if (result.count === 1) return;
+    await persistence.markPaid({ bookingId, sessionId: session.id, paymentIntentId: session.payment_intent });
     const booking = await persistence.findBooking(bookingId);
-    if (booking && ['PAID', 'CONFIRMED'].includes(booking.status) &&
-        booking.stripeCheckoutSessionId === session.id && booking.stripePaymentIntentId === session.payment_intent) return;
+    if (!booking || !['PAID', 'CONFIRMED'].includes(booking.status) ||
+        booking.stripeCheckoutSessionId !== session.id || booking.stripePaymentIntentId !== session.payment_intent) {
+      throw new StripeWebhookReconciliationError();
+    }
+    if (booking.status === 'CONFIRMED') {
+      let expectedEventId;
+      try { expectedEventId = googleEventIdForBooking(booking.id); }
+      catch { throw new StripeWebhookReconciliationError(); }
+      if (booking.calendarEventId !== expectedEventId || !isUsableGoogleMeetUrl(booking.meetingUrl)) {
+        throw new StripeWebhookReconciliationError();
+      }
+      return;
+    }
+    if (!finalizeCalendar) return;
+    let google;
+    try { google = await finalizeCalendar(booking); } catch { throw new StripeWebhookReconciliationError('Calendar finalization is pending.'); }
+    if (!google?.calendarEventId || !google?.meetingUrl) throw new StripeWebhookReconciliationError('Calendar finalization is pending.');
+    let confirmed;
+    try {
+      confirmed = await persistence.confirm({
+        bookingId, sessionId: session.id, paymentIntentId: session.payment_intent,
+        calendarEventId: google.calendarEventId, meetingUrl: google.meetingUrl,
+      });
+    } catch {
+      throw new StripeWebhookReconciliationError('Calendar finalization persistence is pending.');
+    }
+    if (confirmed.count === 1) return;
+    const current = await persistence.findBooking(bookingId);
+    if (current?.status === 'CONFIRMED' && current.stripeCheckoutSessionId === session.id &&
+        current.stripePaymentIntentId === session.payment_intent &&
+        current.calendarEventId === google.calendarEventId && current.meetingUrl === google.meetingUrl) return;
     throw new StripeWebhookReconciliationError();
   }
 
@@ -64,5 +107,6 @@ export async function processStripeWebhookEvent(event, persistence) {
 
 export async function processStripeWebhook(event) {
   const { db } = await import('../db.ts');
-  return processStripeWebhookEvent(event, createStripeWebhookPersistence(db));
+  const { reconcileBookingCalendarEvent } = await import('../calendar/booking-event.mjs');
+  return processStripeWebhookEvent(event, createStripeWebhookPersistence(db), reconcileBookingCalendarEvent);
 }
