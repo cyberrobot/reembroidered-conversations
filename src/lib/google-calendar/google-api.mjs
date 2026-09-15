@@ -1,16 +1,84 @@
 import {
   GOOGLE_CALENDAR_LIST_ENDPOINT,
   GOOGLE_FREEBUSY_ENDPOINT,
+  GOOGLE_CALENDAR_EVENTS_ENDPOINT,
   GOOGLE_TOKEN_ENDPOINT,
 } from './constants.mjs';
 
 export class GoogleApiError extends Error {
-  /** @param {'authorization' | 'unavailable' | 'invalid_response'} category */
+  /** @param {'authorization' | 'unavailable' | 'invalid_response' | 'conflict'} category */
   constructor(category) {
     super('Google Calendar request failed.');
     this.name = 'GoogleApiError';
     this.category = category;
   }
+}
+
+function calendarEventUrl(calendarId, eventId) {
+  const url = new URL(`${GOOGLE_CALENDAR_EVENTS_ENDPOINT}/${encodeURIComponent(calendarId)}/events`);
+  if (eventId) url.pathname += `/${encodeURIComponent(eventId)}`;
+  return url;
+}
+
+async function calendarEventResponse(response) {
+  if (response.ok) return readJson(response);
+  if (response.status === 409) throw new GoogleApiError('conflict');
+  if (response.status === 401 || response.status === 403) {
+    if (response.status === 403) {
+      try {
+        const body = await response.json();
+        const reasons = Array.isArray(body?.error?.errors)
+          ? body.error.errors.map((error) => error?.reason).filter(Boolean)
+          : [];
+        if (reasons.some((reason) => ['rateLimitExceeded', 'userRateLimitExceeded', 'quotaExceeded'].includes(reason))) {
+          throw new GoogleApiError('unavailable');
+        }
+      } catch (error) {
+        if (error instanceof GoogleApiError) throw error;
+      }
+    }
+    throw new GoogleApiError('authorization');
+  }
+  throw new GoogleApiError('unavailable');
+}
+
+export async function insertGoogleCalendarEvent(
+  { accessToken, calendarId, event },
+  fetchImplementation = fetch,
+) {
+  const url = calendarEventUrl(calendarId);
+  url.searchParams.set('conferenceDataVersion', '1');
+  url.searchParams.set('sendUpdates', 'all');
+  let response;
+  try {
+    response = await fetchImplementation(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(event),
+      cache: 'no-store',
+    });
+  } catch {
+    throw new GoogleApiError('unavailable');
+  }
+  return calendarEventResponse(response);
+}
+
+export async function getGoogleCalendarEvent(
+  { accessToken, calendarId, eventId },
+  fetchImplementation = fetch,
+) {
+  const url = calendarEventUrl(calendarId, eventId);
+  url.searchParams.set('conferenceDataVersion', '1');
+  let response;
+  try {
+    response = await fetchImplementation(url, {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+      cache: 'no-store',
+    });
+  } catch {
+    throw new GoogleApiError('unavailable');
+  }
+  return calendarEventResponse(response);
 }
 
 const RFC3339_INSTANT_PATTERN =

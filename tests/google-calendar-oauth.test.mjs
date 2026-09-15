@@ -12,12 +12,13 @@ import {
   validateOAuthStateEnvelope,
 } from '../src/lib/google-calendar/oauth.mjs';
 
-test('OAuth scopes are exactly the approved identity, CalendarList, and FreeBusy scopes', () => {
+test('OAuth scopes are exactly the approved identity, CalendarList, FreeBusy, and owned-event scopes', () => {
   assert.deepEqual([...GOOGLE_OAUTH_SCOPES], [
     'openid',
     'email',
     'https://www.googleapis.com/auth/calendar.calendarlist.readonly',
     'https://www.googleapis.com/auth/calendar.freebusy',
+    'https://www.googleapis.com/auth/calendar.events.owned',
   ]);
 });
 

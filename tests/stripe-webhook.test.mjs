@@ -8,7 +8,11 @@ const session = (overrides = {}) => ({ object: 'checkout.session', id: 'cs_test_
 const event = (type, overrides) => ({ id: 'evt_test', type, data: { object: session(overrides) } });
 
 function persistence(initial = { status: 'HOLD', stripeCheckoutSessionId: 'cs_test_one', stripePaymentIntentId: null }) {
-  let booking = { ...initial };
+  let booking = {
+    id: bookingId, email: 'listener@example.com', startAt: new Date('2030-01-01T10:00:00Z'),
+    endAt: new Date('2030-01-01T10:55:00Z'), timezone: 'Europe/London', calendarEventId: null,
+    meetingUrl: null, ...initial,
+  };
   return {
     markPaid: async ({ sessionId, paymentIntentId }) => {
       if (booking.status !== 'HOLD' || booking.stripeCheckoutSessionId !== sessionId) return { count: 0 };
@@ -19,6 +23,10 @@ function persistence(initial = { status: 'HOLD', stripeCheckoutSessionId: 'cs_te
       booking = { ...booking, status: 'CANCELLED' }; return { count: 1 };
     },
     findBooking: async () => booking,
+    confirm: async ({ sessionId, paymentIntentId, calendarEventId, meetingUrl }) => {
+      if (booking.status !== 'PAID' || booking.stripeCheckoutSessionId !== sessionId || booking.stripePaymentIntentId !== paymentIntentId) return { count: 0 };
+      booking = { ...booking, status: 'CONFIRMED', calendarEventId, meetingUrl }; return { count: 1 };
+    },
     get: () => booking,
   };
 }
@@ -29,6 +37,61 @@ test('completed paid Checkout moves HOLD to PAID and duplicate delivery is idemp
   await processStripeWebhookEvent(event('checkout.session.completed'), p);
   assert.equal(p.get().status, 'PAID');
   assert.equal(p.get().stripePaymentIntentId, 'pi_test_one');
+});
+
+test('completed paid Checkout moves HOLD through PAID to CONFIRMED after Google succeeds', async () => {
+  const p = persistence();
+  const seen = [];
+  await processStripeWebhookEvent(event('checkout.session.completed'), p, async (paidBooking) => {
+    seen.push(paidBooking.status);
+    return { calendarEventId: 'rec5a4496557be3432ca124b769e10b50ef', meetingUrl: 'https://meet.google.com/abc-defg-hij' };
+  });
+  assert.deepEqual(seen, ['PAID']);
+  assert.equal(p.get().status, 'CONFIRMED');
+  assert.equal(p.get().calendarEventId, 'rec5a4496557be3432ca124b769e10b50ef');
+  assert.equal(p.get().meetingUrl, 'https://meet.google.com/abc-defg-hij');
+});
+
+test('Google failure leaves payment durably PAID and duplicate webhook retries finalization', async () => {
+  const p = persistence(); let calls = 0;
+  const finalize = async () => {
+    calls += 1;
+    if (calls === 1) throw new Error('provider detail');
+    return { calendarEventId: 'event-id', meetingUrl: 'https://meet.google.com/abc-defg-hij' };
+  };
+  await assert.rejects(() => processStripeWebhookEvent(event('checkout.session.completed'), p, finalize), StripeWebhookReconciliationError);
+  assert.equal(p.get().status, 'PAID');
+  await processStripeWebhookEvent(event('checkout.session.completed'), p, finalize);
+  assert.equal(p.get().status, 'CONFIRMED');
+  assert.equal(calls, 2);
+});
+
+test('duplicate completed webhook after CONFIRMED is a Google no-op', async () => {
+  const p = persistence({
+    status: 'CONFIRMED', stripeCheckoutSessionId: 'cs_test_one', stripePaymentIntentId: 'pi_test_one',
+    calendarEventId: 'event-id', meetingUrl: 'https://meet.google.com/abc-defg-hij',
+  });
+  let calls = 0;
+  await processStripeWebhookEvent(event('checkout.session.completed'), p, async () => { calls += 1; });
+  assert.equal(calls, 0);
+});
+
+test('failed local confirmation is recovered only when matching confirmed data is reloaded', async () => {
+  const p = persistence({ status: 'PAID', stripeCheckoutSessionId: 'cs_test_one', stripePaymentIntentId: 'pi_test_one' });
+  p.confirm = async ({ calendarEventId, meetingUrl }) => {
+    const current = p.get();
+    Object.assign(current, { status: 'CONFIRMED', calendarEventId, meetingUrl });
+    return { count: 0 };
+  };
+  await processStripeWebhookEvent(event('checkout.session.completed'), p, async () => ({ calendarEventId: 'event-id', meetingUrl: 'https://meet.google.com/abc-defg-hij' }));
+  assert.equal(p.get().status, 'CONFIRMED');
+});
+
+test('unsupported and expired events never invoke Calendar finalization', async () => {
+  let calls = 0; const finalize = async () => { calls += 1; };
+  await processStripeWebhookEvent({ type: 'customer.created' }, persistence(), finalize);
+  await processStripeWebhookEvent(event('checkout.session.expired', { payment_status: 'unpaid', payment_intent: null }), persistence(), finalize);
+  assert.equal(calls, 0);
 });
 
 test('completed payment after local Checkout expiry still moves unresolved HOLD to PAID', async () => {
@@ -64,7 +127,10 @@ test('expiry never downgrades paid and completion never downgrades confirmed', a
   const paid = persistence({ status: 'PAID', stripeCheckoutSessionId: 'cs_test_one', stripePaymentIntentId: 'pi_test_one' });
   await processStripeWebhookEvent(event('checkout.session.expired', { payment_status: 'unpaid' }), paid);
   assert.equal(paid.get().status, 'PAID');
-  const confirmed = persistence({ status: 'CONFIRMED', stripeCheckoutSessionId: 'cs_test_one', stripePaymentIntentId: 'pi_test_one' });
+  const confirmed = persistence({
+    status: 'CONFIRMED', stripeCheckoutSessionId: 'cs_test_one', stripePaymentIntentId: 'pi_test_one',
+    calendarEventId: 'event-id', meetingUrl: 'https://meet.google.com/abc-defg-hij',
+  });
   await processStripeWebhookEvent(event('checkout.session.completed'), confirmed);
   assert.equal(confirmed.get().status, 'CONFIRMED');
 });
