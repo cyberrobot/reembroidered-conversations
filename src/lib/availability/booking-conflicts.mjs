@@ -5,12 +5,13 @@ import 'server-only';
 const MINUTE_MS = 60_000;
 
 /**
- * @typedef {{ startAt: Date, endAt: Date, status?: 'HOLD' | 'PAID' | 'CONFIRMED' | 'CANCELLED' | 'REFUNDED', expiresAt?: Date }} BookingConflict
+ * @typedef {{ startAt: Date, endAt: Date, status?: 'HOLD' | 'PAID' | 'CONFIRMED' | 'CANCELLED' | 'REFUNDED', expiresAt?: Date, stripeCheckoutSessionId?: string | null }} BookingConflict
  */
 
 /**
  * Load every slot-owning booking which intersects one bounded candidate range.
- * Expired holds and released bookings are excluded by the database query.
+ * Ordinary expired holds and released bookings are excluded. Checkout-backed
+ * holds remain slot-owning until an authoritative Stripe webhook resolves them.
  *
  * @param {{ from: Date, to: Date, now: Date }} input
  * @returns {Promise<BookingConflict[]>}
@@ -23,10 +24,16 @@ export async function getActiveBookingConflicts({ from, to, now }) {
       endAt: { gt: from },
       OR: [
         { status: { in: ['PAID', 'CONFIRMED'] } },
-        { status: 'HOLD', expiresAt: { gt: now } },
+        {
+          status: 'HOLD',
+          OR: [
+            { expiresAt: { gt: now } },
+            { stripeCheckoutSessionId: { not: null } },
+          ],
+        },
       ],
     },
-    select: { startAt: true, endAt: true, status: true, expiresAt: true },
+    select: { startAt: true, endAt: true, status: true, expiresAt: true, stripeCheckoutSessionId: true },
     orderBy: { startAt: 'asc' },
   });
 }
@@ -42,7 +49,10 @@ export async function getActiveBookingConflicts({ from, to, now }) {
 export function toBookingOccupancyIntervals(bookings, config, now) {
   return bookings.filter((booking) =>
     booking.status === undefined || booking.status === 'PAID' || booking.status === 'CONFIRMED' ||
-      (booking.status === 'HOLD' && booking.expiresAt instanceof Date && booking.expiresAt > now)
+      (booking.status === 'HOLD' && (
+        typeof booking.stripeCheckoutSessionId === 'string' ||
+        (booking.expiresAt instanceof Date && booking.expiresAt > now)
+      ))
   ).map((booking) => ({
     startAt: new Date(booking.startAt.getTime() - config.bufferBeforeMinutes * MINUTE_MS).toISOString(),
     endAt: new Date(booking.endAt.getTime() + config.bufferAfterMinutes * MINUTE_MS).toISOString(),

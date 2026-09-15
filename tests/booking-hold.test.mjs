@@ -128,7 +128,12 @@ test('claim transaction releases only an exact expired HOLD before inserting', a
   };
   assert.equal(await createHoldPersistence(database)(input), created);
   assert.deepEqual(calls[0], ['update', {
-    where: { startAt: input.startAt, status: 'HOLD', expiresAt: { lte: now } },
+    where: {
+      startAt: input.startAt,
+      status: 'HOLD',
+      expiresAt: { lte: now },
+      stripeCheckoutSessionId: null,
+    },
     data: { status: 'CANCELLED' },
   }]);
   assert.equal(calls[1][0], 'create');

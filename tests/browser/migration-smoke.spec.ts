@@ -1,4 +1,6 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import 'dotenv/config';
+import pg from 'pg';
 import { invalidPlaybackId } from '../../playwright.config';
 
 const defaultPlaybackId = '4qvdrc02lmk21KDbxfyWcWyiV7YG9Fljckr5xj5wBzXg';
@@ -96,9 +98,11 @@ async function attachScreenshot(page: Page, testInfo: TestInfo, name: string) {
   });
 }
 
-test('production routes and root confirmation entries remain compatible', async ({ request }) => {
+test('production routes ignore legacy payment-authority query parameters', async ({ request }) => {
   await expect((await request.get('/')).status()).toBe(200);
-  await expect((await request.get('/confirmation')).status()).toBe(200);
+  const legacyConfirmation = await request.get('/confirmation?payment_success=true', { maxRedirects: 0 });
+  expect(legacyConfirmation.status()).toBe(307);
+  expect(new URL(legacyConfirmation.headers().location!, 'http://127.0.0.1').pathname).toBe('/payment');
 
   const entries = [
     ['confirmation', 'true'],
@@ -111,18 +115,7 @@ test('production routes and root confirmation entries remain compatible', async 
 
   for (const [key, value] of entries) {
     const response = await request.get(`/?${key}=${encodeURIComponent(value)}`, { maxRedirects: 0 });
-    expect(response.status(), `${key} should redirect once`).toBe(307);
-
-    const location = response.headers().location;
-    expect(location).toBeTruthy();
-    const destination = new URL(location!, 'http://127.0.0.1:3000');
-    expect(destination.pathname).toBe('/confirmation');
-    expect(destination.searchParams.get(key)).toBe(value);
-
-    const destinationResponse = await request.get(`${destination.pathname}${destination.search}`, {
-      maxRedirects: 0,
-    });
-    expect(destinationResponse.status(), `${key} destination should render without a loop`).toBe(200);
+    expect(response.status(), `${key} must not manufacture a confirmation redirect`).toBe(200);
   }
 });
 
@@ -208,6 +201,14 @@ test('booking flow preserves availability and creates an honest temporary hold',
       timezone: 'Europe/London', expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
     } }) });
   });
+  let checkoutRequests = 0;
+  await page.route('**/api/bookings/checkout', async (route) => {
+    checkoutRequests += 1;
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ checkout: {
+      url: '/payment?booking_id=5a449655-7be3-432c-a124-b769e10b50ef',
+      expiresAt: new Date(Date.now() + 30 * 60_000).toISOString(),
+    } }) });
+  });
   await openHomeWithMuxFallback(page);
   await page.locator('#book-session').scrollIntoViewIfNeeded();
 
@@ -275,9 +276,13 @@ test('booking flow preserves availability and creates an honest temporary hold',
   });
   releaseHold?.();
   await expect(page.getByText('Your selected time is temporarily held.')).toBeVisible();
-  await expect(page.getByText('This is not yet paid or confirmed.')).toBeVisible();
+  await expect(page.getByText(/This is not yet paid or confirmed/)).toBeVisible();
   await expect(page.getByText(/Held until/)).toBeVisible();
-  expect(page.url()).not.toContain('/confirmation');
+  const paymentButton = page.getByRole('button', { name: 'Continue to secure payment · £55' });
+  await paymentButton.dblclick();
+  await expect.poll(() => checkoutRequests).toBe(1);
+  await expect(page).toHaveURL(/\/payment\?booking_id=/);
+  await expect(page.getByText('Payment is being processed.')).toBeVisible();
   expect(failures).toEqual([]);
 });
 
@@ -352,6 +357,39 @@ test('lost-slot and temporary hold failures preserve form state and allow recove
   expect(page.url()).not.toContain('/confirmation');
 });
 
+test('checkout initiation failure is retryable and a lost hold refreshes availability', async ({ page }) => {
+  let availabilityRequests = 0;
+  await page.route('**/api/availability*', (route) => {
+    availabilityRequests += 1;
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(availabilityFixture()) });
+  });
+  await page.route('**/api/bookings/hold', (route) => route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ hold: {
+    id: '5a449655-7be3-432c-a124-b769e10b50ef', startAt: '2099-01-02T10:00:00.000Z', endAt: '2099-01-02T10:55:00.000Z',
+    timezone: 'Europe/London', expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+  } }) }));
+  let checkoutRequests = 0;
+  await page.route('**/api/bookings/checkout', (route) => {
+    checkoutRequests += 1;
+    const unavailable = checkoutRequests > 1;
+    return route.fulfill({ status: unavailable ? 409 : 503, contentType: 'application/json', body: JSON.stringify({ error: {
+      code: unavailable ? 'hold_unavailable' : 'checkout_unavailable',
+    } }) });
+  });
+  await page.goto('/');
+  await page.locator('#client-name').fill('Checkout Recovery');
+  await page.locator('#client-email').fill('checkout@example.com');
+  await page.locator('#boundaries-checkbox').check();
+  await page.locator('#confirm-booking-button').click();
+  const paymentButton = page.getByRole('button', { name: 'Continue to secure payment · £55' });
+  await paymentButton.click();
+  await expect(page.getByRole('alert').filter({ hasText: 'please try again' })).toBeVisible();
+  await expect(paymentButton).toBeEnabled();
+  await paymentButton.click();
+  await expect(page.getByRole('alert').filter({ hasText: 'no longer reserved' })).toBeVisible();
+  await expect.poll(() => availabilityRequests).toBeGreaterThan(1);
+  await expect(page.getByText('Your selected time is temporarily held.')).toBeHidden();
+});
+
 test('locally expired hold clears ownership and refreshes availability', async ({ page }) => {
   let availabilityRequests = 0;
   await page.route('**/api/availability*', (route) => {
@@ -397,39 +435,46 @@ test('booking availability distinguishes loading, empty, and recoverable service
   await expect(page.locator('#confirm-booking-button')).toBeDisabled();
 });
 
-test('confirmation parameters and prototype utilities remain usable', async ({ page, context }, testInfo) => {
+test('payment return requires matching booking and Checkout Session identifiers', async ({ page }) => {
   const failures = collectBrowserFailures(page);
-  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-  const query = new URLSearchParams({
-    payment_success: 'true',
-    booking_id: 'RC-12345',
-    name: 'Ada Example',
-    email: 'ada@example.com',
-    date: 'Tuesday, 15 September 2026',
-    time: '11:30 AM',
-    format: 'audio',
-    timezone: 'Europe/London (GMT/BST)',
-    session_id: 'test-session',
-  });
-  await page.goto(`/confirmation?${query}`);
+  const paidId = '5a449655-7be3-432c-a124-b769e10b50c1';
+  const holdId = '5a449655-7be3-432c-a124-b769e10b50c2';
+  const paidSession = 'cs_test_browser_paid';
+  const holdSession = 'cs_test_browser_hold';
+  const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
+  await client.connect();
+  try {
+    await client.query(`
+      INSERT INTO bookings
+        (id, name, email, "startAt", "endAt", timezone, status, "stripeCheckoutSessionId", "stripePaymentIntentId", "expiresAt", "createdAt")
+      VALUES
+        ($1, 'Browser Paid', 'paid@example.com', '2039-01-03T10:00:00Z', '2039-01-03T10:55:00Z', 'Europe/London', 'PAID', $2, 'pi_test_browser_paid', '2039-01-02T10:31:00Z', '2039-01-02T10:00:00Z'),
+        ($3, 'Browser Hold', 'hold@example.com', '2039-01-03T12:00:00Z', '2039-01-03T12:55:00Z', 'Europe/London', 'HOLD', $4, NULL, '2039-01-02T10:31:00Z', '2039-01-02T10:00:00Z')
+    `, [paidId, paidSession, holdId, holdSession]);
 
-  await expect(page.getByText('Ada Example')).toBeVisible();
-  await expect(page.getByText('ada@example.com', { exact: true })).toBeVisible();
-  await expect(page.getByText('Tuesday, 15 September 2026')).toBeVisible();
-  await expect(page.getByText(/11:30 AM \(Europe\/London \(GMT\/BST\)\) · 55 min/)).toBeVisible();
-  await expect(page.getByText('Audio-Only Phone Call')).toBeVisible();
-  await expect(page.getByText('RC-12345', { exact: true })).toBeVisible();
-  await expect(page.getByText('test-session')).toBeVisible();
+    await page.goto(`/payment?booking_id=${paidId}`);
+    await expect(page.getByText('Payment is being processed.')).toBeVisible();
+    await expect(page.getByText('Payment received.')).toHaveCount(0);
 
-  await page.getByTitle('Copy reference code').click();
-  await expect(page.getByTitle('Copy reference code')).toContainText('Copied');
-  const downloadPromise = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Download .ics File (Apple / Outlook)' }).click();
-  expect((await downloadPromise).suggestedFilename()).toBe('listening-session-shahd-karaeen-RC-12345.ics');
-  await attachScreenshot(page, testInfo, 'desktop-confirmation');
+    await page.goto(`/payment?payment_success=true&success=true&booking_id=${paidId}&session_id=cs_test_wrong`);
+    await expect(page.getByText('Payment is being processed.')).toBeVisible();
+    await expect(page.getByText('Payment received.')).toHaveCount(0);
 
-  await page.getByRole('button', { name: /Return to Re-Embroidered$/ }).click();
-  await expect(page).toHaveURL('/');
+    await page.goto(`/payment?booking_id=${paidId}&session_id=${paidSession}`);
+    await expect(page.getByText('Payment received.')).toBeVisible();
+    await expect(page.getByText(/booking is being finalised/)).toBeVisible();
+
+    await page.goto(`/payment?booking_id=${holdId}&session_id=${holdSession}`);
+    await expect(page.getByText('Payment is being processed.')).toBeVisible();
+    await expect(page.getByText('Payment received.')).toHaveCount(0);
+
+    await page.goto('/confirmation?payment_success=true&success=true');
+    await expect(page).toHaveURL('/payment');
+    await expect(page.getByText('Payment is being processed.')).toBeVisible();
+  } finally {
+    await client.query('DELETE FROM bookings WHERE id = ANY($1::uuid[])', [[paidId, holdId]]);
+    await client.end();
+  }
   expect(failures).toEqual([]);
 });
 
