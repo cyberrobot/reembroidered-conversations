@@ -68,6 +68,7 @@ await mock.module(configModule, {
         'email',
         'https://www.googleapis.com/auth/calendar.calendarlist.readonly',
         'https://www.googleapis.com/auth/calendar.freebusy',
+        'https://www.googleapis.com/auth/calendar.events.owned',
       ],
       adminEmail: process.env.GOOGLE_ADMIN_EMAIL,
     }),
@@ -180,7 +181,7 @@ function installGoogleFetch(scenario = {}) {
         id_token: scenario.invalidIdentityToken
           ? 'invalid.identity.token'
           : createIdentityToken(scenario.email, scenario.identityOverrides),
-        scope: 'openid email https://www.googleapis.com/auth/calendar.calendarlist.readonly https://www.googleapis.com/auth/calendar.freebusy',
+        scope: 'openid email https://www.googleapis.com/auth/calendar.calendarlist.readonly https://www.googleapis.com/auth/calendar.freebusy https://www.googleapis.com/auth/calendar.events.owned',
       });
     }
     if (url.toString() === 'https://www.googleapis.com/oauth2/v3/certs') {
@@ -251,6 +252,7 @@ test('connect route emits the exact secure authorization request without persist
     'email',
     'https://www.googleapis.com/auth/calendar.calendarlist.readonly',
     'https://www.googleapis.com/auth/calendar.freebusy',
+    'https://www.googleapis.com/auth/calendar.events.owned',
   ]);
   const setCookies = response.headers.getSetCookie().join('\n');
   assert.match(setCookies, /rec_google_oauth_state=.*HttpOnly/i);
@@ -283,6 +285,7 @@ test('callback route completes the real orchestration and rejects replay before 
   assert.deepEqual(persistedConnection.grantedScopes, [
     'openid', 'email', 'https://www.googleapis.com/auth/calendar.calendarlist.readonly',
     'https://www.googleapis.com/auth/calendar.freebusy',
+    'https://www.googleapis.com/auth/calendar.events.owned',
   ]);
   assert.equal(JSON.stringify(persistedConnection).includes('route-test-refresh-token'), false);
   assert.equal(

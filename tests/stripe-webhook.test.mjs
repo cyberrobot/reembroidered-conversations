@@ -2,13 +2,25 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createStripeWebhookHandler } from '../src/lib/booking/stripe-webhook-handler.ts';
 import { processStripeWebhookEvent, StripeWebhookReconciliationError } from '../src/lib/booking/stripe-webhook.mjs';
+import {
+  googleEventIdForBooking,
+  reconcileBookingCalendarEvent,
+} from '../src/lib/calendar/booking-event.mjs';
+import { GOOGLE_EVENTS_OWNED_SCOPE } from '../src/lib/google-calendar/constants.mjs';
+import { GoogleApiError } from '../src/lib/google-calendar/google-api.mjs';
 
 const bookingId = '5a449655-7be3-432c-a124-b769e10b50ef';
+const calendarEventId = googleEventIdForBooking(bookingId);
+const meetingUrl = 'https://meet.google.com/abc-defg-hij';
 const session = (overrides = {}) => ({ object: 'checkout.session', id: 'cs_test_one', client_reference_id: bookingId, metadata: { bookingId }, mode: 'payment', payment_status: 'paid', amount_total: 5500, currency: 'gbp', payment_intent: 'pi_test_one', ...overrides });
 const event = (type, overrides) => ({ id: 'evt_test', type, data: { object: session(overrides) } });
 
 function persistence(initial = { status: 'HOLD', stripeCheckoutSessionId: 'cs_test_one', stripePaymentIntentId: null }) {
-  let booking = { ...initial };
+  let booking = {
+    id: bookingId, email: 'listener@example.com', startAt: new Date('2030-01-01T10:00:00Z'),
+    endAt: new Date('2030-01-01T10:55:00Z'), timezone: 'Europe/London', calendarEventId: null,
+    meetingUrl: null, ...initial,
+  };
   return {
     markPaid: async ({ sessionId, paymentIntentId }) => {
       if (booking.status !== 'HOLD' || booking.stripeCheckoutSessionId !== sessionId) return { count: 0 };
@@ -19,6 +31,10 @@ function persistence(initial = { status: 'HOLD', stripeCheckoutSessionId: 'cs_te
       booking = { ...booking, status: 'CANCELLED' }; return { count: 1 };
     },
     findBooking: async () => booking,
+    confirm: async ({ sessionId, paymentIntentId, calendarEventId, meetingUrl }) => {
+      if (booking.status !== 'PAID' || booking.stripeCheckoutSessionId !== sessionId || booking.stripePaymentIntentId !== paymentIntentId) return { count: 0 };
+      booking = { ...booking, status: 'CONFIRMED', calendarEventId, meetingUrl }; return { count: 1 };
+    },
     get: () => booking,
   };
 }
@@ -29,6 +45,120 @@ test('completed paid Checkout moves HOLD to PAID and duplicate delivery is idemp
   await processStripeWebhookEvent(event('checkout.session.completed'), p);
   assert.equal(p.get().status, 'PAID');
   assert.equal(p.get().stripePaymentIntentId, 'pi_test_one');
+});
+
+test('completed paid Checkout moves HOLD through PAID to CONFIRMED after Google succeeds', async () => {
+  const p = persistence();
+  const seen = [];
+  await processStripeWebhookEvent(event('checkout.session.completed'), p, async (paidBooking) => {
+    seen.push(paidBooking.status);
+    return { calendarEventId, meetingUrl };
+  });
+  assert.deepEqual(seen, ['PAID']);
+  assert.equal(p.get().status, 'CONFIRMED');
+  assert.equal(p.get().calendarEventId, calendarEventId);
+  assert.equal(p.get().meetingUrl, meetingUrl);
+});
+
+test('Google failure leaves payment durably PAID and duplicate webhook retries finalization', async () => {
+  const p = persistence(); let calls = 0;
+  const finalize = async () => {
+    calls += 1;
+    if (calls === 1) throw new Error('provider detail');
+    return { calendarEventId, meetingUrl };
+  };
+  await assert.rejects(() => processStripeWebhookEvent(event('checkout.session.completed'), p, finalize), StripeWebhookReconciliationError);
+  assert.equal(p.get().status, 'PAID');
+  await processStripeWebhookEvent(event('checkout.session.completed'), p, finalize);
+  assert.equal(p.get().status, 'CONFIRMED');
+  assert.equal(calls, 2);
+});
+
+test('duplicate completed webhook accepts matching CONFIRMED Google data without another Google call', async () => {
+  const p = persistence({
+    status: 'CONFIRMED', stripeCheckoutSessionId: 'cs_test_one', stripePaymentIntentId: 'pi_test_one',
+    calendarEventId, meetingUrl,
+  });
+  let calls = 0;
+  await processStripeWebhookEvent(event('checkout.session.completed'), p, async () => { calls += 1; });
+  assert.equal(calls, 0);
+});
+
+test('CONFIRMED webhook rejects wrong event IDs and missing or invalid Meet URLs', async () => {
+  const invalidGoogleData = [
+    { calendarEventId: 'event-id', meetingUrl },
+    { calendarEventId, meetingUrl: null },
+    { calendarEventId, meetingUrl: 'https://example.com/not-meet' },
+  ];
+  for (const data of invalidGoogleData) {
+    await assert.rejects(() => processStripeWebhookEvent(event('checkout.session.completed'), persistence({
+      status: 'CONFIRMED', stripeCheckoutSessionId: 'cs_test_one', stripePaymentIntentId: 'pi_test_one', ...data,
+    }), async () => assert.fail('Calendar finalization must not run')), StripeWebhookReconciliationError);
+  }
+});
+
+test('remote success followed by local persistence failure recovers the same event and Meet on webhook retry', async () => {
+  const p = persistence();
+  const originalConfirm = p.confirm;
+  let confirmAttempts = 0;
+  p.confirm = async (input) => {
+    confirmAttempts += 1;
+    if (confirmAttempts === 1) throw new Error('database unavailable');
+    return originalConfirm(input);
+  };
+
+  let remoteEvent;
+  let logicalEventCreations = 0;
+  let insertAttempts = 0;
+  let getAttempts = 0;
+  const finalize = (paidBooking) => reconcileBookingCalendarEvent(paidBooking, {
+    getCredentials: async () => ({
+      calendarId: 'persisted-calendar@example.com', refreshToken: 'refresh-token',
+      grantedScopes: [GOOGLE_EVENTS_OWNED_SCOPE],
+    }),
+    getOAuthConfig: async () => ({ clientId: 'client-id', clientSecret: 'client-secret' }),
+    refreshAccessToken: async () => ({ accessToken: 'access-token' }),
+    insertEvent: async ({ event: requestedEvent }) => {
+      insertAttempts += 1;
+      if (remoteEvent) throw new GoogleApiError('conflict');
+      logicalEventCreations += 1;
+      remoteEvent = {
+        ...requestedEvent,
+        hangoutLink: meetingUrl,
+        conferenceData: { createRequest: { status: { statusCode: 'success' } } },
+      };
+      return remoteEvent;
+    },
+    getEvent: async ({ eventId }) => {
+      getAttempts += 1;
+      assert.equal(eventId, calendarEventId);
+      return remoteEvent;
+    },
+  });
+
+  await assert.rejects(
+    () => processStripeWebhookEvent(event('checkout.session.completed'), p, finalize),
+    StripeWebhookReconciliationError,
+  );
+  assert.equal(p.get().status, 'PAID');
+  assert.equal(p.get().calendarEventId, null);
+  assert.equal(p.get().meetingUrl, null);
+
+  await processStripeWebhookEvent(event('checkout.session.completed'), p, finalize);
+  assert.equal(logicalEventCreations, 1);
+  assert.equal(insertAttempts, 2);
+  assert.equal(getAttempts, 1);
+  assert.equal(confirmAttempts, 2);
+  assert.equal(p.get().status, 'CONFIRMED');
+  assert.equal(p.get().calendarEventId, calendarEventId);
+  assert.equal(p.get().meetingUrl, meetingUrl);
+});
+
+test('unsupported and expired events never invoke Calendar finalization', async () => {
+  let calls = 0; const finalize = async () => { calls += 1; };
+  await processStripeWebhookEvent({ type: 'customer.created' }, persistence(), finalize);
+  await processStripeWebhookEvent(event('checkout.session.expired', { payment_status: 'unpaid', payment_intent: null }), persistence(), finalize);
+  assert.equal(calls, 0);
 });
 
 test('completed payment after local Checkout expiry still moves unresolved HOLD to PAID', async () => {
@@ -64,7 +194,10 @@ test('expiry never downgrades paid and completion never downgrades confirmed', a
   const paid = persistence({ status: 'PAID', stripeCheckoutSessionId: 'cs_test_one', stripePaymentIntentId: 'pi_test_one' });
   await processStripeWebhookEvent(event('checkout.session.expired', { payment_status: 'unpaid' }), paid);
   assert.equal(paid.get().status, 'PAID');
-  const confirmed = persistence({ status: 'CONFIRMED', stripeCheckoutSessionId: 'cs_test_one', stripePaymentIntentId: 'pi_test_one' });
+  const confirmed = persistence({
+    status: 'CONFIRMED', stripeCheckoutSessionId: 'cs_test_one', stripePaymentIntentId: 'pi_test_one',
+    calendarEventId, meetingUrl,
+  });
   await processStripeWebhookEvent(event('checkout.session.completed'), confirmed);
   assert.equal(confirmed.get().status, 'CONFIRMED');
 });
