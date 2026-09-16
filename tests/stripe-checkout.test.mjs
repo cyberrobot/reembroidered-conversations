@@ -48,6 +48,11 @@ test('active hold creates and persists a correlated card-only Checkout Session',
   assert.equal(input.metadata.bookingId, bookingId);
   assert.equal(input.payment_intent_data.metadata.bookingId, bookingId);
   assert.equal(input.customer_email, 'customer@example.com');
+  const successUrl = new URL(input.success_url);
+  assert.equal(successUrl.pathname, '/booking/success');
+  assert.equal(successUrl.searchParams.get('booking_id'), bookingId);
+  assert.equal(successUrl.searchParams.get('session_id'), '{CHECKOUT_SESSION_ID}');
+  for (const forbidden of ['name', 'date', 'time', 'timezone', 'amount', 'meetingUrl']) assert.equal(successUrl.searchParams.has(forbidden), false);
   assert.equal(input.expires_at, Math.floor(now.getTime() / 1000) + 31 * 60);
   assert.ok(input.expires_at > Math.floor(now.getTime() / 1000) + 30 * 60);
   assert.equal(options.idempotencyKey, `booking-checkout:${bookingId}`);

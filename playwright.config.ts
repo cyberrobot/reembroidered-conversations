@@ -5,7 +5,10 @@ const testPort = process.env.PLAYWRIGHT_PORT ?? '3000';
 
 export default defineConfig({
   testDir: './tests/browser',
-  snapshotPathTemplate: '{testDir}/{testFilePath}-snapshots/{arg}{ext}',
+  // Text rasterization differs between macOS development and Linux CI even
+  // after fonts have loaded. Keep reviewed baselines for each rendering
+  // platform rather than weakening pixel comparisons for every screenshot.
+  snapshotPathTemplate: `{testDir}/{testFilePath}-snapshots/{arg}-${process.platform}{ext}`,
   fullyParallel: false,
   workers: 1,
   timeout: 30_000,

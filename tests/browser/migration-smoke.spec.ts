@@ -102,7 +102,7 @@ test('production routes ignore legacy payment-authority query parameters', async
   await expect((await request.get('/')).status()).toBe(200);
   const legacyConfirmation = await request.get('/confirmation?payment_success=true', { maxRedirects: 0 });
   expect(legacyConfirmation.status()).toBe(307);
-  expect(new URL(legacyConfirmation.headers().location!, 'http://127.0.0.1').pathname).toBe('/payment');
+  expect(new URL(legacyConfirmation.headers().location!, 'http://127.0.0.1').pathname).toBe('/booking/success');
 
   const entries = [
     ['confirmation', 'true'],
@@ -209,7 +209,7 @@ test('one booking action creates a hold and automatically redirects to Checkout'
     checkoutRequests += 1;
     submittedCheckout = route.request().postDataJSON();
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ checkout: {
-      url: '/payment?booking_id=5a449655-7be3-432c-a124-b769e10b50ef',
+      url: '/booking/success?booking_id=5a449655-7be3-432c-a124-b769e10b50ef&session_id=cs_test_browser_smoke',
       expiresAt: new Date(Date.now() + 30 * 60_000).toISOString(),
     } }) });
   });
@@ -287,8 +287,8 @@ test('one booking action creates a hold and automatically redirects to Checkout'
   expect(submittedCheckout).toEqual({ bookingId: '5a449655-7be3-432c-a124-b769e10b50ef' });
   await expect(page.getByText('Temporary Hold Created')).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Continue to secure payment/ })).toHaveCount(0);
-  await expect(page).toHaveURL(/\/payment\?booking_id=/);
-  await expect(page.getByText('Payment is being processed.')).toBeVisible();
+  await expect(page).toHaveURL(/\/booking\/success\?booking_id=/);
+  await expect(page.getByText('We couldn’t verify this booking link.')).toBeVisible();
   expect(failures).toEqual([]);
 });
 
@@ -477,7 +477,7 @@ test('a pending Checkout response cannot affect state after its hold expires', a
   await page.locator('#confirm-booking-button').click();
   await expect.poll(() => holdRequests).toBe(2);
   await expect.poll(() => checkoutRequests).toBe(2);
-  await expect(page).toHaveURL(/\/payment\?booking_id=fresh-hold/);
+  await expect(page).toHaveURL(/\/booking\/success\?booking_id=fresh-hold/);
 });
 
 test('booking availability distinguishes loading, empty, and recoverable service errors', async ({ page }) => {
@@ -518,24 +518,23 @@ test('payment return requires matching booking and Checkout Session identifiers'
     `, [paidId, paidSession, holdId, holdSession]);
 
     await page.goto(`/payment?booking_id=${paidId}`);
-    await expect(page.getByText('Payment is being processed.')).toBeVisible();
-    await expect(page.getByText('Payment received.')).toHaveCount(0);
+    await expect(page).toHaveURL(new RegExp(`/booking/success\\?booking_id=${paidId}`));
+    await expect(page.getByText('We couldn’t verify this booking link.')).toBeVisible();
 
     await page.goto(`/payment?payment_success=true&success=true&booking_id=${paidId}&session_id=cs_test_wrong`);
-    await expect(page.getByText('Payment is being processed.')).toBeVisible();
-    await expect(page.getByText('Payment received.')).toHaveCount(0);
+    await expect(page.getByText('We couldn’t verify this booking link.')).toBeVisible();
 
     await page.goto(`/payment?booking_id=${paidId}&session_id=${paidSession}`);
-    await expect(page.getByText('Payment received.')).toBeVisible();
-    await expect(page.getByText(/booking is being finalised/)).toBeVisible();
+    await expect(page.getByText('Payment received')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'We’re preparing your booking.' })).toBeVisible();
 
     await page.goto(`/payment?booking_id=${holdId}&session_id=${holdSession}`);
-    await expect(page.getByText('Payment is being processed.')).toBeVisible();
-    await expect(page.getByText('Payment received.')).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Confirming your payment…' })).toBeVisible();
+    await expect(page.getByText('Payment received')).toHaveCount(0);
 
     await page.goto('/confirmation?payment_success=true&success=true');
-    await expect(page).toHaveURL('/payment');
-    await expect(page.getByText('Payment is being processed.')).toBeVisible();
+    await expect(page).toHaveURL('/booking/success');
+    await expect(page.getByText('We couldn’t verify this booking link.')).toBeVisible();
   } finally {
     await client.query('DELETE FROM bookings WHERE id = ANY($1::uuid[])', [[paidId, holdId]]);
     await client.end();
