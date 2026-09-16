@@ -10,6 +10,7 @@ const bookingIds = [
   '5a449655-7be3-432c-a124-b769e10b5101',
   '5a449655-7be3-432c-a124-b769e10b5102',
   '5a449655-7be3-432c-a124-b769e10b5103',
+  '5a449655-7be3-432c-a124-b769e10b5104',
 ];
 
 async function seedBooking(index: number, status: 'PAID' | 'CONFIRMED' = 'CONFIRMED') {
@@ -55,17 +56,25 @@ test('session mismatch reveals no persisted booking information', async ({ page 
   await expect(page.getByRole('link', { name: 'Join Google Meet' })).toHaveCount(0);
 });
 
-test('PAID booking automatically transitions to confirmed without reload', async ({ page }) => {
+test('finalising booking visual is stable', async ({ page }) => {
   const fixture = await seedBooking(2, 'PAID');
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/booking/success?booking_id=${fixture.id}&session_id=${fixture.sessionId}`);
   await expect(page.getByRole('heading', { name: 'We’re preparing your booking.' })).toBeVisible();
   await expect(page).toHaveScreenshot('booking-success-finalising.png', { fullPage: true, animations: 'disabled' });
+});
+
+test('PAID booking automatically transitions to confirmed without reload', async ({ page }) => {
+  const fixture = await seedBooking(3, 'PAID');
+  await page.goto(`/booking/success?booking_id=${fixture.id}&session_id=${fixture.sessionId}`);
+  await expect(page.getByRole('heading', { name: 'We’re preparing your booking.' })).toBeVisible();
   await pool!.query(
     `UPDATE "bookings" SET "status" = 'CONFIRMED', "calendarEventId" = $2, "meetingUrl" = 'https://meet.google.com/abc-defg-hij' WHERE "id" = $1`,
     [fixture.id, `rec${fixture.id.replaceAll('-', '')}`],
   );
-  await expect(page.getByRole('link', { name: 'Join Google Meet' })).toBeVisible({ timeout: 10_000 });
+  const meet = page.getByRole('link', { name: 'Join Google Meet' });
+  await expect(meet).toBeVisible({ timeout: 10_000 });
+  await expect(meet).toHaveAttribute('href', 'https://meet.google.com/abc-defg-hij');
 });
 
 test('confirmed mobile layout has no horizontal overflow', async ({ page }) => {
