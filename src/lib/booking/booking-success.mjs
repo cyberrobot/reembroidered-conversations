@@ -12,7 +12,7 @@ export function createBookingSuccessPersistence(database) {
     findBooking: (id) => database.booking.findUnique({
       where: { id },
       select: {
-        id: true, name: true, startAt: true, endAt: true, timezone: true, status: true,
+        id: true, name: true, email: true, startAt: true, endAt: true, timezone: true, status: true,
         stripeCheckoutSessionId: true, stripePaymentIntentId: true, calendarEventId: true, meetingUrl: true,
       },
     }),
@@ -31,12 +31,13 @@ export function formatConfirmedBooking(booking) {
     return {
       id: booking.id,
       name: booking.name,
+      email: booking.email,
       date: formatInTimeZone(startAt, booking.timezone, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
       startTime: formatInTimeZone(startAt, booking.timezone, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }),
       endTime: formatInTimeZone(endAt, booking.timezone, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }),
       timezone: booking.timezone,
       timezoneName: formatInTimeZone(startAt, booking.timezone, { timeZoneName: 'short' }).split(' ').at(-1),
-      durationLabel: `${SESSION_PRODUCT.durationMinutes}-minute session`,
+      durationMinutes: SESSION_PRODUCT.durationMinutes,
       paymentLabel: `${SESSION_PRODUCT.displayPrice} paid`,
       meetingUrl: booking.meetingUrl,
     };

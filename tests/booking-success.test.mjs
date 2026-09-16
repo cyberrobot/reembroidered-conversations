@@ -9,6 +9,7 @@ function booking(overrides = {}) {
   return {
     id: bookingId,
     name: 'Sarah Jenkins',
+    email: 'sarah@example.test',
     startAt: new Date('2026-09-24T13:00:00.000Z'),
     endAt: new Date('2026-09-24T13:55:00.000Z'),
     timezone: 'Europe/London',
@@ -56,18 +57,29 @@ test('confirmed state exposes only required customer presentation data', async (
   assert.deepEqual(result.booking, {
     id: bookingId,
     name: 'Sarah Jenkins',
+    email: 'sarah@example.test',
     date: 'Thursday, 24 September 2026',
     startTime: '14:00',
     endTime: '14:55',
     timezone: 'Europe/London',
     timezoneName: 'BST',
-    durationLabel: '55-minute session',
+    durationMinutes: 55,
     paymentLabel: '£55 paid',
     meetingUrl: 'https://meet.google.com/abc-defg-hij',
   });
   assert.equal('stripePaymentIntentId' in result.booking, false);
   assert.equal('calendarEventId' in result.booking, false);
   assert.equal('stripeCheckoutSessionId' in result.booking, false);
+});
+
+test('confirmed view uses persisted identity data only after correlation', async () => {
+  const result = await getBookingSuccessState(
+    { bookingId, sessionId, email: 'attacker@example.test' },
+    { persistence: persistence(booking({ email: 'persisted@example.test' })) },
+  );
+  assert.equal(result.kind, 'confirmed');
+  assert.equal(result.booking.id, bookingId);
+  assert.equal(result.booking.email, 'persisted@example.test');
 });
 
 test('confirmed rows with incomplete finalisation or unsafe Meet URLs fail closed', async () => {
@@ -89,4 +101,5 @@ test('time formatting follows the persisted timezone across London daylight savi
   const winter = formatConfirmedBooking(booking({ startAt: new Date('2026-12-03T14:00:00.000Z'), endAt: new Date('2026-12-03T14:55:00.000Z') }));
   assert.deepEqual([summer.startTime, summer.timezoneName], ['14:00', 'BST']);
   assert.deepEqual([winter.startTime, winter.timezoneName], ['14:00', 'GMT']);
+  assert.equal(summer.durationMinutes, 55);
 });

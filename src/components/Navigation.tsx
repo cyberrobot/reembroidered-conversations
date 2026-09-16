@@ -2,8 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { Calendar, Menu, X } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 
 export const Navigation: React.FC = () => {
+  const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -20,7 +22,9 @@ export const Navigation: React.FC = () => {
     const element = document.getElementById(id);
     if (element) {
       element.scrollIntoView({ behavior: 'smooth' });
+      return;
     }
+    window.location.assign(`/#${id}`);
   };
 
   return (
@@ -35,11 +39,13 @@ export const Navigation: React.FC = () => {
       <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between gap-4">
         {/* Brand & Subtitle */}
         <a
-          href="#"
+          href="/"
           className="group flex flex-col focus:outline-none shrink-0"
           onClick={(e) => {
-            e.preventDefault();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            if (pathname === '/') {
+              e.preventDefault();
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
           }}
         >
           <span className="font-serif text-xl sm:text-2xl tracking-tight text-[#282524] font-medium group-hover:text-[#A35048] transition-colors whitespace-nowrap">
