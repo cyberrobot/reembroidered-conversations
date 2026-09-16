@@ -99,7 +99,7 @@ export async function createBookingCheckout(input, now, dependencies = defaultDe
           product_data: { name: SESSION_PRODUCT.name },
         },
       }],
-      success_url: `${new URL('/payment', appUrl)}?booking_id=${encodeURIComponent(booking.id)}&session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${new URL('/booking/success', appUrl)}?booking_id=${encodeURIComponent(booking.id)}&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${new URL('/', appUrl)}?booking_cancelled=true#book-session`,
       expires_at: Math.floor(expiresAt.getTime() / 1000),
     }, { idempotencyKey: `booking-checkout:${booking.id}` });
