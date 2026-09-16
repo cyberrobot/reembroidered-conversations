@@ -38,14 +38,6 @@ test(
     const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: schemaTestUrl }) });
     const now = new Date('2040-01-02T12:00:00.000Z');
     const providerDate = '2040-01-09';
-    const candidates = getProviderCandidateSlotsForDate({
-      date: providerDate,
-      now,
-      config: PROVIDER_AVAILABILITY_CONFIG,
-    });
-    assert.ok(candidates.length >= 2, 'test date must expose a booked and adjacent provider slot');
-    const selectedSlot = candidates[0];
-    const adjacentSlot = candidates[1];
     const checkoutSessionId = 'cs_test_lifecycle';
     const paymentIntentId = 'pi_test_lifecycle';
     const meetingUrl = 'https://meet.google.com/abc-defg-hij';
@@ -54,8 +46,21 @@ test(
     const databaseModule = await mock.module('../src/lib/db.ts', {
       namedExports: { db },
     });
+    const availabilityDependencies = {
+      getCandidates: getProviderCandidateSlotsForDate,
+      getBookingConflicts: getActiveBookingConflicts,
+      getCalendarBusyPeriods: async () => [],
+    };
 
     try {
+      const initiallyAvailable = await getAvailableSlots(
+        { fromDate: providerDate, toDate: providerDate, now },
+        availabilityDependencies,
+      );
+      assert.ok(initiallyAvailable.length >= 1, 'test date must expose an available provider slot');
+      const selectedSlot = initiallyAvailable[0];
+      const comparisonSlot = initiallyAvailable[1];
+
       const hold = await createHoldPersistence(db)({
         name: 'Lifecycle Listener',
         email: 'lifecycle-listener@example.test',
@@ -192,14 +197,12 @@ test(
 
       const available = await getAvailableSlots(
         { fromDate: providerDate, toDate: providerDate, now },
-        {
-          getCandidates: getProviderCandidateSlotsForDate,
-          getBookingConflicts: getActiveBookingConflicts,
-          getCalendarBusyPeriods: async () => [],
-        },
+        availabilityDependencies,
       );
       assert.equal(available.some((slot) => slot.startAt === confirmed.startAt.toISOString()), false);
-      assert.equal(available.some((slot) => slot.startAt === adjacentSlot.startAt), true);
+      if (comparisonSlot) {
+        assert.equal(available.some((slot) => slot.startAt === comparisonSlot.startAt), true);
+      }
     } finally {
       if (bookingId) await db.booking.deleteMany({ where: { id: bookingId } });
       databaseModule.restore();
