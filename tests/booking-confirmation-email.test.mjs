@@ -32,13 +32,29 @@ test('renders branded HTML and plain text from authoritative confirmed booking d
   assert.equal(result.subject, BOOKING_CONFIRMATION_SUBJECT);
   for (const expected of [
     'Evelyn St. Claire', 'Thursday, 24 September 2026', '14:00', '14:55',
-    'Europe/London', '55-minute session', 'https://meet.google.com/abc-defg-hij',
+    'Europe/London', 'https://meet.google.com/abc-defg-hij',
     'Request cancellation or rescheduling', 'There is nothing you need to prepare formally',
     'Re-Embroidered Conversations',
   ]) {
     assert.ok(result.html.includes(expected), `HTML should include ${expected}`);
     assert.ok(result.text.includes(expected), `text should include ${expected}`);
   }
+  for (const marker of [
+    'CONFIRMED DIALOGUE',
+    'A space for thoughtful, unhurried dialogue',
+    'Re-Embroidered Conversations: One-to-One',
+    '55 Minutes',
+    'Hosted by <strong style="color:#1c2a39">Shahd Karaeen',
+    'Join via Google Meet',
+    'Warmly',
+  ]) assert.ok(result.html.includes(marker), `HTML should include ${marker}`);
+  for (const colour of ['#faf7f2', '#bd4d36', '#1c2a39', '#446654']) {
+    assert.ok(result.html.includes(colour), `HTML should include ${colour}`);
+  }
+  assert.ok(result.html.includes('@media only screen and (max-width:620px)'));
+  assert.ok(result.html.includes('Your Google Calendar invitation is sent separately'));
+  assert.ok(result.text.includes('55-minute session'));
+  assert.ok(result.text.includes('Your session is confirmed'));
   assert.ok(result.html.includes(configuration.changesUrl));
   assert.ok(result.text.includes(configuration.changesUrl));
   for (const internal of ['pi_secret_not_for_email', 'rec5a4496557be3432ca124b769e10b50ef', booking().id]) {
