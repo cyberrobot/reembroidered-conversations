@@ -8,7 +8,15 @@ import {
 import { SESSION_PRODUCT } from './session-product.mjs';
 
 export class StripeWebhookReconciliationError extends Error {
-  constructor(message = 'Stripe event could not be reconciled.') { super(message); this.name = 'StripeWebhookReconciliationError'; }
+  /**
+   * @param {string} [message]
+   * @param {'reconciliation_pending' | 'email_configuration' | 'email_provider_unavailable' | 'email_provider_rejected' | 'email_invalid_response' | 'email_delivery_pending' | 'email_persistence_pending'} [code]
+   */
+  constructor(message = 'Stripe event could not be reconciled.', code = 'reconciliation_pending') {
+    super(message);
+    this.name = 'StripeWebhookReconciliationError';
+    this.code = code;
+  }
 }
 
 export function createStripeWebhookPersistence(database) {
@@ -56,9 +64,17 @@ async function deliverConfirmationEmail(booking, persistence, sendConfirmationEm
   if (!sendConfirmationEmail || booking.confirmationEmailSentAt) return;
   let result;
   try { result = await sendConfirmationEmail(booking); }
-  catch { throw new StripeWebhookReconciliationError('Confirmation email delivery is pending.'); }
+  catch (error) {
+    const deliveryCode = {
+      configuration: 'email_configuration',
+      provider_unavailable: 'email_provider_unavailable',
+      provider_rejected: 'email_provider_rejected',
+      invalid_response: 'email_invalid_response',
+    }[error?.code] ?? 'email_delivery_pending';
+    throw new StripeWebhookReconciliationError('Confirmation email delivery is pending.', deliveryCode);
+  }
   if (typeof result?.messageId !== 'string' || !result.messageId.trim()) {
-    throw new StripeWebhookReconciliationError('Confirmation email delivery is pending.');
+    throw new StripeWebhookReconciliationError('Confirmation email delivery is pending.', 'email_invalid_response');
   }
   let recorded;
   try {
@@ -68,12 +84,12 @@ async function deliverConfirmationEmail(booking, persistence, sendConfirmationEm
       acceptedAt: new Date(),
     });
   } catch {
-    throw new StripeWebhookReconciliationError('Confirmation email persistence is pending.');
+    throw new StripeWebhookReconciliationError('Confirmation email persistence is pending.', 'email_persistence_pending');
   }
   if (recorded.count === 1) return;
   const current = await persistence.findBooking(booking.id);
   if (current?.status === 'CONFIRMED' && current.confirmationEmailSentAt) return;
-  throw new StripeWebhookReconciliationError('Confirmation email persistence is pending.');
+  throw new StripeWebhookReconciliationError('Confirmation email persistence is pending.', 'email_persistence_pending');
 }
 
 export async function processStripeWebhookEvent(event, persistence, finalizeCalendar, sendConfirmationEmail) {

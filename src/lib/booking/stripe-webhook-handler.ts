@@ -23,6 +23,7 @@ export function createStripeWebhookHandler(dependencies: Dependencies) {
         eventId: typeof event === 'object' && event && 'id' in event ? event.id : undefined,
         errorName: error instanceof Error ? error.name : 'UnknownError',
         reconciliationRequired: error instanceof StripeWebhookReconciliationError,
+        reconciliationCode: error instanceof StripeWebhookReconciliationError ? error.code : undefined,
       });
       return NextResponse.json({ error: { code: 'webhook_processing_failed' } }, { status: 500 });
     }

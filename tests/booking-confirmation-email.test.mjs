@@ -77,6 +77,33 @@ test('sends one narrow provider request to the persisted recipient with a stable
   assert.equal(message.subject, BOOKING_CONFIRMATION_SUBJECT);
 });
 
+test('booking retries and concurrent attempts use one deterministic logical email key', async () => {
+  const messages = [];
+  const sendEmail = async (message) => {
+    messages.push(message);
+    return { messageId: `accepted:${message.idempotencyKey}` };
+  };
+  const otherBooking = booking({
+    id: 'e05a0b9a-bf48-42ef-a542-cebf1e24f7b8',
+    email: 'other@example.test',
+  });
+
+  const [first, retry, concurrentRetry, other] = await Promise.all([
+    sendBookingConfirmationEmail(booking(), { configuration, sendEmail }),
+    sendBookingConfirmationEmail(booking(), { configuration, sendEmail }),
+    sendBookingConfirmationEmail(booking(), { configuration, sendEmail }),
+    sendBookingConfirmationEmail(otherBooking, { configuration, sendEmail }),
+  ]);
+
+  const sameBookingKeys = messages.slice(0, 3).map(({ idempotencyKey }) => idempotencyKey);
+  assert.deepEqual(sameBookingKeys, Array(3).fill(`booking-confirmation:${booking().id}`));
+  assert.equal(messages[3].idempotencyKey, `booking-confirmation:${otherBooking.id}`);
+  assert.notEqual(messages[3].idempotencyKey, sameBookingKeys[0]);
+  assert.deepEqual(first, retry);
+  assert.deepEqual(first, concurrentRetry);
+  assert.notDeepEqual(first, other);
+});
+
 test('Resend boundary uses provider idempotency and normalises failures', async () => {
   let request;
   const result = await sendEmailWithResend({
