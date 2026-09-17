@@ -30,6 +30,8 @@ model Booking {
   stripePaymentIntentId   String?       @unique(map: "bookings_stripe_payment_intent_id_key")
   calendarEventId         String?       @unique(map: "bookings_calendar_event_id_key")
   meetingUrl              String?
+  confirmationEmailSentAt DateTime?     @db.Timestamptz(3)
+  confirmationEmailId     String?
   expiresAt               DateTime      @db.Timestamptz(3)
   createdAt               DateTime      @default(now()) @db.Timestamptz(3)
 

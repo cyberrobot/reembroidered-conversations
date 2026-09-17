@@ -31,7 +31,7 @@ test(
       const migrationCount = await admin.query(
         `SELECT COUNT(*)::int AS count FROM "${schema}"."_prisma_migrations" WHERE finished_at IS NOT NULL`,
       );
-      assert.equal(migrationCount.rows[0].count, 2);
+      assert.equal(migrationCount.rows[0].count, 3);
 
       const columns = await admin.query(
         `SELECT column_name, is_nullable

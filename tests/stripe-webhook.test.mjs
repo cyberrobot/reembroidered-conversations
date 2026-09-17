@@ -17,9 +17,9 @@ const event = (type, overrides) => ({ id: 'evt_test', type, data: { object: sess
 
 function persistence(initial = { status: 'HOLD', stripeCheckoutSessionId: 'cs_test_one', stripePaymentIntentId: null }) {
   let booking = {
-    id: bookingId, email: 'listener@example.com', startAt: new Date('2030-01-01T10:00:00Z'),
+    id: bookingId, name: 'Persisted Listener', email: 'listener@example.com', startAt: new Date('2030-01-01T10:00:00Z'),
     endAt: new Date('2030-01-01T10:55:00Z'), timezone: 'Europe/London', calendarEventId: null,
-    meetingUrl: null, ...initial,
+    meetingUrl: null, confirmationEmailSentAt: null, confirmationEmailId: null, ...initial,
   };
   return {
     markPaid: async ({ sessionId, paymentIntentId }) => {
@@ -35,6 +35,11 @@ function persistence(initial = { status: 'HOLD', stripeCheckoutSessionId: 'cs_te
       if (booking.status !== 'PAID' || booking.stripeCheckoutSessionId !== sessionId || booking.stripePaymentIntentId !== paymentIntentId) return { count: 0 };
       booking = { ...booking, status: 'CONFIRMED', calendarEventId, meetingUrl }; return { count: 1 };
     },
+    recordConfirmationEmail: async ({ messageId, acceptedAt }) => {
+      if (booking.status !== 'CONFIRMED' || booking.confirmationEmailSentAt) return { count: 0 };
+      booking = { ...booking, confirmationEmailSentAt: acceptedAt, confirmationEmailId: messageId };
+      return { count: 1 };
+    },
     get: () => booking,
   };
 }
@@ -45,6 +50,72 @@ test('completed paid Checkout moves HOLD to PAID and duplicate delivery is idemp
   await processStripeWebhookEvent(event('checkout.session.completed'), p);
   assert.equal(p.get().status, 'PAID');
   assert.equal(p.get().stripePaymentIntentId, 'pi_test_one');
+});
+
+test('confirmation email is sent only after durable CONFIRMED state using persisted booking data', async () => {
+  const p = persistence();
+  const seen = [];
+  await processStripeWebhookEvent(
+    event('checkout.session.completed'),
+    p,
+    async () => ({ calendarEventId, meetingUrl }),
+    async (confirmedBooking) => {
+      seen.push({ ...confirmedBooking });
+      assert.equal(p.get().status, 'CONFIRMED');
+      return { messageId: 'email_one' };
+    },
+  );
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0].email, 'listener@example.com');
+  assert.equal(seen[0].name, 'Persisted Listener');
+  assert.ok(p.get().confirmationEmailSentAt instanceof Date);
+  assert.equal(p.get().confirmationEmailId, 'email_one');
+});
+
+test('HOLD, PAID, and Calendar or confirmation persistence failures never send email', async () => {
+  let sends = 0;
+  const send = async () => { sends += 1; return { messageId: 'email_one' }; };
+  await processStripeWebhookEvent(event('checkout.session.completed'), persistence(), undefined, send);
+  await assert.rejects(() => processStripeWebhookEvent(
+    event('checkout.session.completed'), persistence(), async () => { throw new Error('calendar failed'); }, send,
+  ), StripeWebhookReconciliationError);
+  const p = persistence();
+  p.confirm = async () => { throw new Error('database unavailable'); };
+  await assert.rejects(() => processStripeWebhookEvent(
+    event('checkout.session.completed'), p, async () => ({ calendarEventId, meetingUrl }), send,
+  ), StripeWebhookReconciliationError);
+  assert.equal(sends, 0);
+});
+
+test('email failure leaves booking CONFIRMED and replay retries until acceptance, then skips duplicates', async () => {
+  const p = persistence();
+  let sends = 0;
+  const send = async () => {
+    sends += 1;
+    if (sends === 1) throw new Error('provider unavailable');
+    return { messageId: 'email_retry' };
+  };
+  await assert.rejects(() => processStripeWebhookEvent(
+    event('checkout.session.completed'), p, async () => ({ calendarEventId, meetingUrl }), send,
+  ), StripeWebhookReconciliationError);
+  assert.equal(p.get().status, 'CONFIRMED');
+  assert.equal(p.get().confirmationEmailSentAt, null);
+  await processStripeWebhookEvent(event('checkout.session.completed'), p, async () => assert.fail('Calendar must not repeat'), send);
+  await processStripeWebhookEvent(event('checkout.session.completed'), p, async () => assert.fail('Calendar must not repeat'), send);
+  assert.equal(sends, 2);
+  assert.ok(p.get().confirmationEmailSentAt instanceof Date);
+});
+
+test('already-recorded confirmation email is idempotent on webhook replay', async () => {
+  const p = persistence({
+    status: 'CONFIRMED', stripeCheckoutSessionId: 'cs_test_one', stripePaymentIntentId: 'pi_test_one',
+    calendarEventId, meetingUrl, confirmationEmailSentAt: new Date('2030-01-01T11:00:00Z'),
+    confirmationEmailId: 'email_existing',
+  });
+  await processStripeWebhookEvent(
+    event('checkout.session.completed'), p, async () => assert.fail('Calendar must not repeat'),
+    async () => assert.fail('Email must not repeat'),
+  );
 });
 
 test('completed paid Checkout moves HOLD through PAID to CONFIRMED after Google succeeds', async () => {
