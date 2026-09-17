@@ -15,6 +15,15 @@ export class CalendarFinalizationError extends Error {
   }
 }
 
+export class CalendarManagementError extends Error {
+  /** @param {'invalid_booking' | 'not_connected' | 'reauthorization_required' | 'provider_unavailable' | 'invalid_provider_response' | 'event_mismatch'} code */
+  constructor(code) {
+    super(`Calendar management failed: ${code}.`);
+    this.name = 'CalendarManagementError';
+    this.code = code;
+  }
+}
+
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function googleEventIdForBooking(bookingId) {
@@ -73,6 +82,16 @@ function meetUrl(event) {
   return candidates.find(isUsableGoogleMeetUrl);
 }
 
+function eventMatchesTime(event, booking) {
+  try {
+    return instant(event?.start?.dateTime) === instant(booking.startAt) &&
+      instant(event?.end?.dateTime) === instant(booking.endAt) &&
+      event?.start?.timeZone === booking.timezone && event?.end?.timeZone === booking.timezone;
+  } catch {
+    return false;
+  }
+}
+
 export function validateBookingCalendarEvent(event, booking, expectedEventId = googleEventIdForBooking(booking.id)) {
   if (!event || event.id !== expectedEventId || event.extendedProperties?.private?.bookingId !== booking.id) {
     throw new CalendarFinalizationError('event_mismatch');
@@ -103,6 +122,8 @@ const defaultDependencies = {
   refreshAccessToken: async (input) => (await import('../google-calendar/google-api.mjs')).refreshGoogleAccessToken(input),
   insertEvent: async (input) => (await import('../google-calendar/google-api.mjs')).insertGoogleCalendarEvent(input),
   getEvent: async (input) => (await import('../google-calendar/google-api.mjs')).getGoogleCalendarEvent(input),
+  updateEvent: async (input) => (await import('../google-calendar/google-api.mjs')).updateGoogleCalendarEvent(input),
+  deleteEvent: async (input) => (await import('../google-calendar/google-api.mjs')).deleteGoogleCalendarEvent(input),
 };
 
 export async function reconcileBookingCalendarEvent(booking, dependencies = defaultDependencies) {
@@ -132,4 +153,106 @@ export async function reconcileBookingCalendarEvent(booking, dependencies = defa
     }
     throw new CalendarFinalizationError('provider_unavailable');
   }
+}
+
+async function getManagementAccess(dependencies) {
+  let credentials;
+  try { credentials = await dependencies.getCredentials(); } catch { throw new CalendarManagementError('provider_unavailable'); }
+  if (!credentials) throw new CalendarManagementError('not_connected');
+  if (!credentials.grantedScopes.includes(GOOGLE_EVENTS_OWNED_SCOPE)) throw new CalendarManagementError('reauthorization_required');
+  try {
+    const config = await dependencies.getOAuthConfig();
+    const { accessToken } = await dependencies.refreshAccessToken({
+      refreshToken: credentials.refreshToken, clientId: config.clientId, clientSecret: config.clientSecret,
+    });
+    return { accessToken, calendarId: credentials.calendarId };
+  } catch (error) {
+    if (error instanceof GoogleApiError && error.category === 'authorization') {
+      throw new CalendarManagementError('reauthorization_required');
+    }
+    throw new CalendarManagementError('provider_unavailable');
+  }
+}
+
+export async function cancelBookingCalendarEvent(booking, dependencies = defaultDependencies) {
+  if (typeof booking?.calendarEventId !== 'string' || !booking.calendarEventId.trim()) {
+    throw new CalendarManagementError('invalid_booking');
+  }
+  const access = await getManagementAccess(dependencies);
+  try {
+    await dependencies.deleteEvent({ ...access, eventId: booking.calendarEventId });
+    return { cancelled: true };
+  } catch (error) {
+    if (error instanceof GoogleApiError) {
+      if (error.category === 'not_found') return { cancelled: true };
+      if (error.category === 'authorization') throw new CalendarManagementError('reauthorization_required');
+      if (error.category === 'invalid_response') throw new CalendarManagementError('invalid_provider_response');
+    }
+    throw new CalendarManagementError('provider_unavailable');
+  }
+}
+
+export async function rescheduleBookingCalendarEvent(sourceBooking, target, dependencies = defaultDependencies) {
+  if (typeof sourceBooking?.calendarEventId !== 'string' || !sourceBooking.calendarEventId.trim() ||
+      typeof sourceBooking?.id !== 'string' || !isUsableGoogleMeetUrl(sourceBooking.meetingUrl)) {
+    throw new CalendarManagementError('invalid_booking');
+  }
+  // Validate target instants before any provider call.
+  try {
+    if (instant(target?.startAt) >= instant(target?.endAt) || typeof target?.timezone !== 'string' || !target.timezone.trim()) {
+      throw new Error();
+    }
+  } catch {
+    throw new CalendarManagementError('invalid_booking');
+  }
+
+  const access = await getManagementAccess(dependencies);
+  let current;
+  try {
+    current = await dependencies.getEvent({ ...access, eventId: sourceBooking.calendarEventId });
+  } catch (error) {
+    if (error instanceof GoogleApiError) {
+      if (error.category === 'authorization') throw new CalendarManagementError('reauthorization_required');
+      if (error.category === 'not_found' || error.category === 'invalid_response') {
+        throw new CalendarManagementError('invalid_provider_response');
+      }
+    }
+    throw new CalendarManagementError('provider_unavailable');
+  }
+  if (current?.id !== sourceBooking.calendarEventId ||
+      current?.extendedProperties?.private?.bookingId !== sourceBooking.id) {
+    throw new CalendarManagementError('event_mismatch');
+  }
+
+  if (!eventMatchesTime(current, target)) {
+    if (!eventMatchesTime(current, sourceBooking)) throw new CalendarManagementError('event_mismatch');
+    try {
+      current = await dependencies.updateEvent({
+        ...access,
+        eventId: sourceBooking.calendarEventId,
+        event: {
+          start: { dateTime: instant(target.startAt), timeZone: target.timezone },
+          end: { dateTime: instant(target.endAt), timeZone: target.timezone },
+        },
+      });
+    } catch (error) {
+      if (error instanceof GoogleApiError) {
+        if (error.category === 'authorization') throw new CalendarManagementError('reauthorization_required');
+        if (error.category === 'not_found' || error.category === 'invalid_response') {
+          throw new CalendarManagementError('invalid_provider_response');
+        }
+      }
+      // Network/provider failures after PATCH submission have an uncertain outcome.
+      throw new CalendarManagementError('provider_unavailable');
+    }
+  }
+
+  if (current?.id !== sourceBooking.calendarEventId || !eventMatchesTime(current, target)) {
+    throw new CalendarManagementError('event_mismatch');
+  }
+  const authoritativeMeetUrl = meetUrl(current);
+  return {
+    calendarEventId: sourceBooking.calendarEventId,
+    meetingUrl: authoritativeMeetUrl ?? sourceBooking.meetingUrl,
+  };
 }

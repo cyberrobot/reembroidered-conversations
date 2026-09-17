@@ -32,6 +32,17 @@ model Booking {
   meetingUrl              String?
   confirmationEmailSentAt DateTime?     @db.Timestamptz(3)
   confirmationEmailId     String?
+  cancelledAt             DateTime?     @db.Timestamptz(3)
+  cancellationRefundDue   Boolean?
+  calendarCancelledAt     DateTime?     @db.Timestamptz(3)
+  stripeRefundId          String?       @unique(map: "bookings_stripe_refund_id_key")
+  stripeRefundStatus      String?
+  refundRequestedAt       DateTime?     @db.Timestamptz(3)
+  refundedAt              DateTime?     @db.Timestamptz(3)
+  rescheduledAt           DateTime?     @db.Timestamptz(3)
+  rescheduleSourceBookingId String?      @unique(map: "bookings_reschedule_source_booking_id_key") @db.Uuid
+  rescheduleSourceBooking Booking?       @relation("BookingReschedule", fields: [rescheduleSourceBookingId], references: [id], onDelete: SetNull)
+  rescheduleHold          Booking?       @relation("BookingReschedule")
   expiresAt               DateTime      @db.Timestamptz(3)
   createdAt               DateTime      @default(now()) @db.Timestamptz(3)
 

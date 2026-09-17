@@ -4,16 +4,21 @@ import test from 'node:test';
 import {
   buildBookingCalendarEvent,
   CalendarFinalizationError,
+  CalendarManagementError,
+  cancelBookingCalendarEvent,
   googleEventIdForBooking,
   isUsableGoogleMeetUrl,
   meetRequestIdForBooking,
   reconcileBookingCalendarEvent,
+  rescheduleBookingCalendarEvent,
   validateBookingCalendarEvent,
 } from '../src/lib/calendar/booking-event.mjs';
 import {
   getGoogleCalendarEvent,
   GoogleApiError,
   insertGoogleCalendarEvent,
+  updateGoogleCalendarEvent,
+  deleteGoogleCalendarEvent,
 } from '../src/lib/google-calendar/google-api.mjs';
 import { GOOGLE_EVENTS_OWNED_SCOPE } from '../src/lib/google-calendar/constants.mjs';
 
@@ -160,4 +165,89 @@ test('Calendar API classifies conflict, authorization, rate-limit, outage, and m
   for (const [response, category] of scenarios) {
     await assert.rejects(() => insertGoogleCalendarEvent(input, async () => response), (error) => error instanceof GoogleApiError && error.category === category);
   }
+});
+
+test('reschedule updates the stored event in place, preserves Meet, and requests attendee notifications', async () => {
+  const managedBooking = {
+    ...booking,
+    calendarEventId: googleEventIdForBooking(booking.id),
+    meetingUrl: 'https://meet.google.com/abc-defg-hij',
+  };
+  const target = {
+    startAt: new Date('2030-01-02T11:00:00.000Z'),
+    endAt: new Date('2030-01-02T11:55:00.000Z'),
+    timezone: 'Europe/London',
+  };
+  let patch;
+  const result = await rescheduleBookingCalendarEvent(managedBooking, target, dependencies({
+    getEvent: async () => createdEvent(),
+    updateEvent: async (input) => {
+      patch = input;
+      return createdEvent({
+        start: input.event.start,
+        end: input.event.end,
+      });
+    },
+  }));
+  assert.equal(patch.eventId, managedBooking.calendarEventId);
+  assert.deepEqual(patch.event, {
+    start: { dateTime: target.startAt.toISOString(), timeZone: target.timezone },
+    end: { dateTime: target.endAt.toISOString(), timeZone: target.timezone },
+  });
+  assert.equal('conferenceData' in patch.event, false);
+  assert.deepEqual(result, { calendarEventId: managedBooking.calendarEventId, meetingUrl: managedBooking.meetingUrl });
+});
+
+test('reschedule retry observes an already moved event and does not patch again', async () => {
+  const managedBooking = { ...booking, calendarEventId: googleEventIdForBooking(booking.id), meetingUrl: 'https://meet.google.com/abc-defg-hij' };
+  const target = { startAt: new Date('2030-01-02T11:00:00.000Z'), endAt: new Date('2030-01-02T11:55:00.000Z'), timezone: 'Europe/London' };
+  let updates = 0;
+  await rescheduleBookingCalendarEvent(managedBooking, target, dependencies({
+    getEvent: async () => createdEvent({
+      start: { dateTime: target.startAt.toISOString(), timeZone: target.timezone },
+      end: { dateTime: target.endAt.toISOString(), timeZone: target.timezone },
+    }),
+    updateEvent: async () => { updates += 1; },
+  }));
+  assert.equal(updates, 0);
+});
+
+test('Calendar cancellation uses the persisted event and treats already removed as success', async () => {
+  const managedBooking = { ...booking, calendarEventId: 'persisted-event-id' };
+  let deleted;
+  assert.deepEqual(await cancelBookingCalendarEvent(managedBooking, dependencies({
+    deleteEvent: async (input) => { deleted = input; return { removed: true }; },
+  })), { cancelled: true });
+  assert.equal(deleted.eventId, 'persisted-event-id');
+
+  assert.deepEqual(await cancelBookingCalendarEvent(managedBooking, dependencies({
+    deleteEvent: async () => { throw new GoogleApiError('not_found'); },
+  })), { cancelled: true });
+});
+
+test('Calendar update and delete API boundaries preserve event identity and sendUpdates=all', async () => {
+  const requests = [];
+  const updated = createdEvent();
+  await updateGoogleCalendarEvent({ accessToken: 'token', calendarId: 'calendar/id', eventId: 'event/id', event: { start: updated.start, end: updated.end } }, async (url, options) => {
+    requests.push({ url, options });
+    return Response.json(updated);
+  });
+  await deleteGoogleCalendarEvent({ accessToken: 'token', calendarId: 'calendar/id', eventId: 'event/id' }, async (url, options) => {
+    requests.push({ url, options });
+    return new Response(null, { status: 204 });
+  });
+  assert.equal(requests[0].options.method, 'PATCH');
+  assert.equal(requests[0].url.pathname.endsWith('/event%2Fid'), true);
+  assert.equal(requests[0].url.searchParams.get('sendUpdates'), 'all');
+  assert.equal(requests[0].url.searchParams.get('conferenceDataVersion'), '1');
+  assert.equal(requests[1].options.method, 'DELETE');
+  assert.equal(requests[1].url.searchParams.get('sendUpdates'), 'all');
+});
+
+test('Calendar management authorization/provider errors stay sanitized', async () => {
+  const managedBooking = { ...booking, calendarEventId: 'event', meetingUrl: 'https://meet.google.com/abc-defg-hij' };
+  await assert.rejects(
+    () => cancelBookingCalendarEvent(managedBooking, dependencies({ deleteEvent: async () => { throw new GoogleApiError('authorization'); } })),
+    (error) => error instanceof CalendarManagementError && error.code === 'reauthorization_required',
+  );
 });

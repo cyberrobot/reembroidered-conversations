@@ -1,0 +1,119 @@
+import { NextResponse } from 'next/server.js';
+import { BookingCancellationError } from './booking-cancellation.mjs';
+import { BookingRescheduleError } from './booking-reschedule.mjs';
+
+const headers = { 'Cache-Control': 'no-store' };
+
+function sameOrigin(request: Request) {
+  const origin = request.headers.get('origin');
+  return !origin || origin === new URL(request.url).origin;
+}
+
+function invalidLink() {
+  return NextResponse.json(
+    { error: { code: 'invalid_management_link', message: 'This booking-management link cannot be verified.' } },
+    { status: 404, headers },
+  );
+}
+
+export function createManagementStateHandler(service: (capability: string, now: Date) => Promise<any>, getNow = () => new Date()) {
+  return async function managementStateHandler(_request: Request, capability: string) {
+    const state = await service(capability, getNow());
+    if (state.kind === 'invalid') return invalidLink();
+    if (state.kind === 'unavailable') {
+      return NextResponse.json(
+        { error: { code: 'management_unavailable', message: 'Booking management is temporarily unavailable.' } },
+        { status: 503, headers },
+      );
+    }
+    return NextResponse.json(state, { headers });
+  };
+}
+
+export function createCancellationHandler(
+  authenticate: (capability: string) => string | null,
+  service: (bookingId: string, now: Date) => Promise<any>,
+  getNow = () => new Date(),
+) {
+  return async function cancellationHandler(request: Request, capability: string) {
+    if (!sameOrigin(request)) {
+      return NextResponse.json(
+        { error: { code: 'invalid_origin', message: 'This request could not be verified.' } },
+        { status: 403, headers },
+      );
+    }
+    const bookingId = authenticate(capability);
+    if (!bookingId) return invalidLink();
+    try {
+      return NextResponse.json(await service(bookingId, getNow()), { headers });
+    } catch (error) {
+      if (error instanceof BookingCancellationError && error.code === 'booking_not_cancellable') {
+        return NextResponse.json(
+          { error: { code: error.code, message: 'This booking can no longer be cancelled online.' } },
+          { status: 409, headers },
+        );
+      }
+      return NextResponse.json(
+        { error: { code: 'management_unavailable', message: 'The booking was not changed. Please try again.' } },
+        { status: 503, headers },
+      );
+    }
+  };
+}
+
+export function createRescheduleHandler(
+  authenticate: (capability: string) => string | null,
+  service: (bookingId: string, input: unknown, now: Date) => Promise<any>,
+  getNow = () => new Date(),
+) {
+  return async function rescheduleHandler(request: Request, capability: string) {
+    if (!sameOrigin(request)) {
+      return NextResponse.json(
+        { error: { code: 'invalid_origin', message: 'This request could not be verified.' } },
+        { status: 403, headers },
+      );
+    }
+    const bookingId = authenticate(capability);
+    if (!bookingId) return invalidLink();
+    let input: unknown;
+    try { input = await request.json(); }
+    catch {
+      return NextResponse.json(
+        { error: { code: 'invalid_reschedule_request', message: 'Choose a valid available time.' } },
+        { status: 400, headers },
+      );
+    }
+    try {
+      return NextResponse.json(await service(bookingId, input, getNow()), { headers });
+    } catch (error) {
+      if (error instanceof BookingRescheduleError) {
+        const status = {
+          invalid_reschedule_request: 400,
+          booking_not_reschedulable: 409,
+          slot_unavailable: 409,
+          change_in_progress: 409,
+          calendar_unavailable: 503,
+          reconciliation_pending: 202,
+          management_unavailable: 503,
+        }[error.code] ?? 503;
+        const messages: Record<string, string> = {
+          invalid_reschedule_request: 'Choose a valid available time.',
+          booking_not_reschedulable: 'This booking can no longer be rescheduled online.',
+          slot_unavailable: 'That time is no longer available. Your original booking has not changed.',
+          change_in_progress: 'A booking change is already being finalised.',
+          calendar_unavailable: 'The new time could not be secured. Your original booking has not changed.',
+          reconciliation_pending: 'Your change is still being safely finalised. Both times remain protected.',
+          management_unavailable: 'The booking was not changed. Please try again.',
+        };
+        return NextResponse.json(
+          { error: { code: error.code, message: messages[error.code] } },
+          { status, headers },
+        );
+      }
+      return NextResponse.json(
+        { error: { code: 'management_unavailable', message: 'The booking was not changed. Please try again.' } },
+        { status: 503, headers },
+      );
+    }
+  };
+}

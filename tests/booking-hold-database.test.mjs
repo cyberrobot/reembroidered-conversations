@@ -123,6 +123,41 @@ test(
 );
 
 test(
+  'expired reschedule-linked HOLD cannot be reclaimed by ordinary hold cleanup',
+  { skip: connectionString ? false : 'DATABASE_SCHEMA_TEST_URL is not configured' },
+  async () => {
+    const db = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+    const sourceId = '5a449655-7be3-432c-a124-b769e10b50b3';
+    const holdId = '5a449655-7be3-432c-a124-b769e10b50b4';
+    const sourceStart = new Date('2038-01-05T10:00:00.000Z');
+    const targetStart = new Date('2038-01-06T10:00:00.000Z');
+    const targetEnd = new Date('2038-01-06T10:55:00.000Z');
+    const now = new Date('2038-01-03T11:00:00.000Z');
+    try {
+      await db.booking.create({ data: {
+        id: sourceId, name: 'Confirmed Source', email: 'source@example.test',
+        startAt: sourceStart, endAt: new Date('2038-01-05T10:55:00.000Z'),
+        timezone: 'Europe/London', status: 'CONFIRMED',
+        expiresAt: new Date('2038-01-03T10:30:00.000Z'), createdAt: new Date('2038-01-03T10:00:00.000Z'),
+      } });
+      await db.booking.create({ data: {
+        id: holdId, name: 'Confirmed Source', email: 'source@example.test', startAt: targetStart, endAt: targetEnd,
+        timezone: 'Europe/London', status: 'HOLD', rescheduleSourceBookingId: sourceId,
+        expiresAt: new Date('2038-01-03T10:59:00.000Z'), createdAt: new Date('2038-01-03T10:00:00.000Z'),
+      } });
+      await assert.rejects(createHoldPersistence(db)({
+        name: 'Competitor', email: 'competitor@example.test', startAt: targetStart, endAt: targetEnd,
+        timezone: 'Europe/London', expiresAt: new Date('2038-01-03T11:15:00.000Z'), now,
+      }), (error) => isActiveSlotUniqueConflict(error));
+      assert.equal((await db.booking.findUniqueOrThrow({ where: { id: holdId } })).status, 'HOLD');
+    } finally {
+      await db.booking.deleteMany({ where: { id: { in: [holdId, sourceId] } } });
+      await db.$disconnect();
+    }
+  },
+);
+
+test(
   'Stripe webhook persistence transitions HOLD to PAID and unpaid HOLD to CANCELLED',
   { skip: connectionString ? false : 'DATABASE_SCHEMA_TEST_URL is not configured' },
   async () => {

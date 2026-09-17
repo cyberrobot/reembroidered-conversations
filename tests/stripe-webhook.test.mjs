@@ -150,6 +150,7 @@ test('remote email acceptance followed by local persistence failure recovers ide
     configuration: {
       apiKey: 'test-key', from: 'Bookings <bookings@example.test>',
       changesUrl: 'https://example.test/request-a-change',
+      managementSecret: 'test-management-secret-with-at-least-32-bytes',
     },
     sendEmail: async (message) => {
       providerRequests.push(message);

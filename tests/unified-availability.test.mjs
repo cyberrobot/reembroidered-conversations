@@ -87,11 +87,24 @@ test('CONFIRMED, PAID, and active HOLD block while expired or released bookings 
         status,
         expiresAt,
         stripeCheckoutSessionId,
+        rescheduleSourceBookingId: null,
       }],
     });
     const result = await getAvailableSlots({ fromDate: date, toDate: date, now }, deps);
     assert.equal(result.some((slot) => slot.startAt === '2026-09-07T09:00:00.000Z'), !blocks, status);
   }
+});
+
+test('an expired HOLD linked to a reschedule remains slot-owning', async () => {
+  const deps = await realDependencies({
+    getBookingConflicts: async () => [{
+      startAt: new Date('2026-09-07T09:00:00Z'), endAt: new Date('2026-09-07T09:55:00Z'),
+      status: 'HOLD', expiresAt: new Date('2026-08-01T00:00:00Z'),
+      stripeCheckoutSessionId: null, rescheduleSourceBookingId: '5a449655-7be3-432c-a124-b769e10b50ef',
+    }],
+  });
+  const result = await getAvailableSlots({ fromDate: date, toDate: date, now }, deps);
+  assert.equal(result.some((slot) => slot.startAt === '2026-09-07T09:00:00.000Z'), false);
 });
 
 test('booking and candidate occupancy buffers remove otherwise non-overlapping sessions', async () => {

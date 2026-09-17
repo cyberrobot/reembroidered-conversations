@@ -5,7 +5,7 @@ import 'server-only';
 const MINUTE_MS = 60_000;
 
 /**
- * @typedef {{ startAt: Date, endAt: Date, status?: 'HOLD' | 'PAID' | 'CONFIRMED' | 'CANCELLED' | 'REFUNDED', expiresAt?: Date, stripeCheckoutSessionId?: string | null }} BookingConflict
+ * @typedef {{ startAt: Date, endAt: Date, status?: 'HOLD' | 'PAID' | 'CONFIRMED' | 'CANCELLED' | 'REFUNDED', expiresAt?: Date, stripeCheckoutSessionId?: string | null, rescheduleSourceBookingId?: string | null }} BookingConflict
  */
 
 /**
@@ -29,11 +29,15 @@ export async function getActiveBookingConflicts({ from, to, now }) {
           OR: [
             { expiresAt: { gt: now } },
             { stripeCheckoutSessionId: { not: null } },
+            { rescheduleSourceBookingId: { not: null } },
           ],
         },
       ],
     },
-    select: { startAt: true, endAt: true, status: true, expiresAt: true, stripeCheckoutSessionId: true },
+    select: {
+      startAt: true, endAt: true, status: true, expiresAt: true,
+      stripeCheckoutSessionId: true, rescheduleSourceBookingId: true,
+    },
     orderBy: { startAt: 'asc' },
   });
 }
@@ -51,6 +55,7 @@ export function toBookingOccupancyIntervals(bookings, config, now) {
     booking.status === undefined || booking.status === 'PAID' || booking.status === 'CONFIRMED' ||
       (booking.status === 'HOLD' && (
         typeof booking.stripeCheckoutSessionId === 'string' ||
+        typeof booking.rescheduleSourceBookingId === 'string' ||
         (booking.expiresAt instanceof Date && booking.expiresAt > now)
       ))
   ).map((booking) => ({

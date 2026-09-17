@@ -31,6 +31,7 @@ export function getBookingEmailConfiguration(environment = process.env) {
     apiKey: requiredConfiguration('RESEND_API_KEY', environment),
     from: requiredConfiguration('BOOKING_EMAIL_FROM', environment),
     changesUrl: parsedChangesUrl.toString(),
+    managementSecret: requiredConfiguration('BOOKING_MANAGEMENT_SECRET', environment),
   };
 }
 
