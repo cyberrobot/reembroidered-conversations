@@ -67,6 +67,13 @@ test(
       const first = await insertBooking();
       assert.equal(first.rows[0].status, 'HOLD');
 
+      const emailColumns = await client.query(
+        `SELECT "confirmationEmailSentAt", "confirmationEmailId" FROM bookings WHERE id = $1`,
+        [first.rows[0].id],
+      );
+      assert.equal(emailColumns.rows[0].confirmationEmailSentAt, null);
+      assert.equal(emailColumns.rows[0].confirmationEmailId, null);
+
       await rejectsConstraint(
         () => insertBooking(),
         'bookings_active_start_at_key',

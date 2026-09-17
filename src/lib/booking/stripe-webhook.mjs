@@ -8,7 +8,15 @@ import {
 import { SESSION_PRODUCT } from './session-product.mjs';
 
 export class StripeWebhookReconciliationError extends Error {
-  constructor(message = 'Stripe event could not be reconciled.') { super(message); this.name = 'StripeWebhookReconciliationError'; }
+  /**
+   * @param {string} [message]
+   * @param {'reconciliation_pending' | 'email_configuration' | 'email_provider_unavailable' | 'email_provider_rejected' | 'email_invalid_response' | 'email_delivery_pending' | 'email_persistence_pending'} [code]
+   */
+  constructor(message = 'Stripe event could not be reconciled.', code = 'reconciliation_pending') {
+    super(message);
+    this.name = 'StripeWebhookReconciliationError';
+    this.code = code;
+  }
 }
 
 export function createStripeWebhookPersistence(database) {
@@ -24,9 +32,10 @@ export function createStripeWebhookPersistence(database) {
     findBooking: (bookingId) => database.booking.findUnique({
       where: { id: bookingId },
       select: {
-        id: true, email: true, startAt: true, endAt: true, timezone: true, status: true,
+        id: true, name: true, email: true, startAt: true, endAt: true, timezone: true, status: true,
         stripeCheckoutSessionId: true, stripePaymentIntentId: true,
         calendarEventId: true, meetingUrl: true,
+        confirmationEmailSentAt: true, confirmationEmailId: true,
       },
     }),
     confirm: ({ bookingId, sessionId, paymentIntentId, calendarEventId, meetingUrl }) => database.booking.updateMany({
@@ -35,6 +44,10 @@ export function createStripeWebhookPersistence(database) {
         stripePaymentIntentId: paymentIntentId,
       },
       data: { status: 'CONFIRMED', calendarEventId, meetingUrl },
+    }),
+    recordConfirmationEmail: ({ bookingId, messageId, acceptedAt }) => database.booking.updateMany({
+      where: { id: bookingId, status: 'CONFIRMED', confirmationEmailSentAt: null },
+      data: { confirmationEmailSentAt: acceptedAt, confirmationEmailId: messageId },
     }),
   };
 }
@@ -47,7 +60,39 @@ function correlation(session) {
   return metadataId;
 }
 
-export async function processStripeWebhookEvent(event, persistence, finalizeCalendar) {
+async function deliverConfirmationEmail(booking, persistence, sendConfirmationEmail) {
+  if (!sendConfirmationEmail || booking.confirmationEmailSentAt) return;
+  let result;
+  try { result = await sendConfirmationEmail(booking); }
+  catch (error) {
+    const deliveryCode = {
+      configuration: 'email_configuration',
+      provider_unavailable: 'email_provider_unavailable',
+      provider_rejected: 'email_provider_rejected',
+      invalid_response: 'email_invalid_response',
+    }[error?.code] ?? 'email_delivery_pending';
+    throw new StripeWebhookReconciliationError('Confirmation email delivery is pending.', deliveryCode);
+  }
+  if (typeof result?.messageId !== 'string' || !result.messageId.trim()) {
+    throw new StripeWebhookReconciliationError('Confirmation email delivery is pending.', 'email_invalid_response');
+  }
+  let recorded;
+  try {
+    recorded = await persistence.recordConfirmationEmail({
+      bookingId: booking.id,
+      messageId: result.messageId,
+      acceptedAt: new Date(),
+    });
+  } catch {
+    throw new StripeWebhookReconciliationError('Confirmation email persistence is pending.', 'email_persistence_pending');
+  }
+  if (recorded.count === 1) return;
+  const current = await persistence.findBooking(booking.id);
+  if (current?.status === 'CONFIRMED' && current.confirmationEmailSentAt) return;
+  throw new StripeWebhookReconciliationError('Confirmation email persistence is pending.', 'email_persistence_pending');
+}
+
+export async function processStripeWebhookEvent(event, persistence, finalizeCalendar, sendConfirmationEmail) {
   if (event?.type !== 'checkout.session.completed' && event?.type !== 'checkout.session.expired') return;
   const session = event?.data?.object;
   if (!session || session.object !== 'checkout.session' || typeof session.id !== 'string') {
@@ -74,7 +119,7 @@ export async function processStripeWebhookEvent(event, persistence, finalizeCale
       if (booking.calendarEventId !== expectedEventId || !isUsableGoogleMeetUrl(booking.meetingUrl)) {
         throw new StripeWebhookReconciliationError();
       }
-      return;
+      return deliverConfirmationEmail(booking, persistence, sendConfirmationEmail);
     }
     if (!finalizeCalendar) return;
     let google;
@@ -89,11 +134,16 @@ export async function processStripeWebhookEvent(event, persistence, finalizeCale
     } catch {
       throw new StripeWebhookReconciliationError('Calendar finalization persistence is pending.');
     }
-    if (confirmed.count === 1) return;
     const current = await persistence.findBooking(bookingId);
+    if (confirmed.count === 1) {
+      if (current?.status !== 'CONFIRMED') throw new StripeWebhookReconciliationError();
+      return deliverConfirmationEmail(current, persistence, sendConfirmationEmail);
+    }
     if (current?.status === 'CONFIRMED' && current.stripeCheckoutSessionId === session.id &&
-        current.stripePaymentIntentId === session.payment_intent &&
-        current.calendarEventId === google.calendarEventId && current.meetingUrl === google.meetingUrl) return;
+        current.stripePaymentIntentId === session.payment_intent && current.calendarEventId === google.calendarEventId &&
+        current.meetingUrl === google.meetingUrl) {
+      return deliverConfirmationEmail(current, persistence, sendConfirmationEmail);
+    }
     throw new StripeWebhookReconciliationError();
   }
 
@@ -108,5 +158,11 @@ export async function processStripeWebhookEvent(event, persistence, finalizeCale
 export async function processStripeWebhook(event) {
   const { db } = await import('../db.ts');
   const { reconcileBookingCalendarEvent } = await import('../calendar/booking-event.mjs');
-  return processStripeWebhookEvent(event, createStripeWebhookPersistence(db), reconcileBookingCalendarEvent);
+  const { sendBookingConfirmationEmail } = await import('./booking-confirmation-email.mjs');
+  return processStripeWebhookEvent(
+    event,
+    createStripeWebhookPersistence(db),
+    reconcileBookingCalendarEvent,
+    sendBookingConfirmationEmail,
+  );
 }

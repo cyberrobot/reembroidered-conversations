@@ -43,6 +43,7 @@ test(
     const meetingUrl = 'https://meet.google.com/abc-defg-hij';
     let bookingId;
     let calendarInsertCount = 0;
+    let confirmationEmailCount = 0;
     const databaseModule = await mock.module('../src/lib/db.ts', {
       namedExports: { db },
     });
@@ -78,6 +79,7 @@ test(
       assert.equal(initial.stripePaymentIntentId, null);
       assert.equal(initial.calendarEventId, null);
       assert.equal(initial.meetingUrl, null);
+      assert.equal(initial.confirmationEmailSentAt, null);
 
       const checkoutExpiry = new Date(now.getTime() + 31 * 60_000);
       const stripeCreateCalls = [];
@@ -179,6 +181,14 @@ test(
             getEvent: async () => assert.fail('successful insert must not fetch an existing event'),
           });
         },
+        async (confirmedBooking) => {
+          confirmationEmailCount += 1;
+          const persistedConfirmed = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
+          assert.equal(persistedConfirmed.status, 'CONFIRMED');
+          assert.equal(confirmedBooking.email, initial.email);
+          assert.equal(confirmedBooking.meetingUrl, meetingUrl);
+          return { messageId: 'email_lifecycle' };
+        },
       );
 
       const confirmed = await db.booking.findUniqueOrThrow({ where: { id: bookingId } });
@@ -187,6 +197,9 @@ test(
       assert.equal(confirmed.stripePaymentIntentId, paymentIntentId);
       assert.equal(confirmed.calendarEventId, googleEventIdForBooking(bookingId));
       assert.equal(confirmed.meetingUrl, meetingUrl);
+      assert.ok(confirmed.confirmationEmailSentAt instanceof Date);
+      assert.equal(confirmed.confirmationEmailId, 'email_lifecycle');
+      assert.equal(confirmationEmailCount, 1);
       assert.equal(calendarInsertCount, 1);
       assert.equal(confirmed.id, initial.id);
       assert.equal(confirmed.startAt.toISOString(), initial.startAt.toISOString());
