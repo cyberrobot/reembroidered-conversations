@@ -32,7 +32,7 @@ export function createManagementStateHandler(service: (capability: string, now: 
 
 export function createCancellationHandler(
   authenticate: (capability: string) => string | null,
-  service: (bookingId: string, now: Date) => Promise<any>,
+  service: (bookingId: string, input: unknown, now: Date) => Promise<any>,
   getNow = () => new Date(),
 ) {
   return async function cancellationHandler(request: Request, capability: string) {
@@ -44,9 +44,35 @@ export function createCancellationHandler(
     }
     const bookingId = authenticate(capability);
     if (!bookingId) return invalidLink();
+    let input: unknown;
+    try { input = await request.json(); }
+    catch {
+      return NextResponse.json(
+        { error: { code: 'invalid_cancellation_request', message: 'Review the current cancellation terms before confirming.' } },
+        { status: 400, headers },
+      );
+    }
     try {
-      return NextResponse.json(await service(bookingId, getNow()), { headers });
+      return NextResponse.json(await service(bookingId, input, getNow()), { headers });
     } catch (error) {
+      if (error instanceof BookingCancellationError && error.code === 'refund_policy_changed') {
+        return NextResponse.json(
+          {
+            error: {
+              code: error.code,
+              message: 'The refund outcome changed while this page was open. Review the updated terms and confirm again.',
+            },
+            cancellation: error.details,
+          },
+          { status: 409, headers },
+        );
+      }
+      if (error instanceof BookingCancellationError && error.code === 'invalid_cancellation_request') {
+        return NextResponse.json(
+          { error: { code: error.code, message: 'Review the current cancellation terms before confirming.' } },
+          { status: 400, headers },
+        );
+      }
       if (error instanceof BookingCancellationError && error.code === 'booking_not_cancellable') {
         return NextResponse.json(
           { error: { code: error.code, message: 'This booking can no longer be cancelled online.' } },

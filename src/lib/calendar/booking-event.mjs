@@ -17,10 +17,12 @@ export class CalendarFinalizationError extends Error {
 
 export class CalendarManagementError extends Error {
   /** @param {'invalid_booking' | 'not_connected' | 'reauthorization_required' | 'provider_unavailable' | 'invalid_provider_response' | 'event_mismatch'} code */
-  constructor(code) {
+  constructor(code, { outcome = 'uncertain', observedOriginal = false } = {}) {
     super(`Calendar management failed: ${code}.`);
     this.name = 'CalendarManagementError';
     this.code = code;
+    this.outcome = outcome;
+    this.observedOriginal = observedOriginal;
   }
 }
 
@@ -195,7 +197,7 @@ export async function cancelBookingCalendarEvent(booking, dependencies = default
 export async function rescheduleBookingCalendarEvent(sourceBooking, target, dependencies = defaultDependencies) {
   if (typeof sourceBooking?.calendarEventId !== 'string' || !sourceBooking.calendarEventId.trim() ||
       typeof sourceBooking?.id !== 'string' || !isUsableGoogleMeetUrl(sourceBooking.meetingUrl)) {
-    throw new CalendarManagementError('invalid_booking');
+    throw new CalendarManagementError('invalid_booking', { outcome: 'definite_unchanged' });
   }
   // Validate target instants before any provider call.
   try {
@@ -203,29 +205,41 @@ export async function rescheduleBookingCalendarEvent(sourceBooking, target, depe
       throw new Error();
     }
   } catch {
-    throw new CalendarManagementError('invalid_booking');
+    throw new CalendarManagementError('invalid_booking', { outcome: 'definite_unchanged' });
   }
 
-  const access = await getManagementAccess(dependencies);
+  let access;
+  try {
+    access = await getManagementAccess(dependencies);
+  } catch (error) {
+    if (error instanceof CalendarManagementError) {
+      throw new CalendarManagementError(error.code, { outcome: 'definite_unchanged' });
+    }
+    throw error;
+  }
   let current;
   try {
     current = await dependencies.getEvent({ ...access, eventId: sourceBooking.calendarEventId });
   } catch (error) {
     if (error instanceof GoogleApiError) {
-      if (error.category === 'authorization') throw new CalendarManagementError('reauthorization_required');
+      if (error.category === 'authorization') {
+        throw new CalendarManagementError('reauthorization_required', { outcome: 'definite_unchanged' });
+      }
       if (error.category === 'not_found' || error.category === 'invalid_response') {
-        throw new CalendarManagementError('invalid_provider_response');
+        throw new CalendarManagementError('invalid_provider_response', { outcome: 'uncertain' });
       }
     }
-    throw new CalendarManagementError('provider_unavailable');
+    throw new CalendarManagementError('provider_unavailable', { outcome: 'uncertain' });
   }
   if (current?.id !== sourceBooking.calendarEventId ||
       current?.extendedProperties?.private?.bookingId !== sourceBooking.id) {
-    throw new CalendarManagementError('event_mismatch');
+    throw new CalendarManagementError('event_mismatch', { outcome: 'uncertain' });
   }
 
   if (!eventMatchesTime(current, target)) {
-    if (!eventMatchesTime(current, sourceBooking)) throw new CalendarManagementError('event_mismatch');
+    if (!eventMatchesTime(current, sourceBooking)) {
+      throw new CalendarManagementError('event_mismatch', { outcome: 'uncertain' });
+    }
     try {
       current = await dependencies.updateEvent({
         ...access,
@@ -237,18 +251,31 @@ export async function rescheduleBookingCalendarEvent(sourceBooking, target, depe
       });
     } catch (error) {
       if (error instanceof GoogleApiError) {
-        if (error.category === 'authorization') throw new CalendarManagementError('reauthorization_required');
-        if (error.category === 'not_found' || error.category === 'invalid_response') {
-          throw new CalendarManagementError('invalid_provider_response');
+        if (error.category === 'authorization' || error.category === 'not_found') {
+          throw new CalendarManagementError(
+            error.category === 'authorization' ? 'reauthorization_required' : 'invalid_provider_response',
+            { outcome: 'definite_unchanged', observedOriginal: true },
+          );
+        }
+        if (error.category === 'invalid_response') {
+          // A successful PATCH with an unreadable body may already have moved
+          // the event. Only a later GET can establish the remote state.
+          throw new CalendarManagementError('invalid_provider_response', { outcome: 'uncertain' });
         }
       }
       // Network/provider failures after PATCH submission have an uncertain outcome.
-      throw new CalendarManagementError('provider_unavailable');
+      throw new CalendarManagementError('provider_unavailable', { outcome: 'uncertain' });
     }
   }
 
-  if (current?.id !== sourceBooking.calendarEventId || !eventMatchesTime(current, target)) {
-    throw new CalendarManagementError('event_mismatch');
+  if (current?.id !== sourceBooking.calendarEventId ||
+      current?.extendedProperties?.private?.bookingId !== sourceBooking.id) {
+    throw new CalendarManagementError('event_mismatch', { outcome: 'uncertain' });
+  }
+  if (!eventMatchesTime(current, target)) {
+    // Any non-target PATCH representation is ambiguous. Even an echoed
+    // original time is not a fresh authoritative GET after submission.
+    throw new CalendarManagementError('event_mismatch', { outcome: 'uncertain' });
   }
   const authoritativeMeetUrl = meetUrl(current);
   return {

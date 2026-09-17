@@ -28,10 +28,14 @@ test(
         },
       );
 
-      const migrationCount = await admin.query(
-        `SELECT COUNT(*)::int AS count FROM "${schema}"."_prisma_migrations" WHERE finished_at IS NOT NULL`,
+      const migrations = await admin.query(
+        `SELECT migration_name, finished_at, rolled_back_at
+           FROM "${schema}"."_prisma_migrations"`,
       );
-      assert.equal(migrationCount.rows[0].count, 3);
+      assert.ok(migrations.rows.length > 0);
+      assert.ok(migrations.rows.every(({ finished_at, rolled_back_at }) => finished_at && !rolled_back_at));
+      assert.ok(migrations.rows.some(({ migration_name }) =>
+        migration_name === '20260911010000_google_calendar_connection'));
 
       const columns = await admin.query(
         `SELECT column_name, is_nullable

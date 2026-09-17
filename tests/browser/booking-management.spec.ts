@@ -157,6 +157,48 @@ test('provider error detail remains visible after returning to cancellation conf
   await expect(page.getByRole('article').getByRole('alert')).toHaveText('Cancellation is temporarily unavailable. Please try again.');
 });
 
+test('stale refundable policy is updated and requires explicit confirmation again', async ({ page }) => {
+  const fixture = await seed(0);
+  let attempts = 0;
+  await page.route(`**/api/bookings/manage/${fixture.capability}/cancel`, async (route) => {
+    attempts += 1;
+    const input = await route.request().postDataJSON();
+    if (attempts === 1) {
+      expect(input).toEqual({ expectedRefundEligible: true });
+      await route.fulfill({
+        status: 409,
+        json: {
+          error: {
+            code: 'refund_policy_changed',
+            message: 'The refund outcome changed while this page was open. Review the updated terms and confirm again.',
+          },
+          cancellation: { refundEligible: false, cutoffHours: 24 },
+        },
+      });
+      return;
+    }
+    expect(input).toEqual({ expectedRefundEligible: false });
+    await route.fulfill({ json: {
+      status: 'cancelled', cancelledAt: '2034-12-01T10:00:00.000Z',
+      refund: { eligible: false, status: 'not_applicable' },
+      calendar: { status: 'cancelled' }, externalFollowUpPending: false,
+    } });
+  });
+  await page.goto(`/booking/manage/${fixture.capability}`);
+  await page.getByRole('button', { name: /Cancel booking/ }).click();
+  await expect(page.getByText('eligible for a full refund', { exact: false })).toBeVisible();
+  await page.getByRole('button', { name: 'Yes, cancel booking' }).click();
+  await expect(page.getByRole('heading', { name: 'Cancel this booking?' })).toBeVisible();
+  await expect(page.getByText('automatic refund period has passed', { exact: false })).toBeVisible();
+  await expect(page.getByRole('article').getByRole('alert')).toContainText('confirm again');
+  expect(attempts).toBe(1);
+
+  await page.getByRole('button', { name: 'Yes, cancel booking' }).click();
+  await expect(page.getByRole('heading', { name: 'This booking has been cancelled' })).toBeVisible();
+  await expect(page.getByText('No automatic refund applies')).toBeVisible();
+  expect(attempts).toBe(2);
+});
+
 test('refreshing an uncertain reschedule exposes and resumes the exact linked hold', async ({ page }) => {
   const fixture = await seed(0);
   await pool!.query(

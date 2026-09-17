@@ -5,11 +5,12 @@ import { cancelBookingCalendarEvent } from '../calendar/booking-event.mjs';
 import { getCancellationPolicy } from './cancellation-policy.mjs';
 
 export class BookingCancellationError extends Error {
-  /** @param {'booking_not_cancellable' | 'management_unavailable'} code */
-  constructor(code) {
+  /** @param {'invalid_cancellation_request' | 'booking_not_cancellable' | 'refund_policy_changed' | 'management_unavailable'} code */
+  constructor(code, details = {}) {
     super(`Booking cancellation failed: ${code}.`);
     this.name = 'BookingCancellationError';
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -87,7 +88,42 @@ function cancellationView(booking) {
   };
 }
 
-export async function cancelBooking(bookingId, now, dependencies) {
+async function reconcileCancellationProviders(bookingId, booking, dependencies) {
+  let current = booking;
+  if (!current.calendarCancelledAt && current.calendarEventId) {
+    try {
+      await dependencies.cancelCalendarEvent(current);
+      current = await dependencies.persistence.recordCalendarCancelled({ bookingId, now: dependencies.getNow() });
+    } catch {
+      // The booking remains authoritatively cancelled; a retry reconciles Calendar.
+    }
+  }
+
+  if (current.cancellationRefundDue === true && current.stripePaymentIntentId) {
+    try {
+      const refund = current.stripeRefundId
+        ? await dependencies.stripe.refunds.retrieve(current.stripeRefundId)
+        : await dependencies.stripe.refunds.create({
+            payment_intent: current.stripePaymentIntentId,
+            reason: 'requested_by_customer',
+            metadata: { bookingId: current.id },
+          }, { idempotencyKey: `booking-cancellation-refund:${current.id}` });
+      if (typeof refund?.id === 'string' && typeof refund?.status === 'string') {
+        current = await dependencies.persistence.recordRefund({
+          bookingId, refund, now: dependencies.getNow(),
+        });
+      }
+    } catch {
+      // The persisted decision is retained and the same idempotency key is reused.
+    }
+  }
+  return current;
+}
+
+export async function cancelBooking(bookingId, input, now, dependencies) {
+  if (typeof input?.expectedRefundEligible !== 'boolean') {
+    throw new BookingCancellationError('invalid_cancellation_request');
+  }
   const persistence = dependencies.persistence;
   let existing;
   try { existing = await persistence.findBooking(bookingId); }
@@ -98,6 +134,12 @@ export async function cancelBooking(bookingId, now, dependencies) {
   if (!['CANCELLED', 'REFUNDED'].includes(existing.status)) {
     const policy = getCancellationPolicy({ startAt: existing.startAt, now });
     if (!policy.canCancel || existing.status !== 'CONFIRMED') throw new BookingCancellationError('booking_not_cancellable');
+    if (input.expectedRefundEligible !== policy.automaticRefundEligible) {
+      throw new BookingCancellationError('refund_policy_changed', {
+        refundEligible: policy.automaticRefundEligible,
+        cutoffHours: policy.cutoffHours,
+      });
+    }
     try {
       booking = await persistence.cancelAuthoritatively({
         bookingId, now, refundDue: policy.automaticRefundEligible,
@@ -108,42 +150,37 @@ export async function cancelBooking(bookingId, now, dependencies) {
     }
   }
 
-  if (!booking.calendarCancelledAt && booking.calendarEventId) {
-    try {
-      await dependencies.cancelCalendarEvent(booking);
-      booking = await persistence.recordCalendarCancelled({ bookingId, now: dependencies.getNow() });
-    } catch {
-      // The booking remains authoritatively cancelled; a retry reconciles Calendar.
-    }
-  }
-
-  if (booking.cancellationRefundDue === true && booking.stripePaymentIntentId) {
-    try {
-      const refund = booking.stripeRefundId
-        ? await dependencies.stripe.refunds.retrieve(booking.stripeRefundId)
-        : await dependencies.stripe.refunds.create({
-            payment_intent: booking.stripePaymentIntentId,
-            reason: 'requested_by_customer',
-            metadata: { bookingId: booking.id },
-          }, { idempotencyKey: `booking-cancellation-refund:${booking.id}` });
-      if (typeof refund?.id === 'string' && typeof refund?.status === 'string') {
-        booking = await persistence.recordRefund({ bookingId, refund, now: dependencies.getNow() });
-      }
-    } catch {
-      // The persisted decision is retained and the same idempotency key is reused.
-    }
-  }
+  booking = await reconcileCancellationProviders(bookingId, booking, dependencies);
   return cancellationView(booking);
 }
 
-export async function cancelBookingWithDefaultDependencies(bookingId, now = new Date()) {
+export async function reconcileCancelledBooking(bookingId, now, dependencies) {
+  let booking;
+  try { booking = await dependencies.persistence.findBooking(bookingId); }
+  catch { throw new BookingCancellationError('management_unavailable'); }
+  if (!booking || !['CANCELLED', 'REFUNDED'].includes(booking.status)) {
+    throw new BookingCancellationError('booking_not_cancellable');
+  }
+  booking = await reconcileCancellationProviders(bookingId, booking, dependencies);
+  return cancellationView(booking);
+}
+
+async function defaultDependencies() {
   const [{ db }, { getStripeClient }] = await Promise.all([
     import('../db.ts'), import('../stripe/client.ts'),
   ]);
-  return cancelBooking(bookingId, now, {
+  return {
     persistence: createBookingCancellationPersistence(db),
     cancelCalendarEvent: cancelBookingCalendarEvent,
     stripe: getStripeClient(),
     getNow: () => new Date(),
-  });
+  };
+}
+
+export async function cancelBookingWithDefaultDependencies(bookingId, input, now = new Date()) {
+  return cancelBooking(bookingId, input, now, await defaultDependencies());
+}
+
+export async function reconcileCancelledBookingWithDefaultDependencies(bookingId, now = new Date()) {
+  return reconcileCancelledBooking(bookingId, now, await defaultDependencies());
 }

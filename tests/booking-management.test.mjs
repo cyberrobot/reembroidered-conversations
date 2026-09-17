@@ -58,3 +58,38 @@ test('a linked replacement hold is exposed as a resumable pending change', async
     startAt: '2030-01-04T12:00:00.000Z', endAt: '2030-01-04T12:55:00.000Z', timezone: 'Europe/London',
   });
 });
+
+test('secure reload retries pending cancellation providers and returns fully reconciled state', async () => {
+  const capability = createBookingManagementCapability(bookingId, secret);
+  let stored = {
+    id: bookingId,
+    name: 'Listener', email: 'listener@example.test',
+    startAt: new Date('2030-01-03T10:00:00.000Z'), endAt: new Date('2030-01-03T10:55:00.000Z'),
+    timezone: 'Europe/London', status: 'CANCELLED', meetingUrl: 'https://meet.google.com/abc-defg-hij',
+    cancelledAt: new Date('2030-01-01T10:00:00.000Z'), cancellationRefundDue: true,
+    calendarEventId: 'event_pending', calendarCancelledAt: null,
+    stripePaymentIntentId: 'pi_existing', stripeRefundId: null, stripeRefundStatus: null, refundedAt: null,
+  };
+  let reconciliations = 0;
+  const state = await getBookingManagementState(capability, new Date('2030-01-01T10:05:00.000Z'), {
+    secret,
+    persistence: { findBooking: async () => ({ ...stored }) },
+    reconcileCancellation: async (id) => {
+      assert.equal(id, bookingId);
+      reconciliations += 1;
+      stored = {
+        ...stored,
+        status: 'REFUNDED',
+        calendarCancelledAt: new Date('2030-01-01T10:05:00.000Z'),
+        stripeRefundId: 're_existing', stripeRefundStatus: 'succeeded',
+        refundedAt: new Date('2030-01-01T10:05:00.000Z'),
+      };
+    },
+  });
+  assert.equal(reconciliations, 1);
+  assert.equal(state.kind, 'cancelled');
+  assert.equal(state.cancellation.calendarStatus, 'cancelled');
+  assert.equal(state.cancellation.refundStatus, 'refunded');
+  assert.equal(JSON.stringify(state).includes('pi_existing'), false);
+  assert.equal(JSON.stringify(state).includes('re_existing'), false);
+});

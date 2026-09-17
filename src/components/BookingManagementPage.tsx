@@ -222,12 +222,29 @@ export function BookingManagementPage({ capability, initialState }: BookingManag
   };
 
   const submitCancellation = async () => {
-    if (!capability || mutationInFlight.current || !booking) return;
+    if (!capability || mutationInFlight.current || !booking || managementState.kind !== 'active') return;
+    const expectedRefundEligible = managementState.cancellation.refundEligible;
     mutationInFlight.current = true;
     moveTo('cancel_processing');
     try {
-      const response = await fetch(`/api/bookings/manage/${encodeURIComponent(capability)}/cancel`, { method: 'POST' });
+      const response = await fetch(`/api/bookings/manage/${encodeURIComponent(capability)}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expectedRefundEligible }),
+      });
       const body = await response.json();
+      if (body?.error?.code === 'refund_policy_changed' &&
+          typeof body?.cancellation?.refundEligible === 'boolean') {
+        setManagementState({
+          ...managementState,
+          cancellation: {
+            refundEligible: body.cancellation.refundEligible,
+            cutoffHours: body.cancellation.cutoffHours ?? managementState.cancellation.cutoffHours,
+          },
+        });
+        moveTo('cancel_confirm', body.error.message);
+        return;
+      }
       if (!response.ok || !['cancelled', 'refunded'].includes(body?.status)) {
         moveTo('cancel_confirm', body?.error?.message ?? 'We could not confirm the cancellation. Please try again.');
         return;

@@ -94,7 +94,9 @@ test('unavailable, same-slot and competing targets leave the original booking un
 });
 
 test('definite Calendar failure releases the target while uncertain failure retains both reservations', async () => {
-  const definite = fixture({ calendarError: new CalendarManagementError('reauthorization_required') });
+  const definite = fixture({ calendarError: new CalendarManagementError('reauthorization_required', {
+    outcome: 'definite_unchanged',
+  }) });
   await assert.rejects(
     () => rescheduleBooking(source().id, { startAt: target.startAt }, now, definite.dependencies),
     (error) => error instanceof BookingRescheduleError && error.code === 'calendar_unavailable',
@@ -109,6 +111,46 @@ test('definite Calendar failure releases the target while uncertain failure reta
   );
   assert.deepEqual(uncertain.order, ['reserve', 'calendar']);
   assert.equal(uncertain.pending().status, 'HOLD');
+});
+
+test('malformed PATCH results and post-PATCH validation failures retain the target hold', async () => {
+  for (const code of ['invalid_provider_response', 'event_mismatch']) {
+    const attempt = fixture({ calendarError: new CalendarManagementError(code, { outcome: 'uncertain' }) });
+    await assert.rejects(
+      () => rescheduleBooking(source().id, { startAt: target.startAt }, now, attempt.dependencies),
+      (error) => error instanceof BookingRescheduleError && error.code === 'reconciliation_pending',
+    );
+    assert.deepEqual(attempt.order, ['reserve', 'calendar']);
+    assert.equal(attempt.pending().status, 'HOLD');
+  }
+});
+
+test('a pending retry releases only after Calendar positively observed the original slot', async () => {
+  const pending = {
+    id: 'target-hold', status: 'HOLD', rescheduleSourceBookingId: source().id,
+    startAt: new Date(target.startAt), endAt: new Date(target.endAt), timezone: 'Europe/London',
+  };
+  const unknown = fixture({
+    pending,
+    calendarError: new CalendarManagementError('reauthorization_required', { outcome: 'definite_unchanged' }),
+  });
+  await assert.rejects(
+    () => rescheduleBooking(source().id, { startAt: target.startAt }, now, unknown.dependencies),
+    (error) => error instanceof BookingRescheduleError && error.code === 'reconciliation_pending',
+  );
+  assert.equal(unknown.pending().status, 'HOLD');
+
+  const observed = fixture({
+    pending,
+    calendarError: new CalendarManagementError('reauthorization_required', {
+      outcome: 'definite_unchanged', observedOriginal: true,
+    }),
+  });
+  await assert.rejects(
+    () => rescheduleBooking(source().id, { startAt: target.startAt }, now, observed.dependencies),
+    (error) => error instanceof BookingRescheduleError && error.code === 'calendar_unavailable',
+  );
+  assert.equal(observed.pending(), null);
 });
 
 test('database failure after Calendar update retains the hold and retry resumes it without another reservation', async () => {

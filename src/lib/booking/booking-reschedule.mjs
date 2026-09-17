@@ -138,6 +138,7 @@ export async function rescheduleBooking(bookingId, input, now, dependencies, con
   }
 
   let hold = await dependencies.persistence.findPendingHold(bookingId);
+  const resumingPendingChange = hold?.status === 'HOLD';
   if (hold && hold.status === 'HOLD' && hold.startAt.getTime() !== requestedStart.getTime()) {
     throw new BookingRescheduleError('change_in_progress');
   }
@@ -169,9 +170,10 @@ export async function rescheduleBooking(bookingId, input, now, dependencies, con
   try {
     calendar = await dependencies.rescheduleCalendarEvent(source, hold);
   } catch (error) {
-    const definiteFailure = error instanceof CalendarManagementError &&
-      ['invalid_booking', 'not_connected', 'reauthorization_required', 'invalid_provider_response', 'event_mismatch'].includes(error.code);
-    if (definiteFailure) {
+    const definitelyUnchanged = error instanceof CalendarManagementError &&
+      error.outcome === 'definite_unchanged' &&
+      (!resumingPendingChange || error.observedOriginal);
+    if (definitelyUnchanged) {
       try { await dependencies.persistence.releaseTarget({ sourceId: source.id, holdId: hold.id }); } catch {}
       throw new BookingRescheduleError('calendar_unavailable');
     }

@@ -212,6 +212,63 @@ test('reschedule retry observes an already moved event and does not patch again'
   assert.equal(updates, 0);
 });
 
+test('malformed successful PATCH response is uncertain and retains reconciliation state', async () => {
+  const managedBooking = { ...booking, calendarEventId: googleEventIdForBooking(booking.id), meetingUrl: 'https://meet.google.com/abc-defg-hij' };
+  const target = { startAt: new Date('2030-01-02T11:00:00.000Z'), endAt: new Date('2030-01-02T11:55:00.000Z'), timezone: 'Europe/London' };
+  await assert.rejects(
+    () => rescheduleBookingCalendarEvent(managedBooking, target, dependencies({
+      getEvent: async () => createdEvent(),
+      updateEvent: async () => { throw new GoogleApiError('invalid_response'); },
+    })),
+    (error) => error instanceof CalendarManagementError &&
+      error.code === 'invalid_provider_response' && error.outcome === 'uncertain',
+  );
+});
+
+test('an unvalidated post-PATCH event is uncertain, while a definite rejection after observing the original is releasable', async () => {
+  const managedBooking = { ...booking, calendarEventId: googleEventIdForBooking(booking.id), meetingUrl: 'https://meet.google.com/abc-defg-hij' };
+  const target = { startAt: new Date('2030-01-02T11:00:00.000Z'), endAt: new Date('2030-01-02T11:55:00.000Z'), timezone: 'Europe/London' };
+  await assert.rejects(
+    () => rescheduleBookingCalendarEvent(managedBooking, target, dependencies({
+      getEvent: async () => createdEvent(),
+      updateEvent: async () => createdEvent({
+        start: { dateTime: '2030-01-03T11:00:00.000Z', timeZone: 'Europe/London' },
+        end: { dateTime: '2030-01-03T11:55:00.000Z', timeZone: 'Europe/London' },
+      }),
+    })),
+    (error) => error instanceof CalendarManagementError &&
+      error.code === 'event_mismatch' && error.outcome === 'uncertain',
+  );
+
+  await assert.rejects(
+    () => rescheduleBookingCalendarEvent(managedBooking, target, dependencies({
+      getEvent: async () => createdEvent(),
+      updateEvent: async () => createdEvent(),
+    })),
+    (error) => error instanceof CalendarManagementError &&
+      error.code === 'event_mismatch' && error.outcome === 'uncertain',
+  );
+
+  await assert.rejects(
+    () => rescheduleBookingCalendarEvent(managedBooking, target, dependencies({
+      getEvent: async () => createdEvent(),
+      updateEvent: async () => { throw new GoogleApiError('authorization'); },
+    })),
+    (error) => error instanceof CalendarManagementError && error.outcome === 'definite_unchanged' &&
+      error.observedOriginal === true,
+  );
+});
+
+test('Calendar PATCH boundary reports an unreadable successful response as invalid', async () => {
+  await assert.rejects(
+    () => updateGoogleCalendarEvent({
+      accessToken: 'token', calendarId: 'calendar', eventId: 'event',
+      event: { start: createdEvent().start, end: createdEvent().end },
+    }, async () => new Response('not-json')),
+    (error) => error instanceof GoogleApiError && error.category === 'invalid_response',
+  );
+});
+
 test('Calendar cancellation uses the persisted event and treats already removed as success', async () => {
   const managedBooking = { ...booking, calendarEventId: 'persisted-event-id' };
   let deleted;
