@@ -33,7 +33,7 @@ test.afterAll(async () => {
   await pool?.end();
 });
 
-test('confirmed booking renders persisted details and desktop visual', async ({ page, context }) => {
+test('customer can later open the known success URL for a webhook-confirmed booking without a Stripe redirect', async ({ page, context }) => {
   const fixture = await seedBooking(0);
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.setViewportSize({ width: 1280, height: 900 });

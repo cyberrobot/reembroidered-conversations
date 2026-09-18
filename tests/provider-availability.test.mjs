@@ -158,6 +158,32 @@ test('London wall-clock slots map to distinct GMT and BST instants', () => {
   assert.equal(starts('2026-07-07', providerConfig, now)[0], '2026-07-07T09:00:00.000Z');
 });
 
+test('London working hours remain ordered and 55 minutes across both DST transitions', () => {
+  const providerConfig = config({
+    minimumNoticeMinutes: 0,
+    maximumBookingHorizonDays: 400,
+    weeklyWorkingHours: {
+      ...emptyWeek(),
+      friday: [{ start: '10:00', end: '12:00' }],
+      monday: [{ start: '10:00', end: '12:00' }],
+    },
+  });
+  const now = new Date('2026-01-01T00:00:00.000Z');
+  const cases = [
+    ['2026-03-27', ['2026-03-27T10:00:00.000Z', '2026-03-27T10:55:00.000Z']],
+    ['2026-03-30', ['2026-03-30T09:00:00.000Z', '2026-03-30T09:55:00.000Z']],
+    ['2026-10-23', ['2026-10-23T09:00:00.000Z', '2026-10-23T09:55:00.000Z']],
+    ['2026-10-26', ['2026-10-26T10:00:00.000Z', '2026-10-26T10:55:00.000Z']],
+  ];
+  for (const [date, expectedStarts] of cases) {
+    const slots = getProviderCandidateSlotsForDate({ date, now, config: providerConfig });
+    assert.deepEqual(slots.map((slot) => slot.startAt), expectedStarts);
+    assert.deepEqual(slots.map((slot) => Date.parse(slot.endAt) - Date.parse(slot.startAt)), [55 * 60_000, 55 * 60_000]);
+    assert.deepEqual(slots.map((slot) => slot.startAt), [...slots.map((slot) => slot.startAt)].sort());
+    assert.equal(new Set(slots.map((slot) => slot.startAt)).size, slots.length);
+  }
+});
+
 test('results are chronological and duplicate-free even with adjacent windows', () => {
   const providerConfig = config({
     minimumNoticeMinutes: 0,
