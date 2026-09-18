@@ -1,9 +1,12 @@
-import React from 'react';
-import laraAboutImg from '../assets/images/shahd_karaeen_portrait.jpeg';
+import React from "react";
+import laraAboutImg from "../assets/images/shahd_karaeen_portrait.jpeg";
 
 export const AboutShahd: React.FC = () => {
   return (
-    <section id="about-shahd" className="py-20 md:py-28 bg-[#FAF8F5] relative overflow-hidden">
+    <section
+      id="about-shahd"
+      className="py-20 md:py-28 bg-[#FAF8F5] relative overflow-hidden"
+    >
       <div className="max-w-5xl mx-auto px-6">
         {/* Section Tag */}
         <div className="text-center mb-16">
@@ -18,7 +21,8 @@ export const AboutShahd: React.FC = () => {
             Meet Shahd Karaeen
           </h2>
           <p className="font-sans text-sm sm:text-base text-[#78716C] mt-2 font-light">
-            Author, listener, and founder of <em className="italic font-serif">Re-Embroidered Conversations</em>
+            Author, listener, and founder of{" "}
+            <em className="italic font-serif">Re-Embroidered Conversations</em>
           </p>
         </div>
 
@@ -60,7 +64,9 @@ export const AboutShahd: React.FC = () => {
               </div>
 
               <blockquote className="font-serif italic text-sm sm:text-base text-[#282524] leading-relaxed pl-4 border-l-2 border-l-[#A35048]">
-                “When you sit with me, you don't have to edit your truth or protect anyone’s comfort. Survival is not a weakness—it is proof of your resilience. You are safe to put the burden down.”
+                “When you sit with me, you don't have to edit your truth or
+                protect anyone’s comfort. Survival is not a weakness—it is proof
+                of your resilience. You are safe to put the burden down.”
               </blockquote>
 
               <div className="pt-1 flex flex-col gap-2 font-sans text-xs">
@@ -80,24 +86,49 @@ export const AboutShahd: React.FC = () => {
           {/* Right Column: Personality & Narrative */}
           <div className="lg:col-span-7 space-y-6 font-sans text-[#4B4643]">
             <h3 className="font-serif text-2xl sm:text-3xl text-[#282524] font-normal leading-snug">
-              “For as long as I can remember, words have been the way back to oneself.”
+              “For as long as I can remember, words have been the way back to
+              oneself.”
             </h3>
 
             <div className="space-y-4 text-base font-light leading-relaxed text-[#59534F]">
               <p>
-                Born in Jerusalem and now rooted in the United Kingdom, my perspective has been shaped by the liminal spaces between homeland, displacement, and the unwritten expectations placed upon women across cultures. Long before I published my work, I kept diaries as a refuge—using words to name fears, untangle silence, and make sense of the quiet pressures women are taught to absorb.
+                Born in Jerusalem and now rooted in the United Kingdom, my
+                perspective has been shaped by the liminal spaces between
+                homeland, displacement, and the unwritten expectations placed
+                upon women across cultures. Long before I published my work, I
+                kept diaries as a refuge—using words to name fears, untangle
+                silence, and make sense of the quiet pressures women are taught
+                to absorb.
               </p>
 
               <p>
-                Over the years, those private journals evolved into poetry, fiction, and the novel <strong className="font-serif font-medium text-[#282524]">Hope: Re-Embroidered</strong>, alongside the <strong className="font-serif font-medium text-[#282524]">Re-Embroidered Conversations</strong> series. As someone who has walked through the realities of survival and emotional conditioning, I know intimately what it means to feel unseen, isolated, or conditioned to endure in silence.
+                Over the years, those private journals evolved into poetry,
+                fiction, and the novel{" "}
+                <strong className="font-serif font-medium text-[#282524]">
+                  Hope: Re-Embroidered
+                </strong>
+                , alongside the{" "}
+                <strong className="font-serif font-medium text-[#282524]">
+                  Re-Embroidered Conversations
+                </strong>{" "}
+                series. As someone who has walked through the realities of
+                survival and emotional conditioning, I know intimately what it
+                means to feel unseen, isolated, or conditioned to endure in
+                silence.
               </p>
 
               <p>
-                I am deeply interested in what happens behind closed doors—how silence operates within families, marriages, and cultural structures, and how speaking what has been buried can become an act of profound reclamation.
+                I am deeply interested in what happens behind closed doors—how
+                silence operates within families, marriages, and cultural
+                structures, and how speaking what has been buried can become an
+                act of profound reclamation.
               </p>
 
               <p>
-                These one-to-one sessions are not about providing tidy solutions. They are a dedicated, safe threshold where the truths you have carried quietly can finally be heard, untangled, and met with absolute presence.
+                These one-to-one sessions are not about providing tidy
+                solutions. They are a dedicated, safe threshold where the truths
+                you have carried quietly can finally be heard, untangled, and
+                met with absolute presence.
               </p>
             </div>
 
@@ -112,48 +143,79 @@ export const AboutShahd: React.FC = () => {
 
               <div className="grid sm:grid-cols-2 gap-x-8 gap-y-3.5 text-xs sm:text-sm text-[#4B4643]">
                 <div className="flex items-start gap-2.5">
-                  <span className="text-[#A35048] font-serif text-sm leading-none mt-1 select-none">•</span>
+                  <span className="text-[#A35048] font-serif text-sm leading-none mt-1 select-none">
+                    •
+                  </span>
                   <div>
-                    <span className="font-medium text-[#282524]">Author</span>,{' '}
-                    <em className="font-serif italic text-[#A35048]">Hope: Re-Embroidered</em>
+                    <span className="font-medium text-[#282524]">Author</span>,{" "}
+                    <em className="font-serif italic text-[#A35048]">
+                      Hope: Re-Embroidered
+                    </em>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-2.5">
-                  <span className="text-[#A35048] font-serif text-sm leading-none mt-1 select-none">•</span>
+                  <span className="text-[#A35048] font-serif text-sm leading-none mt-1 select-none">
+                    •
+                  </span>
                   <div>
-                    <span className="font-medium text-[#282524]">Founder & Director</span>, Peace Is The Song CIC
+                    <span className="font-medium text-[#282524]">
+                      Founder & Director
+                    </span>
+                    , Peace Is The Song CIC
                   </div>
                 </div>
 
                 <div className="flex items-start gap-2.5">
-                  <span className="text-[#A35048] font-serif text-sm leading-none mt-1 select-none">•</span>
+                  <span className="text-[#A35048] font-serif text-sm leading-none mt-1 select-none">
+                    •
+                  </span>
                   <div>
-                    <span className="font-medium text-[#282524]">Host & Creator</span>,{' '}
-                    <em className="font-serif italic text-[#A35048]">Re-Embroidered Conversations</em>
+                    <span className="font-medium text-[#282524]">
+                      Host & Creator
+                    </span>
+                    ,{" "}
+                    <em className="font-serif italic text-[#A35048]">
+                      Re-Embroidered Conversations
+                    </em>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-2.5">
-                  <span className="text-[#A35048] font-serif text-sm leading-none mt-1 select-none">•</span>
+                  <span className="text-[#A35048] font-serif text-sm leading-none mt-1 select-none">
+                    •
+                  </span>
                   <div>
-                    <span className="font-medium text-[#282524]">Internationally Published Poet</span>{' '}
+                    <span className="font-medium text-[#282524]">
+                      Internationally Published Poet
+                    </span>{" "}
                     <span className="text-[#78716C]">— Nexus Institute</span>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-2.5">
-                  <span className="text-[#A35048] font-serif text-sm leading-none mt-1 select-none">•</span>
+                  <span className="text-[#A35048] font-serif text-sm leading-none mt-1 select-none">
+                    •
+                  </span>
                   <div>
-                    <span className="font-medium text-[#282524]">Ambassador for Peace</span>{' '}
-                    <span className="text-[#78716C]">— Universal Peace Federation (UPF)</span>
+                    <span className="font-medium text-[#282524]">
+                      Ambassador for Peace
+                    </span>{" "}
+                    <span className="text-[#78716C]">
+                      — Universal Peace Federation (UPF)
+                    </span>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-2.5">
-                  <span className="text-[#A35048] font-serif text-sm leading-none mt-1 select-none">•</span>
+                  <span className="text-[#A35048] font-serif text-sm leading-none mt-1 select-none">
+                    •
+                  </span>
                   <div>
-                    <span className="font-medium text-[#282524]">Lived-Experience Advocate</span> & Speaker
+                    <span className="font-medium text-[#282524]">
+                      Lived-Experience Advocate
+                    </span>{" "}
+                    & Speaker
                   </div>
                 </div>
               </div>

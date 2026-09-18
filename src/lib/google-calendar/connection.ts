@@ -1,10 +1,10 @@
-import 'server-only';
+import "server-only";
 
-import { GOOGLE_CONNECTION_ID } from './constants.mjs';
+import { GOOGLE_CONNECTION_ID } from "./constants.mjs";
 import {
   decryptRefreshToken,
   encryptedRefreshTokenContainsOAuthState,
-} from './token-encryption';
+} from "./token-encryption";
 
 export type GoogleCalendarConnectionInput = {
   googleSubject: string;
@@ -16,8 +16,10 @@ export type GoogleCalendarConnectionInput = {
   grantedScopes: string[];
 };
 
-export async function saveGoogleCalendarConnection(input: GoogleCalendarConnectionInput) {
-  const { db } = await import('@/lib/db');
+export async function saveGoogleCalendarConnection(
+  input: GoogleCalendarConnectionInput,
+) {
+  const { db } = await import("@/lib/db");
   return db.googleCalendarConnection.upsert({
     where: { id: GOOGLE_CONNECTION_ID },
     create: { id: GOOGLE_CONNECTION_ID, ...input },
@@ -25,19 +27,24 @@ export async function saveGoogleCalendarConnection(input: GoogleCalendarConnecti
   });
 }
 
-export async function isGoogleOAuthStateConsumed(state: string): Promise<boolean> {
-  const { db } = await import('@/lib/db');
+export async function isGoogleOAuthStateConsumed(
+  state: string,
+): Promise<boolean> {
+  const { db } = await import("@/lib/db");
   const connection = await db.googleCalendarConnection.findUnique({
     where: { id: GOOGLE_CONNECTION_ID },
     select: { refreshTokenEncrypted: true },
   });
   return connection
-    ? encryptedRefreshTokenContainsOAuthState(connection.refreshTokenEncrypted, state)
+    ? encryptedRefreshTokenContainsOAuthState(
+        connection.refreshTokenEncrypted,
+        state,
+      )
     : false;
 }
 
 export async function getGoogleCalendarConnection() {
-  const { db } = await import('@/lib/db');
+  const { db } = await import("@/lib/db");
   return db.googleCalendarConnection.findUnique({
     where: { id: GOOGLE_CONNECTION_ID },
     select: {
@@ -54,7 +61,7 @@ export async function getGoogleCalendarConnection() {
 }
 
 export async function getGoogleCalendarCredentials() {
-  const { db } = await import('@/lib/db');
+  const { db } = await import("@/lib/db");
   const connection = await db.googleCalendarConnection.findUnique({
     where: { id: GOOGLE_CONNECTION_ID },
   });

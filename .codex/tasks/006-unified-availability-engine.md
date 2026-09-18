@@ -11,7 +11,7 @@
 **Worktree:**  
 `N/A`
 
-**Dependencies:**  
+**Dependencies:**
 
 - PR #2 — Booking domain + database schema
 - PR #3 — Provider availability configuration

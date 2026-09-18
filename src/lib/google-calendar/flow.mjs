@@ -1,4 +1,4 @@
-import { authorizeAdminIdentity } from './identity.mjs';
+import { authorizeAdminIdentity } from "./identity.mjs";
 
 export class OAuthFlowError extends Error {
   constructor(code) {
@@ -10,11 +10,14 @@ export class OAuthFlowError extends Error {
 export async function completeGoogleOAuth(input, dependencies) {
   try {
     const tokens = await dependencies.exchangeCode(input);
-    if (!tokens.refreshToken) throw new OAuthFlowError('missing_refresh_token');
+    if (!tokens.refreshToken) throw new OAuthFlowError("missing_refresh_token");
     const claims = await dependencies.verifyIdentity(tokens.idToken);
     const identity = authorizeAdminIdentity(claims, input.adminEmail);
     const calendar = await dependencies.discoverCalendar(tokens.accessToken);
-    const encryptedRefreshToken = dependencies.encryptToken(tokens.refreshToken, input.state);
+    const encryptedRefreshToken = dependencies.encryptToken(
+      tokens.refreshToken,
+      input.state,
+    );
     await dependencies.persistConnection({
       googleSubject: identity.subject,
       googleEmail: identity.email,
@@ -27,9 +30,9 @@ export async function completeGoogleOAuth(input, dependencies) {
     return identity;
   } catch (error) {
     if (error instanceof OAuthFlowError) throw error;
-    if (error?.code === 'unauthorized_account') {
-      throw new OAuthFlowError('unauthorized_account');
+    if (error?.code === "unauthorized_account") {
+      throw new OAuthFlowError("unauthorized_account");
     }
-    throw new OAuthFlowError('connection_failed');
+    throw new OAuthFlowError("connection_failed");
   }
 }

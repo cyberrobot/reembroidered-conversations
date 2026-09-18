@@ -845,12 +845,12 @@ A suitable conceptual result is:
 
 ```ts
 type BookingSuccessState =
-  | { kind: 'invalid' }
-  | { kind: 'confirming-payment' }
-  | { kind: 'finalising-booking' }
-  | { kind: 'confirmed'; booking: ConfirmedBookingView }
-  | { kind: 'inactive' }
-  | { kind: 'unavailable' };
+  | { kind: "invalid" }
+  | { kind: "confirming-payment" }
+  | { kind: "finalising-booking" }
+  | { kind: "confirmed"; booking: ConfirmedBookingView }
+  | { kind: "inactive" }
+  | { kind: "unavailable" };
 ```
 
 Exact naming may follow repository conventions.

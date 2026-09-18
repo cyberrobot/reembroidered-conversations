@@ -1,21 +1,21 @@
-import 'server-only';
+import "server-only";
 
-import { cookies } from 'next/headers';
-import { getAdminSessionSecret } from '../google-calendar/config.ts';
+import { cookies } from "next/headers";
+import { getAdminSessionSecret } from "../google-calendar/config.ts";
 import {
   ADMIN_SESSION_TTL_SECONDS,
   createAdminSession,
   validateAdminSession,
-} from './session-core.mjs';
+} from "./session-core.mjs";
 
-export const ADMIN_SESSION_COOKIE = 'rec_admin_session';
+export const ADMIN_SESSION_COOKIE = "rec_admin_session";
 
 export function adminSessionCookieOptions() {
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax' as const,
-    path: '/',
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax" as const,
+    path: "/",
     maxAge: ADMIN_SESSION_TTL_SECONDS,
   };
 }

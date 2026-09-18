@@ -1,6 +1,6 @@
 // @ts-check
 
-import 'server-only';
+import "server-only";
 
 const MINUTE_MS = 60_000;
 
@@ -17,15 +17,15 @@ const MINUTE_MS = 60_000;
  * @returns {Promise<BookingConflict[]>}
  */
 export async function getActiveBookingConflicts({ from, to, now }) {
-  const { db } = await import('../db.ts');
+  const { db } = await import("../db.ts");
   return db.booking.findMany({
     where: {
       startAt: { lt: to },
       endAt: { gt: from },
       OR: [
-        { status: { in: ['PAID', 'CONFIRMED'] } },
+        { status: { in: ["PAID", "CONFIRMED"] } },
         {
-          status: 'HOLD',
+          status: "HOLD",
           OR: [
             { expiresAt: { gt: now } },
             { stripeCheckoutSessionId: { not: null } },
@@ -35,10 +35,14 @@ export async function getActiveBookingConflicts({ from, to, now }) {
       ],
     },
     select: {
-      startAt: true, endAt: true, status: true, expiresAt: true,
-      stripeCheckoutSessionId: true, rescheduleSourceBookingId: true,
+      startAt: true,
+      endAt: true,
+      status: true,
+      expiresAt: true,
+      stripeCheckoutSessionId: true,
+      rescheduleSourceBookingId: true,
     },
-    orderBy: { startAt: 'asc' },
+    orderBy: { startAt: "asc" },
   });
 }
 
@@ -51,15 +55,23 @@ export async function getActiveBookingConflicts({ from, to, now }) {
  * @param {Date} now
  */
 export function toBookingOccupancyIntervals(bookings, config, now) {
-  return bookings.filter((booking) =>
-    booking.status === undefined || booking.status === 'PAID' || booking.status === 'CONFIRMED' ||
-      (booking.status === 'HOLD' && (
-        typeof booking.stripeCheckoutSessionId === 'string' ||
-        typeof booking.rescheduleSourceBookingId === 'string' ||
-        (booking.expiresAt instanceof Date && booking.expiresAt > now)
-      ))
-  ).map((booking) => ({
-    startAt: new Date(booking.startAt.getTime() - config.bufferBeforeMinutes * MINUTE_MS).toISOString(),
-    endAt: new Date(booking.endAt.getTime() + config.bufferAfterMinutes * MINUTE_MS).toISOString(),
-  }));
+  return bookings
+    .filter(
+      (booking) =>
+        booking.status === undefined ||
+        booking.status === "PAID" ||
+        booking.status === "CONFIRMED" ||
+        (booking.status === "HOLD" &&
+          (typeof booking.stripeCheckoutSessionId === "string" ||
+            typeof booking.rescheduleSourceBookingId === "string" ||
+            (booking.expiresAt instanceof Date && booking.expiresAt > now))),
+    )
+    .map((booking) => ({
+      startAt: new Date(
+        booking.startAt.getTime() - config.bufferBeforeMinutes * MINUTE_MS,
+      ).toISOString(),
+      endAt: new Date(
+        booking.endAt.getTime() + config.bufferAfterMinutes * MINUTE_MS,
+      ).toISOString(),
+    }));
 }

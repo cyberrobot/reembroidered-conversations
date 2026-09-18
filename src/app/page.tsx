@@ -1,12 +1,12 @@
-import { AboutShahd } from '@/components/AboutShahd';
-import { BookShowcase } from '@/components/BookShowcase';
-import { BookingSection } from '@/components/BookingSection';
-import { BoundariesSection } from '@/components/BoundariesSection';
-import { Experience } from '@/components/Experience';
-import { Footer } from '@/components/Footer';
-import { HeroVideo } from '@/components/HeroVideo';
-import { Navigation } from '@/components/Navigation';
-import { ThemeQuestionInterstitial } from '@/components/ThemeQuestionInterstitial';
+import { AboutShahd } from "@/components/AboutShahd";
+import { BookShowcase } from "@/components/BookShowcase";
+import { BookingSection } from "@/components/BookingSection";
+import { BoundariesSection } from "@/components/BoundariesSection";
+import { Experience } from "@/components/Experience";
+import { Footer } from "@/components/Footer";
+import { HeroVideo } from "@/components/HeroVideo";
+import { Navigation } from "@/components/Navigation";
+import { ThemeQuestionInterstitial } from "@/components/ThemeQuestionInterstitial";
 
 export default function Home() {
   return (

@@ -1,5 +1,5 @@
-import React from 'react';
-import { Heart } from 'lucide-react';
+import React from "react";
+import { Heart } from "lucide-react";
 
 export const Footer: React.FC = () => {
   return (
@@ -12,7 +12,8 @@ export const Footer: React.FC = () => {
               Re-Embroidered Conversations
             </span>
             <p className="font-serif italic text-[#D9CFC4] text-base leading-relaxed max-w-md">
-              “Sometimes, you don’t need an answer. You simply need someone to sit in the room while you listen to the sound of your own truth.”
+              “Sometimes, you don’t need an answer. You simply need someone to
+              sit in the room while you listen to the sound of your own truth.”
             </p>
             <span className="text-xs text-[#A8A29E] block">
               Private one-to-one listening sessions with Shahd Karaeen.
@@ -26,22 +27,34 @@ export const Footer: React.FC = () => {
             </span>
             <ul className="space-y-2">
               <li>
-                <a href="#meet-shahd" className="hover:text-white transition-colors">
+                <a
+                  href="#meet-shahd"
+                  className="hover:text-white transition-colors"
+                >
                   Meet Shahd Karaeen (Video Note)
                 </a>
               </li>
               <li>
-                <a href="#the-experience" className="hover:text-white transition-colors">
+                <a
+                  href="#the-experience"
+                  className="hover:text-white transition-colors"
+                >
                   The Experience
                 </a>
               </li>
               <li>
-                <a href="#about-shahd" className="hover:text-white transition-colors">
+                <a
+                  href="#about-shahd"
+                  className="hover:text-white transition-colors"
+                >
                   About Shahd Karaeen & Background
                 </a>
               </li>
               <li>
-                <a href="#the-book" className="hover:text-white transition-colors">
+                <a
+                  href="#the-book"
+                  className="hover:text-white transition-colors"
+                >
                   The Novel: Hope: Re-Embroidered
                 </a>
               </li>
@@ -55,17 +68,24 @@ export const Footer: React.FC = () => {
             </span>
             <ul className="space-y-2">
               <li>
-                <a href="#book-session" className="text-[#E5988F] hover:text-white font-medium transition-colors">
+                <a
+                  href="#book-session"
+                  className="text-[#E5988F] hover:text-white font-medium transition-colors"
+                >
                   Reserve a Conversation (£55)
                 </a>
               </li>
               <li>
-                <a href="#boundaries" className="hover:text-white transition-colors">
+                <a
+                  href="#boundaries"
+                  className="hover:text-white transition-colors"
+                >
                   Boundaries & Safety
                 </a>
               </li>
               <li className="text-[#A8A29E] leading-relaxed pt-1">
-                Strict personal confidentiality. All sessions held over secure private video or telephone links.
+                Strict personal confidentiality. All sessions held over secure
+                private video or telephone links.
               </li>
             </ul>
           </div>
@@ -74,7 +94,8 @@ export const Footer: React.FC = () => {
         {/* Bottom Colophon */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#A8A29E]">
           <div>
-            © 2026 PEACE IS THE SONG C.I.C. Company number 16883201. All rights reserved.
+            © 2026 PEACE IS THE SONG C.I.C. Company number 16883201. All rights
+            reserved.
           </div>
           <div className="flex items-center gap-1.5 text-xs">
             <span>Woven with care & quiet attention</span>
