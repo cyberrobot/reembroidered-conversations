@@ -50,7 +50,7 @@ test.afterAll(async () => {
   await pool?.end();
 });
 
-test("confirmed booking renders persisted details and desktop visual", async ({
+test("customer can later open the known success URL for a webhook-confirmed booking without a Stripe redirect", async ({
   page,
   context,
 }) => {

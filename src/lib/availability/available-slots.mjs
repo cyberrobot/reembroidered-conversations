@@ -65,7 +65,11 @@ export async function getAvailableSlots(
   );
 
   const [bookings, calendarBusyPeriods] = await Promise.all([
-    dependencies.getBookingConflicts({ from: bookingFrom, to: bookingTo, now }),
+    dependencies.getBookingConflicts({
+      from: bookingFrom,
+      to: bookingTo,
+      now,
+    }),
     dependencies.getCalendarBusyPeriods(from, to),
   ]);
   const bookingOccupancy = toBookingOccupancyIntervals(bookings, config, now);

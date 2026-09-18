@@ -105,6 +105,32 @@ test("a slot absent from current unified availability is unavailable", async () 
   assert.equal(persisted, false);
 });
 
+test("a provider event added after display is rejected by the fresh hold-time availability check", async () => {
+  const displayedSlots = [{ date: "2026-09-16", startAt, endAt }];
+  let persisted = false;
+  assert.equal(
+    displayedSlots.some((slot) => slot.startAt === startAt),
+    true,
+  );
+
+  await assert.rejects(
+    () =>
+      createBookingHold(
+        { name: "Sarah", email: "sarah@example.test", startAt },
+        now,
+        dependencies({
+          // The provider added a conflicting event after the displayed snapshot.
+          getAvailableSlots: async () => [],
+          persist: async () => {
+            persisted = true;
+          },
+        }),
+      ),
+    SlotUnavailableError,
+  );
+  assert.equal(persisted, false);
+});
+
 test("availability failures are distinguished and prevent persistence", async () => {
   let persisted = false;
   await assert.rejects(
