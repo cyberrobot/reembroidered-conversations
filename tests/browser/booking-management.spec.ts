@@ -81,14 +81,16 @@ test('confirmed booking renders authoritative details, secure headers, keyboard 
 test('reschedule selection, review, processing, success, and conflict use real API results', async ({ page }) => {
   const fixture = await seed(0);
   await page.route('**/api/availability', (route) => route.fulfill({ json: availability }));
+  let submittedStartAt: string | undefined;
   let releaseResponse!: () => void;
   const responseGate = new Promise<void>((resolve) => { releaseResponse = resolve; });
   await page.route(`**/api/bookings/manage/${fixture.capability}/reschedule`, async (route) => {
+    submittedStartAt = (await route.request().postDataJSON()).startAt;
     await responseGate;
     await route.fulfill({ json: {
       status: 'rescheduled', booking: {
-        startAt: availability.days[0].slots[0].startAt,
-        endAt: availability.days[0].slots[0].endAt,
+        startAt: availability.days[1].slots[0].startAt,
+        endAt: availability.days[1].slots[0].endAt,
         timezone: 'Europe/London', meetingUrl: 'https://meet.google.com/abc-defg-hij',
       },
     } });
@@ -96,7 +98,18 @@ test('reschedule selection, review, processing, success, and conflict use real A
   await page.goto(`/booking/manage/${fixture.capability}`);
   await page.getByRole('button', { name: /Reschedule/ }).click();
   await expect(page.getByRole('heading', { name: 'Choose a new time' })).toBeVisible();
+  await expect(page.getByText('Upcoming available days')).toBeVisible();
+  await expect(page.getByText('Nearest dates shown first')).toBeVisible();
   await expect(page.getByRole('button', { name: '10:00 AM' })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'afternoon', exact: true }).click();
+  await expect(page.getByRole('button', { name: '12:00 PM' })).toBeVisible();
+  await page.getByRole('button', { name: 'View full calendar' }).click();
+  const calendar = page.getByRole('dialog');
+  await expect(calendar).toBeVisible();
+  await calendar.locator('button[title*="Wednesday, 10 Jan"]').click();
+  await expect(calendar).toBeHidden();
+  await expect(page.getByText('Available times on Wednesday, 10 Jan:')).toBeVisible();
+  await expect(page.getByRole('button', { name: '2:00 PM' })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: /Review new time/ }).click();
   await expect(page.getByRole('heading', { name: 'Review your new time' })).toBeVisible();
   await expect(page.getByText('Current time')).toBeVisible();
@@ -105,10 +118,18 @@ test('reschedule selection, review, processing, success, and conflict use real A
   await expect(page.getByRole('heading', { name: 'Securing your new time…' })).toBeVisible();
   releaseResponse();
   await expect(page.getByRole('heading', { name: 'Your conversation has been rescheduled' })).toBeVisible();
-  await expect(page.getByText('Tuesday, 9 January 2035', { exact: false })).toBeVisible();
+  await expect(page.getByText('Wednesday, 10 January 2035', { exact: false })).toBeVisible();
+  expect(submittedStartAt).toBe(availability.days[1].slots[0].startAt);
 
   await page.unrouteAll({ behavior: 'wait' });
-  await page.route('**/api/availability', (route) => route.fulfill({ json: availability }));
+  let refreshedAvailabilityRequests = 0;
+  await page.route('**/api/availability', (route) => {
+    refreshedAvailabilityRequests += 1;
+    return route.fulfill({ json: refreshedAvailabilityRequests === 1 ? availability : {
+      ...availability,
+      days: [availability.days[1]],
+    } });
+  });
   await page.route(`**/api/bookings/manage/${fixture.capability}/reschedule`, (route) => route.fulfill({
     status: 409, json: { error: { code: 'slot_unavailable', message: 'That time is no longer available. Your original booking has not changed.' } },
   }));
@@ -118,6 +139,10 @@ test('reschedule selection, review, processing, success, and conflict use real A
   await page.getByRole('button', { name: 'Secure this new time' }).click();
   await expect(page.getByRole('heading', { name: 'That time could not be secured' })).toBeVisible();
   await expect(page.getByText('remains protected', { exact: false })).toBeVisible();
+  await page.getByRole('button', { name: /Choose another time/ }).click();
+  await expect.poll(() => refreshedAvailabilityRequests).toBeGreaterThan(1);
+  await expect(page.getByText('Available times on Wednesday, 10 Jan:')).toBeVisible();
+  await expect(page.getByRole('button', { name: '2:00 PM' })).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('cancellation is explicit, shows processing, and renders precise refund pending state', async ({ page }) => {

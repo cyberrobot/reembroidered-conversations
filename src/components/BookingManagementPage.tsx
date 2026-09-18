@@ -16,9 +16,9 @@ import {
   ShieldCheck,
   Video,
 } from 'lucide-react';
-import { FullCalendarModal } from './FullCalendarModal';
 import { Navigation } from './Navigation';
-import type { AvailabilityResponse, DayAvailability } from '../types';
+import { AvailabilityPicker } from './availability/AvailabilityPicker';
+import { useAvailability } from '../hooks/useAvailability';
 
 export interface ManagementBookingView {
   name: string;
@@ -75,38 +75,6 @@ interface BookingManagementPageProps {
   initialState: BookingManagementState;
 }
 
-function presentAvailability(response: AvailabilityResponse): DayAvailability[] {
-  const dateFormatter = new Intl.DateTimeFormat('en-GB', {
-    timeZone: response.timezone,
-    weekday: 'long', day: 'numeric', month: 'short',
-  });
-  const timeFormatter = new Intl.DateTimeFormat('en-GB', {
-    timeZone: response.timezone, hour: 'numeric', minute: '2-digit', hour12: true,
-  });
-  const hourFormatter = new Intl.DateTimeFormat('en-GB', {
-    timeZone: response.timezone, hour: 'numeric', hourCycle: 'h23',
-  });
-  return response.days.filter((day) => day.slots.length > 0).map((day) => {
-    const dateInstant = new Date(`${day.date}T12:00:00.000Z`);
-    const parts = Object.fromEntries(dateFormatter.formatToParts(dateInstant).map(({ type, value }) => [type, value]));
-    return {
-      date: day.date,
-      dayOfWeek: parts.weekday,
-      formattedDate: `${parts.weekday}, ${parts.day} ${parts.month}`,
-      slots: day.slots.map((slot) => {
-        const hour = Number(hourFormatter.format(new Date(slot.startAt)));
-        return {
-          id: slot.startAt,
-          startAt: slot.startAt,
-          endAt: slot.endAt,
-          time: timeFormatter.format(new Date(slot.startAt)).replace('am', 'AM').replace('pm', 'PM'),
-          period: hour < 12 ? 'morning' as const : hour < 17 ? 'afternoon' as const : 'evening' as const,
-        };
-      }),
-    };
-  });
-}
-
 function bookingPresentation(booking: ManagementBookingView) {
   const start = new Date(booking.startAt);
   const end = new Date(booking.endAt);
@@ -130,12 +98,9 @@ export function BookingManagementPage({ capability, initialState }: BookingManag
   const [managementState, setManagementState] = useState(initialState);
   const [booking, setBooking] = useState('booking' in initialState ? initialState.booking : null);
   const [step, setStep] = useState<ManagementStep>('overview');
-  const [availableDays, setAvailableDays] = useState<DayAvailability[]>([]);
-  const [availabilityStatus, setAvailabilityStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
-  const [availabilityRequest, setAvailabilityRequest] = useState(0);
-  const [selectedDayIndex, setSelectedDayIndex] = useState(0);
+  const { availableDays, status: availabilityStatus, refresh: refreshAvailability } = useAvailability({ enabled: step === 'reschedule_select' });
+  const [selectedDate, setSelectedDate] = useState('');
   const [selectedSlotId, setSelectedSlotId] = useState('');
-  const [showFullCalendar, setShowFullCalendar] = useState(false);
   const [message, setMessage] = useState('');
   const mutationInFlight = useRef(false);
   const focusRef = useRef<HTMLHeadingElement>(null);
@@ -144,32 +109,7 @@ export function BookingManagementPage({ capability, initialState }: BookingManag
     focusRef.current?.focus();
   }, [step, managementState.kind]);
 
-  useEffect(() => {
-    if (step !== 'reschedule_select') return;
-    const controller = new AbortController();
-    setAvailabilityStatus('loading');
-    fetch('/api/availability', { cache: 'no-store', signal: controller.signal })
-      .then(async (response) => {
-        if (!response.ok) throw new Error('availability unavailable');
-        return response.json() as Promise<AvailabilityResponse>;
-      })
-      .then((response) => {
-        const days = presentAvailability(response);
-        setAvailableDays(days);
-        setSelectedDayIndex(0);
-        setSelectedSlotId(days[0]?.slots[0]?.id ?? '');
-        setAvailabilityStatus('ready');
-      })
-      .catch((error) => {
-        if (error instanceof DOMException && error.name === 'AbortError') return;
-        setAvailableDays([]);
-        setSelectedSlotId('');
-        setAvailabilityStatus('error');
-      });
-    return () => controller.abort();
-  }, [step, availabilityRequest]);
-
-  const activeDay = availableDays[selectedDayIndex] ?? availableDays[0];
+  const activeDay = availableDays.find((day) => day.date === selectedDate);
   const selectedSlot = activeDay?.slots.find((slot) => slot.id === selectedSlotId);
   const current = booking ? bookingPresentation(booking) : null;
   const selected = useMemo(() => selectedSlot && booking ? bookingPresentation({
@@ -204,7 +144,7 @@ export function BookingManagementPage({ capability, initialState }: BookingManag
         }
         moveTo('reschedule_success');
       } else if (body?.error?.code === 'slot_unavailable') {
-        setAvailabilityRequest((value) => value + 1);
+        refreshAvailability();
         moveTo('reschedule_conflict');
       } else if (body?.error?.code === 'reconciliation_pending' || body?.error?.code === 'change_in_progress') {
         moveTo('reschedule_pending', body.error.message);
@@ -357,21 +297,11 @@ export function BookingManagementPage({ capability, initialState }: BookingManag
               <FlowCard title="Choose a new time" eyebrow="Reschedule · Step 1 of 2" focusRef={focusRef} onBack={() => moveTo('overview')}>
                 <InfoBox>Your original booking remains secured while you browse. Availability is checked again when you confirm.</InfoBox>
                 {availabilityStatus === 'loading' && <StatusPanel busy>Checking current availability…</StatusPanel>}
-                {availabilityStatus === 'error' && <StatusPanel error>Availability is temporarily unavailable.<button type="button" onClick={() => setAvailabilityRequest((value) => value + 1)} className="ml-2 underline">Try again</button></StatusPanel>}
+                {availabilityStatus === 'error' && <StatusPanel error>Availability is temporarily unavailable.<button type="button" onClick={refreshAvailability} className="ml-2 underline">Try again</button></StatusPanel>}
                 {availabilityStatus === 'ready' && availableDays.length === 0 && <StatusPanel>No replacement times are currently available.</StatusPanel>}
                 {availabilityStatus === 'ready' && availableDays.length > 0 && (
                   <>
-                    <div className="flex gap-2 overflow-x-auto pb-2" aria-label="Available dates">
-                      {availableDays.slice(0, 14).map((day, index) => (
-                        <button key={day.date} type="button" aria-pressed={selectedDayIndex === index} onClick={() => { setSelectedDayIndex(index); setSelectedSlotId(day.slots[0]?.id ?? ''); }} className={`min-w-28 rounded-xl border p-3 text-center text-xs transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#A35048] ${selectedDayIndex === index ? 'border-[#A35048] bg-[#FAF2EB] text-[#8C4038]' : 'border-[#E8DFD5] bg-white text-[#68635F]'}`}>
-                          <span className="block font-medium">{day.dayOfWeek}</span><span>{day.formattedDate.replace(`${day.dayOfWeek}, `, '')}</span>
-                        </button>
-                      ))}
-                    </div>
-                    <button type="button" onClick={() => setShowFullCalendar(true)} className="text-xs font-medium text-[#A35048] underline">View full calendar</button>
-                    <fieldset className="space-y-3"><legend className="font-serif text-xl font-medium">Available times</legend><div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                      {activeDay?.slots.map((slot) => <button key={slot.id} type="button" aria-pressed={selectedSlotId === slot.id} onClick={() => setSelectedSlotId(slot.id)} className={`min-h-12 rounded-xl border px-4 py-3 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#A35048] ${selectedSlotId === slot.id ? 'border-[#A35048] bg-[#A35048] text-white' : 'border-[#E8DFD5] bg-white hover:border-[#A35048]'}`}>{slot.time}</button>)}
-                    </div></fieldset>
+                    <AvailabilityPicker availableDays={availableDays} selectedDate={selectedDate} selectedSlotId={selectedSlotId} onSelectDate={setSelectedDate} onSelectSlot={setSelectedSlotId} />
                     <button type="button" disabled={!selectedSlot} onClick={() => moveTo('reschedule_review')} className="primary-button w-full disabled:cursor-not-allowed disabled:opacity-50">Review new time<ChevronRight className="h-4 w-4" /></button>
                   </>
                 )}
@@ -424,7 +354,6 @@ export function BookingManagementPage({ capability, initialState }: BookingManag
         )}
       </main>
 
-      <FullCalendarModal isOpen={showFullCalendar} onClose={() => setShowFullCalendar(false)} availableDays={availableDays} selectedDate={activeDay?.date ?? ''} onSelectDate={(date) => { const index = availableDays.findIndex((day) => day.date === date); if (index >= 0) { setSelectedDayIndex(index); setSelectedSlotId(availableDays[index].slots[0]?.id ?? ''); } setShowFullCalendar(false); }} />
       <style jsx global>{`
         .primary-button { display:inline-flex;min-height:3rem;align-items:center;justify-content:center;gap:.5rem;border-radius:9999px;background:#A35048;padding:.75rem 1.5rem;font-size:.8rem;font-weight:600;color:white;transition:background .2s; }
         .primary-button:hover { background:#8C4038; }

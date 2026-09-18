@@ -368,6 +368,8 @@ test('checkout initiation failure is retryable and a lost hold refreshes availab
   await expect(page.getByRole('alert').filter({ hasText: 'please try again' })).toBeVisible();
   await expect(page.locator('#confirm-booking-button')).toBeEnabled();
   await expect(page.locator('#client-name')).toBeDisabled();
+  await expect(page.locator('#book-session form button').filter({ hasText: /slots?/ }).first()).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'View full calendar' })).toBeDisabled();
   expect(holdRequests).toBe(1);
   await page.locator('#confirm-booking-button').press('Enter');
   expect(holdRequests).toBe(1);

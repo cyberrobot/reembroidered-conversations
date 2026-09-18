@@ -1,145 +1,26 @@
 'use client';
 
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
-  Calendar as CalendarIcon,
   Clock,
   Video,
   Phone,
   ShieldCheck,
   AlertCircle,
-  ChevronLeft,
-  ChevronRight,
 } from 'lucide-react';
-import { AvailabilityResponse, BookingCheckoutResponse, BookingHold, BookingHoldResponse, DayAvailability, SessionFormat } from '../types';
-import { FullCalendarModal } from './FullCalendarModal';
-
-function presentAvailability(response: AvailabilityResponse): DayAvailability[] {
-  const dateFormatter = new Intl.DateTimeFormat('en-GB', {
-    timeZone: response.timezone,
-    weekday: 'long',
-    day: 'numeric',
-    month: 'short',
-  });
-  const timeFormatter = new Intl.DateTimeFormat('en-GB', {
-    timeZone: response.timezone,
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
-  const hourFormatter = new Intl.DateTimeFormat('en-GB', {
-    timeZone: response.timezone,
-    hour: 'numeric',
-    hourCycle: 'h23',
-  });
-
-  return response.days.filter((day) => day.slots.length > 0).map((day) => {
-    const dateInstant = new Date(`${day.date}T12:00:00.000Z`);
-    const dateParts = Object.fromEntries(
-      dateFormatter.formatToParts(dateInstant).map(({ type, value }) => [type, value]),
-    );
-    const formattedDate = `${dateParts.weekday}, ${dateParts.day} ${dateParts.month}`;
-    return {
-      date: day.date,
-      dayOfWeek: dateParts.weekday,
-      formattedDate,
-      slots: day.slots.map((slot) => {
-        const hour = Number(hourFormatter.format(new Date(slot.startAt)));
-        return {
-          id: slot.startAt,
-          startAt: slot.startAt,
-          endAt: slot.endAt,
-          time: timeFormatter.format(new Date(slot.startAt)).replace('am', 'AM').replace('pm', 'PM'),
-          period: hour < 12 ? 'morning' as const : hour < 17 ? 'afternoon' as const : 'evening' as const,
-        };
-      }),
-    };
-  });
-}
+import { BookingCheckoutResponse, BookingHold, BookingHoldResponse, SessionFormat } from '../types';
+import { AvailabilityPicker } from './availability/AvailabilityPicker';
+import { useAvailability } from '../hooks/useAvailability';
 
 export const BookingSection: React.FC = () => {
-  const [timeZone, setTimeZone] = useState('Europe/London (GMT/BST)');
-  const [availableDays, setAvailableDays] = useState<DayAvailability[]>([]);
-  const [availabilityStatus, setAvailabilityStatus] = useState<'loading' | 'ready' | 'error'>('loading');
-  const [availabilityRequest, setAvailabilityRequest] = useState(0);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    setAvailabilityStatus('loading');
-    fetch('/api/availability', {
-      cache: 'no-store',
-      signal: controller.signal,
-    }).then(async (response) => {
-      if (!response.ok) throw new Error('availability request failed');
-      return response.json() as Promise<AvailabilityResponse>;
-    }).then((response) => {
-      setAvailableDays(presentAvailability(response));
-      setTimeZone(`${response.timezone} (GMT/BST)`);
-      setSelectedDayIndex(0);
-      setAvailabilityStatus('ready');
-    }).catch((error) => {
-      if (error instanceof DOMException && error.name === 'AbortError') return;
-      setAvailableDays([]);
-      setAvailabilityStatus('error');
-    });
-    return () => controller.abort();
-  }, [availabilityRequest]);
+  const { availableDays, timezone, status: availabilityStatus, refresh: refreshAvailability } = useAvailability();
+  const timeZone = timezone ? `${timezone} (GMT/BST)` : 'Europe/London (GMT/BST)';
 
   // Selected date & slot state
-  const [selectedDayIndex, setSelectedDayIndex] = useState(0);
+  const [selectedDate, setSelectedDate] = useState('');
   const [selectedSlot, setSelectedSlot] = useState<string>('');
   const [requiresFreshSelection, setRequiresFreshSelection] = useState(false);
-  const [periodFilter, setPeriodFilter] = useState<'all' | 'morning' | 'afternoon' | 'evening'>('all');
   const [sessionFormat, setSessionFormat] = useState<SessionFormat>('video');
-
-  // Full calendar modal & horizontal scroll states
-  const [showFullCalendar, setShowFullCalendar] = useState(false);
-  const dateStripRef = useRef<HTMLDivElement>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(true);
-
-  const updateScrollButtons = () => {
-    if (!dateStripRef.current) return;
-    const { scrollLeft, scrollWidth, clientWidth } = dateStripRef.current;
-    setCanScrollLeft(scrollLeft > 10);
-    setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 10);
-  };
-
-  useEffect(() => {
-    updateScrollButtons();
-    const handleResize = () => updateScrollButtons();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [availableDays]);
-
-  const scrollStrip = (direction: 'left' | 'right') => {
-    if (!dateStripRef.current) return;
-    const scrollAmount = 340;
-    dateStripRef.current.scrollBy({
-      left: direction === 'left' ? -scrollAmount : scrollAmount,
-      behavior: 'smooth',
-    });
-    setTimeout(updateScrollButtons, 350);
-  };
-
-  const handleSelectDateFromCalendar = (dateStr: string) => {
-    const idx = availableDays.findIndex((d) => d.date === dateStr);
-    if (idx !== -1) {
-      setSelectedDayIndex(idx);
-      if (availableDays[idx].slots.length > 0) {
-        setSelectedSlot(availableDays[idx].slots[0].id);
-      }
-      setTimeout(() => {
-        if (dateStripRef.current) {
-          const card = dateStripRef.current.children[idx] as HTMLElement;
-          if (card) {
-            card.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-          }
-          updateScrollButtons();
-        }
-      }, 100);
-    }
-  };
 
   // Client details
   const [name, setName] = useState('');
@@ -155,24 +36,8 @@ export const BookingSection: React.FC = () => {
   const nextCheckoutOperationIdRef = useRef(0);
   const activeCheckoutOperationRef = useRef<{ id: number; controller: AbortController } | null>(null);
 
-  const activeDay = availableDays[selectedDayIndex] || availableDays[0];
+  const activeDay = availableDays.find((day) => day.date === selectedDate);
   const selectedSlotData = activeDay?.slots.find((slot) => slot.id === selectedSlot);
-
-  useEffect(() => {
-    if (!activeDay) {
-      setSelectedSlot('');
-      return;
-    }
-    if (!requiresFreshSelection && !activeDay.slots.some((slot) => slot.id === selectedSlot)) {
-      setSelectedSlot(activeDay.slots[0]?.id ?? '');
-    }
-  }, [activeDay, selectedSlot, requiresFreshSelection]);
-
-  const filteredSlots = useMemo(() => {
-    if (!activeDay) return [];
-    if (periodFilter === 'all') return activeDay.slots;
-    return activeDay.slots.filter((s) => s.period === periodFilter);
-  }, [activeDay, periodFilter]);
 
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
@@ -226,7 +91,7 @@ export const BookingSection: React.FC = () => {
             setSelectedSlot('');
             setRequiresFreshSelection(true);
             setErrorMsg('That time has just become unavailable. Please choose another available time.');
-            setAvailabilityRequest((request) => request + 1);
+            refreshAvailability();
           } else {
             setErrorMsg('Your time has not yet been reserved. Please try again.');
           }
@@ -251,7 +116,7 @@ export const BookingSection: React.FC = () => {
           setSelectedSlot('');
           setRequiresFreshSelection(true);
           setErrorMsg('Your temporary hold is no longer reserved. Please choose an available time again.');
-          setAvailabilityRequest((request) => request + 1);
+          refreshAvailability();
         } else {
           setCheckoutError('Secure payment could not be started. Your time is still held, so please try again.');
         }
@@ -289,7 +154,7 @@ export const BookingSection: React.FC = () => {
       setRequiresFreshSelection(true);
       setCheckoutError('');
       setErrorMsg('Your temporary hold has expired. Please choose an available time again.');
-      setAvailabilityRequest((request) => request + 1);
+      refreshAvailability();
     }, delay);
     return () => window.clearTimeout(timer);
   }, [hold]);
@@ -357,7 +222,7 @@ export const BookingSection: React.FC = () => {
                   <p>We could not load availability just now. No times can be selected until the calendar is checked.</p>
                   <button
                     type="button"
-                    onClick={() => setAvailabilityRequest((request) => request + 1)}
+                    onClick={refreshAvailability}
                     className="mt-3 font-medium underline underline-offset-4"
                   >
                     Try again
@@ -372,218 +237,15 @@ export const BookingSection: React.FC = () => {
               )}
 
               {availabilityStatus === 'ready' && availableDays.length > 0 && (
-                <>
-
-              {/* Date Selection Header & Controls */}
-              <div className="mb-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-                  <div className="flex flex-col md:flex-row items-center gap-2">
-                    <p className="text-xs text-[#282524] font-medium font-sans">
-                      Upcoming available days
-                    </p>
-                    <p>
-                      <span className="text-[#C4B7A9]">•</span>
-                      <span className="text-[11px] text-[#78716C] font-light">
-                        Nearest dates shown first
-                      </span>
-                    </p>
-                  </div>
-
-                  <div className="flex items-center justify-between sm:justify-end gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setShowFullCalendar(true)}
-                      disabled={Boolean(hold)}
-                      className="inline-flex items-center gap-1.5 text-xs text-[#A35048] hover:text-[#8C4038] font-medium underline underline-offset-4 decoration-[#A35048]/40 hover:decoration-[#A35048] transition-colors cursor-pointer"
-                    >
-                      <CalendarIcon className="w-3.5 h-3.5 stroke-[1.75]" />
-                      <span>View full calendar</span>
-                    </button>
-
-                    {/* Horizontal Pagination Arrows */}
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => scrollStrip('left')}
-                        disabled={!canScrollLeft}
-                        className="p-1.5 rounded-lg border border-[#E8DFD5] bg-[#FAF8F5] text-[#282524] hover:border-[#A35048] hover:text-[#A35048] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                        aria-label="Scroll to earlier dates"
-                        title="Earlier dates"
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => scrollStrip('right')}
-                        disabled={!canScrollRight}
-                        className="p-1.5 rounded-lg border border-[#E8DFD5] bg-[#FAF8F5] text-[#282524] hover:border-[#A35048] hover:text-[#A35048] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                        aria-label="Scroll to later dates"
-                        title="Later dates"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Horizontal Date Pills Slider with Visual Overflow Cues */}
-                <div className="relative group/strip">
-                  {/* Left gradient fade cue */}
-                  <div
-                    className={`pointer-events-none absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#FDFCFB] to-transparent z-10 transition-opacity duration-200 ${
-                      canScrollLeft ? 'opacity-100' : 'opacity-0'
-                    }`}
-                  />
-
-                  {/* Right gradient fade cue indicating more dates ahead */}
-                  <div
-                    className={`pointer-events-none absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-[#FDFCFB] to-transparent z-10 transition-opacity duration-200 ${
-                      canScrollRight ? 'opacity-100' : 'opacity-0'
-                    }`}
-                  />
-
-                  {/* Desktop Floating Right Arrow for immediate affordance */}
-                  {canScrollRight && (
-                    <button
-                      type="button"
-                      onClick={() => scrollStrip('right')}
-                      className="hidden md:flex absolute -right-2.5 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-[#FAF8F5] border border-[#E8DFD5] shadow-md items-center justify-center text-[#282524] hover:text-[#A35048] hover:border-[#A35048] transition-all cursor-pointer hover:scale-105 active:scale-95"
-                      aria-label="Next dates"
-                      title="Next available dates"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  )}
-
-                  {/* Desktop Floating Left Arrow */}
-                  {canScrollLeft && (
-                    <button
-                      type="button"
-                      onClick={() => scrollStrip('left')}
-                      className="hidden md:flex absolute -left-2.5 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-[#FAF8F5] border border-[#E8DFD5] shadow-md items-center justify-center text-[#282524] hover:text-[#A35048] hover:border-[#A35048] transition-all cursor-pointer hover:scale-105 active:scale-95"
-                      aria-label="Previous dates"
-                      title="Previous dates"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                  )}
-
-                  {/* Date cards scroll container */}
-                  <div
-                    ref={dateStripRef}
-                    onScroll={updateScrollButtons}
-                    className="flex gap-2.5 overflow-x-auto pb-2.5 pt-0.5 px-0.5 scrollbar-none scroll-smooth"
-                  >
-                    {availableDays.map((day, idx) => {
-                      const isSelected = selectedDayIndex === idx;
-                      const availableCount = day.slots.length;
-                      return (
-                        <button
-                          key={day.date}
-                          type="button"
-                          onClick={() => {
-                            setSelectedDayIndex(idx);
-                            if (day.slots.length > 0) {
-                              setSelectedSlot(day.slots[0].id);
-                              setRequiresFreshSelection(false);
-                            }
-                          }}
-                          disabled={Boolean(hold)}
-                          className={`shrink-0 px-4 py-3 rounded-xl border text-left cursor-pointer transition-all duration-150 min-w-[104px] ${
-                            isSelected
-                              ? 'bg-[#A35048] text-[#FAF8F5] border-[#A35048] shadow-xs'
-                              : 'bg-[#FAF8F5] text-[#4B4643] border-[#E8DFD5] hover:border-[#C4B7A9] hover:bg-[#F5EFE9]/60'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-1 mb-0.5">
-                            <span className="block text-[11px] font-sans opacity-80 uppercase tracking-wider font-medium">
-                              {day.dayOfWeek.slice(0, 3)}
-                            </span>
-                            {idx === 0 && (
-                              <span
-                                className={`text-[9px] uppercase tracking-wider font-semibold px-1 py-0.2 rounded-xs ${
-                                  isSelected ? 'bg-white/25 text-white' : 'bg-[#E8DFD5] text-[#A35048]'
-                                }`}
-                              >
-                                Nearest
-                              </span>
-                            )}
-                          </div>
-                          <span className="block font-serif text-base font-medium leading-snug">
-                            {day.formattedDate.split(', ')[1]}
-                          </span>
-                          <span
-                            className={`block text-[10px] font-sans mt-1 ${
-                              isSelected ? 'text-white/80' : 'text-[#78716C]'
-                            }`}
-                          >
-                            {availableCount} {availableCount === 1 ? 'slot' : 'slots'}
-                          </span>
-                        </button>
-                      );
-                    })}
-
-                    {/* Browse Later Dates Card */}
-                    <button
-                      type="button"
-                      onClick={() => setShowFullCalendar(true)}
-                      disabled={Boolean(hold)}
-                      className="shrink-0 px-4 py-3 rounded-xl border border-dashed border-[#C4B7A9] hover:border-[#A35048] text-left cursor-pointer transition-all duration-150 bg-[#FAF8F5]/80 hover:bg-[#F5EFE9] flex flex-col justify-center items-center min-w-[110px] group"
-                      title="Open full calendar to select any date across the next 8 weeks"
-                    >
-                      <CalendarIcon className="w-4 h-4 text-[#A35048] mb-1 group-hover:scale-110 transition-transform" />
-                      <span className="text-xs font-serif font-medium text-[#282524] whitespace-nowrap">
-                        Later dates
-                      </span>
-                      <span className="text-[10px] text-[#78716C] mt-0.5 whitespace-nowrap">
-                        Full calendar →
-                      </span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Time of Day Filter & Slot Grid */}
-              <div>
-                <div className="flex flex-col md:flex-row gap-2 md:gap-0 items-center justify-between mb-3 text-xs text-[#68635F]">
-                  <span>Available times on {activeDay.formattedDate}:</span>
-                  <div className="flex gap-1">
-                    {(['all', 'morning', 'afternoon', 'evening'] as const).map((filter) => (
-                      <button
-                        key={filter}
-                        type="button"
-                        onClick={() => setPeriodFilter(filter)}
-                        className={`px-2 py-0.5 rounded capitalize text-[11px] cursor-pointer ${
-                          periodFilter === filter
-                            ? 'bg-[#E8DFD5] text-[#282524] font-medium'
-                            : 'text-[#78716C] hover:text-[#282524]'
-                        }`}
-                      >
-                        {filter}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {filteredSlots.map((slot) => (
-                    <button
-                      key={slot.id}
-                      type="button"
-                      onClick={() => { setSelectedSlot(slot.id); setRequiresFreshSelection(false); }}
-                      disabled={Boolean(hold)}
-                      className={`py-2.5 px-3 rounded-xl border text-sm font-sans font-medium transition-all cursor-pointer text-center ${
-                        selectedSlot === slot.id
-                          ? 'bg-[#282524] text-white border-[#282524] shadow-xs ring-2 ring-[#A35048]/30'
-                          : 'bg-[#FAF8F5] text-[#4B4643] border-[#E8DFD5] hover:border-[#A35048]'
-                      }`}
-                    >
-                      {slot.time}
-                    </button>
-                  ))}
-                </div>
-              </div>
-                </>
+                <AvailabilityPicker
+                  availableDays={availableDays}
+                  selectedDate={selectedDate}
+                  selectedSlotId={selectedSlot}
+                  onSelectDate={setSelectedDate}
+                  onSelectSlot={(slotId) => { setSelectedSlot(slotId); if (slotId) setRequiresFreshSelection(false); }}
+                  disabled={Boolean(hold)}
+                  autoSelectSlot={!requiresFreshSelection}
+                />
               )}
             </div>
 
@@ -772,14 +434,6 @@ export const BookingSection: React.FC = () => {
               </div>
             </div>
           </form>
-        {/* Full Month Calendar Modal */}
-        <FullCalendarModal
-          isOpen={showFullCalendar}
-          onClose={() => setShowFullCalendar(false)}
-          availableDays={availableDays}
-          selectedDate={activeDay?.date || availableDays[0]?.date}
-          onSelectDate={handleSelectDateFromCalendar}
-        />
       </div>
     </section>
   );
