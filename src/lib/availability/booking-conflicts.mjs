@@ -48,33 +48,6 @@ export async function getActiveBookingConflicts({ from, to, now }, database) {
 }
 
 /**
- * Load cancelled sessions whose Calendar deletion is still pending. Their
- * deterministic booking event can continue to appear in FreeBusy after the
- * authoritative cancellation has released the slot.
- *
- * @param {{ from: Date, to: Date }} input
- * @param {{ booking: { findMany: (query: any) => Promise<Array<{ startAt: Date, endAt: Date }>> } }} [database]
- * @returns {Promise<Array<{ startAt: Date, endAt: Date }>>}
- */
-export async function getPendingCalendarCancellationPeriods(
-  { from, to },
-  database,
-) {
-  const booking = database?.booking ?? (await import("../db.ts")).db.booking;
-  return booking.findMany({
-    where: {
-      startAt: { lt: to },
-      endAt: { gt: from },
-      status: { in: ["CANCELLED", "REFUNDED"] },
-      calendarEventId: { not: null },
-      calendarCancelledAt: null,
-    },
-    select: { startAt: true, endAt: true },
-    orderBy: { startAt: "asc" },
-  });
-}
-
-/**
  * Expand stored customer-session timestamps into provider occupancy intervals.
  * Persisted timestamps are deliberately left unchanged.
  *

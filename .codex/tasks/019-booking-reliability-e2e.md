@@ -794,7 +794,14 @@ Calendar and/or Stripe temporarily fails
 
 Immediately after authoritative cancellation:
 
-- the original slot must be available again;
+- the cancelled booking row must immediately release its PostgreSQL ownership of
+  the original slot;
+- Google FreeBusy remains authoritative: if Calendar deletion is still pending
+  and FreeBusy reports the original interval, the slot must remain unavailable
+  because FreeBusy cannot prove whether an independent provider event occupies
+  that same interval;
+- the original slot becomes customer-visible as available once Calendar deletion
+  is reconciled and FreeBusy no longer reports it;
 - the booking must not return to `CONFIRMED`;
 - the persisted refund eligibility decision must remain unchanged.
 

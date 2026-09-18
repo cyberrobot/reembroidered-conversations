@@ -4,10 +4,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client.ts";
 
 import { getAvailableSlots } from "../src/lib/availability/available-slots.mjs";
-import {
-  getActiveBookingConflicts,
-  getPendingCalendarCancellationPeriods,
-} from "../src/lib/availability/booking-conflicts.mjs";
+import { getActiveBookingConflicts } from "../src/lib/availability/booking-conflicts.mjs";
 import { getProviderCandidateSlotsForDate } from "../src/lib/availability/candidate-slots.mjs";
 import {
   createBookingHold,
@@ -82,8 +79,6 @@ function realAvailabilityDependencies(db, getCalendarBusyPeriods) {
   return {
     getCandidates: getProviderCandidateSlotsForDate,
     getBookingConflicts: (input) => getActiveBookingConflicts(input, db),
-    getPendingCalendarCancellations: (input) =>
-      getPendingCalendarCancellationPeriods(input, db),
     getCalendarBusyPeriods,
   };
 }
@@ -553,7 +548,7 @@ test(
 );
 
 test(
-  "cancellation releases availability before Calendar/refund recovery and reconciles one refund",
+  "pending Calendar deletion keeps same-interval FreeBusy authoritative until cancellation recovery",
   { skip },
   async () => {
     const db = client();
@@ -647,8 +642,8 @@ test(
         availableAfterCancellation.some(
           (slot) => slot.startAt === startAt.toISOString(),
         ),
-        true,
-        "the cancelled slot is available despite its pending Calendar deletion",
+        false,
+        "FreeBusy may represent an independent same-interval event, so timestamp equality cannot release the slot",
       );
       assert.equal(
         availableAfterCancellation.some(
@@ -692,6 +687,34 @@ test(
         `booking-cancellation-refund:${bookingId}`,
         `booking-cancellation-refund:${bookingId}`,
       ]);
+
+      const availableAfterReconciliation = await getAvailableSlots(
+        {
+          fromDate: "2044-01-13",
+          toDate: "2044-01-13",
+          now: new Date("2044-01-01T10:07:01.000Z"),
+        },
+        realAvailabilityDependencies(db, async () => [
+          {
+            startAt: "2044-01-13T10:55:00.000Z",
+            endAt: "2044-01-13T11:50:00.000Z",
+          },
+        ]),
+      );
+      assert.equal(
+        availableAfterReconciliation.some(
+          (slot) => slot.startAt === startAt.toISOString(),
+        ),
+        true,
+        "the cancelled slot becomes available after Calendar deletion is reconciled and FreeBusy no longer reports it",
+      );
+      assert.equal(
+        availableAfterReconciliation.some(
+          (slot) => slot.startAt === "2044-01-13T10:55:00.000Z",
+        ),
+        false,
+        "the unrelated provider event remains authoritative after reconciliation",
+      );
     } finally {
       await db.booking.deleteMany({ where: { id: bookingId } });
       await db.$disconnect();
