@@ -8,12 +8,14 @@ import { getProviderCandidateSlotsForDate } from "./candidate-slots.mjs";
 import { PROVIDER_AVAILABILITY_CONFIG } from "./provider-config.mjs";
 import {
   getActiveBookingConflicts,
+  getPendingCalendarCancellationPeriods,
   toBookingOccupancyIntervals,
 } from "./booking-conflicts.mjs";
 
 const defaultDependencies = {
   getCandidates: getProviderCandidateSlotsForDate,
   getBookingConflicts: getActiveBookingConflicts,
+  getPendingCalendarCancellations: getPendingCalendarCancellationPeriods,
   getCalendarBusyPeriods: getBusyPeriods,
 };
 
@@ -64,11 +66,31 @@ export async function getAvailableSlots(
     to.getTime() + config.bufferBeforeMinutes * 60_000,
   );
 
-  const [bookings, calendarBusyPeriods] = await Promise.all([
-    dependencies.getBookingConflicts({ from: bookingFrom, to: bookingTo, now }),
-    dependencies.getCalendarBusyPeriods(from, to),
-  ]);
+  const [bookings, calendarBusyPeriods, pendingCalendarCancellations] =
+    await Promise.all([
+      dependencies.getBookingConflicts({
+        from: bookingFrom,
+        to: bookingTo,
+        now,
+      }),
+      dependencies.getCalendarBusyPeriods(from, to),
+      (dependencies.getPendingCalendarCancellations ?? (async () => []))({
+        from,
+        to,
+      }),
+    ]);
   const bookingOccupancy = toBookingOccupancyIntervals(bookings, config, now);
+  const pendingCancellationInstants = new Set(
+    pendingCalendarCancellations.map(
+      ({ startAt, endAt }) => `${startAt.toISOString()}/${endAt.toISOString()}`,
+    ),
+  );
+  const authoritativeCalendarBusyPeriods = calendarBusyPeriods.filter(
+    ({ startAt, endAt }) =>
+      !pendingCancellationInstants.has(
+        `${new Date(startAt).toISOString()}/${new Date(endAt).toISOString()}`,
+      ),
+  );
 
   const available = candidates
     .filter((candidate) => {
@@ -80,7 +102,7 @@ export async function getAvailableSlots(
         !bookingOccupancy.some((conflict) =>
           intervalsOverlap(occupancy, conflict),
         ) &&
-        !calendarBusyPeriods.some((conflict) =>
+        !authoritativeCalendarBusyPeriods.some((conflict) =>
           intervalsOverlap(occupancy, conflict),
         )
       );
