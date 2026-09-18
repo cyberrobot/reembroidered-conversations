@@ -1,12 +1,15 @@
 // @ts-check
 
-import 'server-only';
+import "server-only";
 
-import { addCalendarDays } from '../booking-date.mjs';
-import { getBusyPeriods } from '../calendar/busy-periods.mjs';
-import { getProviderCandidateSlotsForDate } from './candidate-slots.mjs';
-import { PROVIDER_AVAILABILITY_CONFIG } from './provider-config.mjs';
-import { getActiveBookingConflicts, toBookingOccupancyIntervals } from './booking-conflicts.mjs';
+import { addCalendarDays } from "../booking-date.mjs";
+import { getBusyPeriods } from "../calendar/busy-periods.mjs";
+import { getProviderCandidateSlotsForDate } from "./candidate-slots.mjs";
+import { PROVIDER_AVAILABILITY_CONFIG } from "./provider-config.mjs";
+import {
+  getActiveBookingConflicts,
+  toBookingOccupancyIntervals,
+} from "./booking-conflicts.mjs";
 
 const defaultDependencies = {
   getCandidates: getProviderCandidateSlotsForDate,
@@ -16,8 +19,10 @@ const defaultDependencies = {
 
 /** @param {{ startAt: string, endAt: string }} left @param {{ startAt: string, endAt: string }} right */
 export function intervalsOverlap(left, right) {
-  return Date.parse(left.startAt) < Date.parse(right.endAt) &&
-    Date.parse(left.endAt) > Date.parse(right.startAt);
+  return (
+    Date.parse(left.startAt) < Date.parse(right.endAt) &&
+    Date.parse(left.endAt) > Date.parse(right.startAt)
+  );
 }
 
 /**
@@ -43,13 +48,21 @@ export async function getAvailableSlots(
 
   if (candidates.length === 0) return [];
 
-  const occupancyStarts = candidates.map((slot) => Date.parse(slot.occupancyStartAt));
-  const occupancyEnds = candidates.map((slot) => Date.parse(slot.occupancyEndAt));
+  const occupancyStarts = candidates.map((slot) =>
+    Date.parse(slot.occupancyStartAt),
+  );
+  const occupancyEnds = candidates.map((slot) =>
+    Date.parse(slot.occupancyEndAt),
+  );
   const from = new Date(Math.min(...occupancyStarts));
   const to = new Date(Math.max(...occupancyEnds));
 
-  const bookingFrom = new Date(from.getTime() - config.bufferAfterMinutes * 60_000);
-  const bookingTo = new Date(to.getTime() + config.bufferBeforeMinutes * 60_000);
+  const bookingFrom = new Date(
+    from.getTime() - config.bufferAfterMinutes * 60_000,
+  );
+  const bookingTo = new Date(
+    to.getTime() + config.bufferBeforeMinutes * 60_000,
+  );
 
   const [bookings, calendarBusyPeriods] = await Promise.all([
     dependencies.getBookingConflicts({ from: bookingFrom, to: bookingTo, now }),
@@ -57,12 +70,26 @@ export async function getAvailableSlots(
   ]);
   const bookingOccupancy = toBookingOccupancyIntervals(bookings, config, now);
 
-  const available = candidates.filter((candidate) => {
-    const occupancy = { startAt: candidate.occupancyStartAt, endAt: candidate.occupancyEndAt };
-    return !bookingOccupancy.some((conflict) => intervalsOverlap(occupancy, conflict)) &&
-      !calendarBusyPeriods.some((conflict) => intervalsOverlap(occupancy, conflict));
-  }).map(({ date, startAt, endAt }) => ({ date, startAt, endAt }));
+  const available = candidates
+    .filter((candidate) => {
+      const occupancy = {
+        startAt: candidate.occupancyStartAt,
+        endAt: candidate.occupancyEndAt,
+      };
+      return (
+        !bookingOccupancy.some((conflict) =>
+          intervalsOverlap(occupancy, conflict),
+        ) &&
+        !calendarBusyPeriods.some((conflict) =>
+          intervalsOverlap(occupancy, conflict),
+        )
+      );
+    })
+    .map(({ date, startAt, endAt }) => ({ date, startAt, endAt }));
 
-  return [...new Map(available.map((slot) => [`${slot.startAt}/${slot.endAt}`, slot])).values()]
-    .sort((left, right) => left.startAt.localeCompare(right.startAt));
+  return [
+    ...new Map(
+      available.map((slot) => [`${slot.startAt}/${slot.endAt}`, slot]),
+    ).values(),
+  ].sort((left, right) => left.startAt.localeCompare(right.startAt));
 }

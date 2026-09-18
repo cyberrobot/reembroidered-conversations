@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server.js';
+import { NextResponse } from "next/server.js";
 
 import {
   getAdminSessionSecret,
   getGoogleOAuthConfig,
-} from '../../../../../lib/google-calendar/config.ts';
+} from "../../../../../lib/google-calendar/config.ts";
 import {
   buildGoogleAuthorizationUrl,
   createCodeChallenge,
@@ -11,21 +11,21 @@ import {
   createOAuthState,
   createOAuthStateEnvelope,
   OAUTH_TRANSACTION_TTL_SECONDS,
-} from '../../../../../lib/google-calendar/oauth.mjs';
+} from "../../../../../lib/google-calendar/oauth.mjs";
 import {
   OAUTH_PKCE_COOKIE,
   OAUTH_STATE_COOKIE,
-} from '../../../../../lib/google-calendar/transaction.ts';
+} from "../../../../../lib/google-calendar/transaction.ts";
 
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 function temporaryCookieOptions() {
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax' as const,
-    path: '/api/admin/google-calendar/callback',
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax" as const,
+    path: "/api/admin/google-calendar/callback",
     maxAge: OAUTH_TRANSACTION_TTL_SECONDS,
   };
 }
@@ -49,6 +49,10 @@ export async function GET() {
     createOAuthStateEnvelope(state, secret),
     temporaryCookieOptions(),
   );
-  response.cookies.set(OAUTH_PKCE_COOKIE, codeVerifier, temporaryCookieOptions());
+  response.cookies.set(
+    OAUTH_PKCE_COOKIE,
+    codeVerifier,
+    temporaryCookieOptions(),
+  );
   return response;
 }

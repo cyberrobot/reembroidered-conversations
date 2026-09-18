@@ -1,30 +1,34 @@
-import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
-import { fileURLToPath } from 'node:url';
-import test from 'node:test';
-import pg from 'pg';
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
+import { fileURLToPath } from "node:url";
+import test from "node:test";
+import pg from "pg";
 
 const connectionString = process.env.DATABASE_SCHEMA_TEST_URL;
 
 test(
-  'all migrations create the Google connection from the existing booking schema',
-  { skip: connectionString ? false : 'DATABASE_SCHEMA_TEST_URL is not configured' },
+  "all migrations create the Google connection from the existing booking schema",
+  {
+    skip: connectionString
+      ? false
+      : "DATABASE_SCHEMA_TEST_URL is not configured",
+  },
   async () => {
-    const schema = `pr4_migration_${randomBytes(8).toString('hex')}`;
+    const schema = `pr4_migration_${randomBytes(8).toString("hex")}`;
     const admin = new pg.Client({ connectionString });
     const schemaUrl = new URL(connectionString);
-    schemaUrl.searchParams.set('schema', schema);
+    schemaUrl.searchParams.set("schema", schema);
     await admin.connect();
     try {
       await admin.query(`CREATE SCHEMA "${schema}"`);
       execFileSync(
-        fileURLToPath(new URL('../node_modules/.bin/prisma', import.meta.url)),
-        ['migrate', 'deploy'],
+        fileURLToPath(new URL("../node_modules/.bin/prisma", import.meta.url)),
+        ["migrate", "deploy"],
         {
-          cwd: fileURLToPath(new URL('..', import.meta.url)),
+          cwd: fileURLToPath(new URL("..", import.meta.url)),
           env: { ...process.env, DATABASE_URL: schemaUrl.toString() },
-          stdio: 'pipe',
+          stdio: "pipe",
         },
       );
 
@@ -33,9 +37,17 @@ test(
            FROM "${schema}"."_prisma_migrations"`,
       );
       assert.ok(migrations.rows.length > 0);
-      assert.ok(migrations.rows.every(({ finished_at, rolled_back_at }) => finished_at && !rolled_back_at));
-      assert.ok(migrations.rows.some(({ migration_name }) =>
-        migration_name === '20260911010000_google_calendar_connection'));
+      assert.ok(
+        migrations.rows.every(
+          ({ finished_at, rolled_back_at }) => finished_at && !rolled_back_at,
+        ),
+      );
+      assert.ok(
+        migrations.rows.some(
+          ({ migration_name }) =>
+            migration_name === "20260911010000_google_calendar_connection",
+        ),
+      );
 
       const columns = await admin.query(
         `SELECT column_name, is_nullable
@@ -44,24 +56,27 @@ test(
         [schema],
       );
       const nullableByColumn = Object.fromEntries(
-        columns.rows.map(({ column_name, is_nullable }) => [column_name, is_nullable]),
+        columns.rows.map(({ column_name, is_nullable }) => [
+          column_name,
+          is_nullable,
+        ]),
       );
       for (const required of [
-        'id',
-        'googleSubject',
-        'googleEmail',
-        'calendarId',
-        'calendarSummary',
-        'refreshTokenEncrypted',
-        'grantedScopes',
-        'connectedAt',
-        'updatedAt',
+        "id",
+        "googleSubject",
+        "googleEmail",
+        "calendarId",
+        "calendarSummary",
+        "refreshTokenEncrypted",
+        "grantedScopes",
+        "connectedAt",
+        "updatedAt",
       ]) {
-        assert.equal(nullableByColumn[required], 'NO', required);
+        assert.equal(nullableByColumn[required], "NO", required);
       }
-      assert.equal(nullableByColumn.calendarTimeZone, 'YES');
+      assert.equal(nullableByColumn.calendarTimeZone, "YES");
 
-      const envelope = `v1.${'n'.repeat(16)}.${'t'.repeat(22)}.${'c'.repeat(2048)}`;
+      const envelope = `v1.${"n".repeat(16)}.${"t".repeat(22)}.${"c".repeat(2048)}`;
       const inserted = await admin.query(
         `INSERT INTO "${schema}"."google_calendar_connections"
           (id, "googleSubject", "googleEmail", "calendarId", "calendarSummary",
@@ -72,19 +87,20 @@ test(
         [envelope],
       );
       assert.deepEqual(inserted.rows[0], {
-        id: 'primary',
+        id: "primary",
         calendarTimeZone: null,
         refreshTokenEncrypted: envelope,
       });
       await assert.rejects(
-        () => admin.query(
-          `INSERT INTO "${schema}"."google_calendar_connections"
+        () =>
+          admin.query(
+            `INSERT INTO "${schema}"."google_calendar_connections"
             (id, "googleSubject", "googleEmail", "calendarId", "calendarSummary",
              "refreshTokenEncrypted", "grantedScopes", "updatedAt")
            VALUES ('primary', 'other', 'other@example.com', 'other', 'Other',
              'v1.n.t.c', ARRAY[]::TEXT[], CURRENT_TIMESTAMP)`,
-        ),
-        (error) => error.constraint === 'google_calendar_connections_pkey',
+          ),
+        (error) => error.constraint === "google_calendar_connections_pkey",
       );
 
       const bookingConstraint = await admin.query(
@@ -94,7 +110,6 @@ test(
         [schema],
       );
       assert.equal(bookingConstraint.rowCount, 1);
-
     } finally {
       await admin.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
       await admin.end();

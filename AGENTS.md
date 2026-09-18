@@ -701,6 +701,14 @@ Do not leave placeholder fake integrations in production paths.
 
 Determine exact commands from `package.json`, lockfiles, test configuration, and CI.
 
+After making implementation changes, Codex must:
+
+1. run `npm run format`;
+2. run the relevant repository verification; and
+3. run `npm run format:check` before considering the task complete.
+
+Formatting is a mandatory implementation step. Do not rely on individual task specifications to repeat this requirement.
+
 For an implementation task, run all relevant checks that exist in the repository, typically covering:
 
 - formatting when configured;

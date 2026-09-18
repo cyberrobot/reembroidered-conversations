@@ -1,8 +1,13 @@
-'use client';
+"use client";
 
-import React, { useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, X, Calendar as CalendarIcon } from 'lucide-react';
-import { DayAvailability } from '../types';
+import React, { useEffect, useState } from "react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Calendar as CalendarIcon,
+} from "lucide-react";
+import { DayAvailability } from "../types";
 
 interface FullCalendarModalProps {
   isOpen: boolean;
@@ -22,7 +27,7 @@ export const FullCalendarModal: React.FC<FullCalendarModalProps> = ({
   const initialDate = selectedDate || availableDays[0]?.date;
   const [viewDate, setViewDate] = useState<Date>(() => {
     if (initialDate) {
-      const parts = initialDate.split('-').map(Number);
+      const parts = initialDate.split("-").map(Number);
       return new Date(Date.UTC(parts[0], parts[1] - 1, 1));
     }
     return new Date();
@@ -30,28 +35,44 @@ export const FullCalendarModal: React.FC<FullCalendarModalProps> = ({
 
   useEffect(() => {
     if (!isOpen || !initialDate) return;
-    const parts = initialDate.split('-').map(Number);
+    const parts = initialDate.split("-").map(Number);
     setViewDate(new Date(Date.UTC(parts[0], parts[1] - 1, 1)));
   }, [initialDate, isOpen]);
 
   if (!isOpen) return null;
 
   const monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
   ];
-  const dayHeaders = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const dayHeaders = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
   const year = viewDate.getUTCFullYear();
   const month = viewDate.getUTCMonth();
 
   // Find min and max dates in availableDays to disable prev/next if out of range
-  const minDate = availableDays.length > 0 ? new Date(availableDays[0].date) : new Date();
-  const maxDate = availableDays.length > 0 ? new Date(availableDays[availableDays.length - 1].date) : new Date();
+  const minDate =
+    availableDays.length > 0 ? new Date(availableDays[0].date) : new Date();
+  const maxDate =
+    availableDays.length > 0
+      ? new Date(availableDays[availableDays.length - 1].date)
+      : new Date();
 
-  const isPrevDisabled = (year < minDate.getUTCFullYear()) ||
+  const isPrevDisabled =
+    year < minDate.getUTCFullYear() ||
     (year === minDate.getUTCFullYear() && month <= minDate.getUTCMonth());
-  const isNextDisabled = (year > maxDate.getUTCFullYear()) ||
+  const isNextDisabled =
+    year > maxDate.getUTCFullYear() ||
     (year === maxDate.getUTCFullYear() && month >= maxDate.getUTCMonth());
 
   const handlePrevMonth = () => {
@@ -117,7 +138,10 @@ export const FullCalendarModal: React.FC<FullCalendarModalProps> = ({
               <CalendarIcon className="w-3.5 h-3.5" />
               <span>Full Calendar View</span>
             </div>
-            <h3 id="calendar-modal-title" className="font-serif text-xl sm:text-2xl text-[#282524] font-medium">
+            <h3
+              id="calendar-modal-title"
+              className="font-serif text-xl sm:text-2xl text-[#282524] font-medium"
+            >
               Select a specific date
             </h3>
             <p className="text-xs text-[#78716C] font-sans font-light mt-0.5">
@@ -162,7 +186,10 @@ export const FullCalendarModal: React.FC<FullCalendarModalProps> = ({
         {/* Day of Week Headers */}
         <div className="grid grid-cols-7 gap-1 text-center mb-1">
           {dayHeaders.map((dh) => (
-            <span key={dh} className="text-[11px] font-sans uppercase font-medium text-[#78716C] py-1">
+            <span
+              key={dh}
+              className="text-[11px] font-sans uppercase font-medium text-[#78716C] py-1"
+            >
               {dh}
             </span>
           ))}
@@ -190,15 +217,15 @@ export const FullCalendarModal: React.FC<FullCalendarModalProps> = ({
                   }}
                   className={`h-10 rounded-xl flex flex-col items-center justify-center transition-all cursor-pointer relative group ${
                     isSelected
-                      ? 'bg-[#A35048] text-[#FAF8F5] shadow-xs font-semibold'
-                      : 'bg-[#FDFCFB] text-[#282524] border border-[#E8DFD5] hover:border-[#A35048] hover:bg-[#F5EFE9]'
+                      ? "bg-[#A35048] text-[#FAF8F5] shadow-xs font-semibold"
+                      : "bg-[#FDFCFB] text-[#282524] border border-[#E8DFD5] hover:border-[#A35048] hover:bg-[#F5EFE9]"
                   }`}
                   title={`${cd.dayData?.formattedDate} (${cd.dayData?.slots.length} available slots)`}
                 >
                   <span className="text-xs">{cd.dayNumber}</span>
                   <span
                     className={`w-1.5 h-1.5 rounded-full mt-0.5 ${
-                      isSelected ? 'bg-white' : 'bg-[#A35048]'
+                      isSelected ? "bg-white" : "bg-[#A35048]"
                     }`}
                   />
                 </button>
@@ -224,7 +251,8 @@ export const FullCalendarModal: React.FC<FullCalendarModalProps> = ({
               <span className="w-2 h-2 rounded-full bg-[#A35048]" /> Available
             </span>
             <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-[#A35048] ring-2 ring-[#A35048]/30" /> Selected
+              <span className="w-2 h-2 rounded-full bg-[#A35048] ring-2 ring-[#A35048]/30" />{" "}
+              Selected
             </span>
             <span className="flex items-center gap-1 text-[#A8A29E]">
               <span className="w-2 h-2 rounded-full bg-[#E8DFD5]" /> Unavailable

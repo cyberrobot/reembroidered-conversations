@@ -1,20 +1,21 @@
 // @ts-check
 
-import 'server-only';
+import "server-only";
 
 export const CANCELLATION_REFUND_CUTOFF_HOURS = 24;
 const CUTOFF_MS = CANCELLATION_REFUND_CUTOFF_HOURS * 60 * 60 * 1000;
 
 export class InvalidCancellationPolicyInputError extends Error {
   constructor() {
-    super('Cancellation policy input is invalid.');
-    this.name = 'InvalidCancellationPolicyInputError';
+    super("Cancellation policy input is invalid.");
+    this.name = "InvalidCancellationPolicyInputError";
   }
 }
 
 function date(value) {
   const result = value instanceof Date ? new Date(value) : new Date(value);
-  if (Number.isNaN(result.getTime())) throw new InvalidCancellationPolicyInputError();
+  if (Number.isNaN(result.getTime()))
+    throw new InvalidCancellationPolicyInputError();
   return result;
 }
 

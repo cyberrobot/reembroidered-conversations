@@ -2,38 +2,39 @@
 
 @theme inline {
   --font-serif: var(--font-cormorant-garamond), Georgia, serif;
-  --font-sans: var(--font-plus-jakarta-sans), system-ui, -apple-system, sans-serif;
-  --color-linen-base: #FAF8F5;
-  --color-linen-surface: #F5EFE9;
-  --color-linen-card: #FDFCFB;
-  --color-linen-border: #E8DFD5;
-  --color-thread-rose: #A35048;
-  --color-thread-deep: #7D3730;
-  --color-thread-ochre: #C08A3E;
+  --font-sans:
+    var(--font-plus-jakarta-sans), system-ui, -apple-system, sans-serif;
+  --color-linen-base: #faf8f5;
+  --color-linen-surface: #f5efe9;
+  --color-linen-card: #fdfcfb;
+  --color-linen-border: #e8dfd5;
+  --color-thread-rose: #a35048;
+  --color-thread-deep: #7d3730;
+  --color-thread-ochre: #c08a3e;
   --color-charcoal-ink: #282524;
-  --color-charcoal-soft: #4B4643;
-  --color-charcoal-muted: #78716C;
-  --color-sage-soft: #63705C;
+  --color-charcoal-soft: #4b4643;
+  --color-charcoal-muted: #78716c;
+  --color-sage-soft: #63705c;
 }
 
 .paper-grain {
-  background-color: #FAF8F5;
-  background-image: radial-gradient(#E8DFC8 0.6px, transparent 0.6px);
+  background-color: #faf8f5;
+  background-image: radial-gradient(#e8dfc8 0.6px, transparent 0.6px);
   background-size: 24px 24px;
 }
 
 .bg-rosy-parchment {
-  background: linear-gradient(180deg, #FBF7F2 0%, #F6EFE8 50%, #FAF7F2 100%);
+  background: linear-gradient(180deg, #fbf7f2 0%, #f6efe8 50%, #faf7f2 100%);
 }
 
 .bg-rosy-parchment-diagonal {
-  background: linear-gradient(135deg, #FBF7F2 0%, #F8F1EB 50%, #F5EDE4 100%);
+  background: linear-gradient(135deg, #fbf7f2 0%, #f8f1eb 50%, #f5ede4 100%);
 }
 
 .deckled-book-leaf {
   position: relative;
-  background: #FAF7F3;
-  border: 1px solid #EAE0D5;
+  background: #faf7f3;
+  border: 1px solid #eae0d5;
   box-shadow:
     0 1px 2px rgba(163, 80, 72, 0.04),
     0 6px 18px -2px rgba(60, 50, 45, 0.05),
@@ -41,25 +42,25 @@
 }
 
 .deckled-book-leaf::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 3px;
   right: -3px;
   bottom: -3px;
   left: 3px;
-  background: #F3EAE0;
-  border: 1px solid #E4D7C8;
+  background: #f3eae0;
+  border: 1px solid #e4d7c8;
   border-radius: inherit;
   z-index: -1;
   pointer-events: none;
 }
 
 .stitch-border-top {
-  border-top: 1.5px dashed #A35048;
+  border-top: 1.5px dashed #a35048;
 }
 
 .stitch-border-b {
-  border-bottom: 1.5px dashed #A35048;
+  border-bottom: 1.5px dashed #a35048;
 }
 
 ::-webkit-scrollbar {
@@ -67,14 +68,14 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: #FAF8F5;
+  background: #faf8f5;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #D9CFC4;
+  background: #d9cfc4;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #C4B7A9;
+  background: #c4b7a9;
 }

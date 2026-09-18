@@ -1,6 +1,6 @@
-import React from 'react';
-import bookImg from '../assets/images/hope_reembroidered_book.jpg';
-import { EmbroideredThread } from './EmbroideredThread';
+import React from "react";
+import bookImg from "../assets/images/hope_reembroidered_book.jpg";
+import { EmbroideredThread } from "./EmbroideredThread";
 
 export const BookShowcase: React.FC = () => {
   return (
@@ -25,7 +25,19 @@ export const BookShowcase: React.FC = () => {
             </h2>
 
             <p className="font-sans text-sm sm:text-base text-[#59534F] leading-relaxed font-light">
-              These sessions and the <strong className="font-serif font-medium text-[#282524]">Re-Embroidered Conversations</strong> series grew directly out of the psychological themes of Shahd Karaeen's novel, <em className="font-serif italic text-[#282524]">Hope: Re-Embroidered</em>. Following a woman confronting coercive control, memory, and inherited patterns of silence while seeking autonomy, the novel examines how trauma shapes identity—and how survival often begins with the quiet courage of telling the unvarnished truth.
+              These sessions and the{" "}
+              <strong className="font-serif font-medium text-[#282524]">
+                Re-Embroidered Conversations
+              </strong>{" "}
+              series grew directly out of the psychological themes of Shahd
+              Karaeen's novel,{" "}
+              <em className="font-serif italic text-[#282524]">
+                Hope: Re-Embroidered
+              </em>
+              . Following a woman confronting coercive control, memory, and
+              inherited patterns of silence while seeking autonomy, the novel
+              examines how trauma shapes identity—and how survival often begins
+              with the quiet courage of telling the unvarnished truth.
             </p>
 
             {/* Excerpt Card with Deckled Book-Leaf & Rosy-Cream Color Harmony */}
@@ -35,18 +47,26 @@ export const BookShowcase: React.FC = () => {
 
               <div className="p-6 sm:p-7 bg-gradient-to-br from-[#FDFBF8] via-[#FAF6F1] to-[#F5EEE6] border border-[#EAE0D5] border-l-3 border-l-[#A35048] rounded-r-xl rounded-l-xs shadow-[0_4px_16px_-2px_rgba(163,80,72,0.06),0_1px_2px_rgba(40,37,36,0.04)] space-y-3 font-serif">
                 <p className="text-base sm:text-lg italic text-[#282524] leading-relaxed">
-                  “What changed was not a person. It was the space I allowed myself to occupy.”
+                  “What changed was not a person. It was the space I allowed
+                  myself to occupy.”
                 </p>
                 <div className="text-xs font-sans text-[#78716C] not-italic flex items-center pt-1 border-t border-[#EAE0D5]/70">
                   <span>
-                    — Excerpt from <span className="font-serif italic text-[#282524]">Hope: Re-Embroidered</span> by Shahd Karaeen
+                    — Excerpt from{" "}
+                    <span className="font-serif italic text-[#282524]">
+                      Hope: Re-Embroidered
+                    </span>{" "}
+                    by Shahd Karaeen
                   </span>
                 </div>
               </div>
             </div>
 
             <p className="font-sans text-sm text-[#68635F] leading-relaxed font-light">
-              This space is an invitation to step away from the pressure to endure quietly. It is a room to explore the realities of survival, identity, and healing without needing to justify yourself to anyone.
+              This space is an invitation to step away from the pressure to
+              endure quietly. It is a room to explore the realities of survival,
+              identity, and healing without needing to justify yourself to
+              anyone.
             </p>
           </div>
 
@@ -65,7 +85,9 @@ export const BookShowcase: React.FC = () => {
                 />
                 <div className="p-4 bg-gradient-to-r from-[#FAF7F2] to-[#F7EFE7] border-t border-[#E8DDD2] flex items-center justify-between text-xs text-[#78716C] font-sans">
                   <span>Hope: Re-Embroidered · A Psychological Novel</span>
-                  <span className="font-serif text-[#A35048] italic font-medium">Hardcover edition</span>
+                  <span className="font-serif text-[#A35048] italic font-medium">
+                    Hardcover edition
+                  </span>
                 </div>
               </div>
             </div>

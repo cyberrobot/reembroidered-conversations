@@ -1,23 +1,51 @@
-import React from 'react';
+import React from "react";
 
 interface EmbroideredThreadProps {
   className?: string;
-  variant?: 'horizontal' | 'curved' | 'divider' | 'knot';
+  variant?: "horizontal" | "curved" | "divider" | "knot";
 }
 
 export const EmbroideredThread: React.FC<EmbroideredThreadProps> = ({
-  className = '',
-  variant = 'horizontal',
+  className = "",
+  variant = "horizontal",
 }) => {
-  if (variant === 'knot') {
+  if (variant === "knot") {
     return (
-      <div className={`inline-flex items-center justify-center gap-1.5 ${className}`}>
+      <div
+        className={`inline-flex items-center justify-center gap-1.5 ${className}`}
+      >
         <span className="w-1.5 h-1.5 rounded-full bg-[#A35048]" />
         <span className="w-12 h-[1px] bg-[#A35048]/40" />
-        <svg width="12" height="12" viewBox="0 0 12 12" className="text-[#A35048]">
-          <circle cx="6" cy="6" r="3" fill="none" stroke="currentColor" strokeWidth="1.2" />
-          <line x1="2" y1="2" x2="10" y2="10" stroke="currentColor" strokeWidth="1" />
-          <line x1="10" y1="2" x2="2" y2="10" stroke="currentColor" strokeWidth="1" />
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 12 12"
+          className="text-[#A35048]"
+        >
+          <circle
+            cx="6"
+            cy="6"
+            r="3"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.2"
+          />
+          <line
+            x1="2"
+            y1="2"
+            x2="10"
+            y2="10"
+            stroke="currentColor"
+            strokeWidth="1"
+          />
+          <line
+            x1="10"
+            y1="2"
+            x2="2"
+            y2="10"
+            stroke="currentColor"
+            strokeWidth="1"
+          />
         </svg>
         <span className="w-12 h-[1px] bg-[#A35048]/40" />
         <span className="w-1.5 h-1.5 rounded-full bg-[#A35048]" />
@@ -25,9 +53,11 @@ export const EmbroideredThread: React.FC<EmbroideredThreadProps> = ({
     );
   }
 
-  if (variant === 'curved') {
+  if (variant === "curved") {
     return (
-      <div className={`w-full overflow-hidden flex justify-center py-4 ${className}`}>
+      <div
+        className={`w-full overflow-hidden flex justify-center py-4 ${className}`}
+      >
         <svg
           viewBox="0 0 1200 48"
           fill="none"
@@ -49,9 +79,11 @@ export const EmbroideredThread: React.FC<EmbroideredThreadProps> = ({
     );
   }
 
-  if (variant === 'divider') {
+  if (variant === "divider") {
     return (
-      <div className={`w-full flex items-center justify-center gap-4 py-6 ${className}`}>
+      <div
+        className={`w-full flex items-center justify-center gap-4 py-6 ${className}`}
+      >
         <div className="h-[1px] flex-1 max-w-xs border-t border-dashed border-[#A35048]/35" />
         <span className="font-serif italic text-xs tracking-widest text-[#A35048] uppercase">
           Re-Embroidered Conversations
@@ -62,6 +94,8 @@ export const EmbroideredThread: React.FC<EmbroideredThreadProps> = ({
   }
 
   return (
-    <div className={`w-full h-px border-t border-dashed border-[#A35048]/40 my-4 ${className}`} />
+    <div
+      className={`w-full h-px border-t border-dashed border-[#A35048]/40 my-4 ${className}`}
+    />
   );
 };

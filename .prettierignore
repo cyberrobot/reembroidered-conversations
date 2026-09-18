@@ -1,0 +1,22 @@
+# Dependencies and package-manager metadata
+node_modules
+package-lock.json
+bun.lock
+
+# Framework and generated output
+.next
+out
+build
+src/generated/prisma
+next-env.d.ts
+
+# Test and coverage output
+coverage
+playwright-report
+test-results
+
+# Local configuration and logs
+.codex
+.env*
+*.log
+*.tsbuildinfo
