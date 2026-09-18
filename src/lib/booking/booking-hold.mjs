@@ -64,6 +64,7 @@ export function createHoldPersistence(database) {
           status: 'HOLD',
           expiresAt: { lte: now },
           stripeCheckoutSessionId: null,
+          rescheduleSourceBookingId: null,
         },
         data: { status: 'CANCELLED' },
       });

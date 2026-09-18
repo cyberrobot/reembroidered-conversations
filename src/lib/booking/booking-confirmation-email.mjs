@@ -3,6 +3,7 @@
 import 'server-only';
 import { isUsableGoogleMeetUrl } from '../calendar/booking-event.mjs';
 import { getBookingEmailConfiguration, sendEmailWithResend } from '../email/resend.mjs';
+import { buildBookingManagementLink } from './booking-management-token.mjs';
 import { SESSION_PRODUCT } from './session-product.mjs';
 
 export const BOOKING_CONFIRMATION_SUBJECT = 'Your Re-Embroidered Conversation is confirmed';
@@ -50,17 +51,17 @@ function confirmationDetails(booking) {
   }
 }
 
-export function renderBookingConfirmationEmail(booking, { changesUrl }) {
+export function renderBookingConfirmationEmail(booking, { changesUrl, managementSecret }) {
   const details = confirmationDetails(booking);
-  let parsedChangesUrl;
-  try { parsedChangesUrl = new URL(changesUrl); } catch { throw new BookingConfirmationEmailError('invalid_configuration'); }
-  if (!['http:', 'https:'].includes(parsedChangesUrl.protocol)) throw new BookingConfirmationEmailError('invalid_configuration');
+  let managementUrl;
+  try { managementUrl = buildBookingManagementLink(booking.id, { baseUrl: changesUrl, secret: managementSecret }); }
+  catch { throw new BookingConfirmationEmailError('invalid_configuration'); }
   const name = escapeHtml(booking.name.trim());
   const date = escapeHtml(details.date);
   const time = `${escapeHtml(details.startTime)}&ndash;${escapeHtml(details.endTime)}`;
   const timezone = escapeHtml(booking.timezone);
   const meetingUrl = escapeHtml(booking.meetingUrl);
-  const safeChangesUrl = escapeHtml(parsedChangesUrl.toString());
+  const safeChangesUrl = escapeHtml(managementUrl);
   const duration = `${SESSION_PRODUCT.durationMinutes}-minute session`;
   const durationBadge = `${SESSION_PRODUCT.durationMinutes} Minutes`;
   const preparationItems = [
@@ -103,7 +104,7 @@ body{margin:0;padding:0;min-width:100%;background-color:#faf7f2;-webkit-text-siz
 </td></tr></table>
 <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 32px"><tr><td align="center" style="padding:24px;background-color:#1c2a39;border-radius:8px;text-align:center"><h2 style="margin:0 0 16px;font-family:'Cormorant Garamond',Georgia,serif;font-size:22px;font-weight:600;color:#ffffff">Join via Google Meet</h2><table role="presentation" border="0" cellpadding="0" cellspacing="0" align="center" style="margin:0 auto 14px"><tr><td align="center" style="background-color:#bd4d36;border-radius:6px"><a href="${meetingUrl}" class="btn-meet" style="display:inline-block;padding:13px 28px;font-family:'Plus Jakarta Sans',Arial,sans-serif;font-size:14.5px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:6px">Join on Google Meet &rarr;</a></td></tr></table><p style="margin:0;font-family:'Plus Jakarta Sans',Arial,sans-serif;font-size:12.5px;color:#a0b0c0;line-height:1.5">Direct link: <a href="${meetingUrl}" style="color:#f4ece1;text-decoration:underline;word-break:break-all">${meetingUrl}</a></p></td></tr></table>
 <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 32px"><tr><td style="padding-bottom:12px;border-bottom:1.5px solid #1c2a39"><table role="presentation" width="100%"><tr><td><h2 style="margin:0;font-family:'Cormorant Garamond',Georgia,serif;font-size:22px;font-weight:700;color:#1c2a39">A little preparation</h2></td><td align="right"><span style="font-family:'Plus Jakarta Sans',Arial,sans-serif;font-size:12px;color:#bd4d36;font-weight:600">Gentle guidance</span></td></tr></table></td></tr>${preparationRows}</table>
-<table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 24px;background-color:#f8f5f0;border-radius:8px;border:1px dashed #d9cebf"><tr><td style="padding:20px"><h2 style="margin:0 0 8px;font-family:'Cormorant Garamond',Georgia,serif;font-size:19px;font-weight:700;color:#1c2a39">Need to make a change?</h2><p style="margin:0 0 14px;font-family:'Plus Jakarta Sans',Arial,sans-serif;font-size:13px;line-height:1.55;color:#5f6b7a">Use the request link below. Opening it does not automatically change your booking.</p><a href="${safeChangesUrl}" class="link-change" style="font-family:'Plus Jakarta Sans',Arial,sans-serif;font-size:13.5px;font-weight:600;color:#bd4d36;text-decoration:underline">Request cancellation or rescheduling</a></td></tr></table>
+<table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 24px;background-color:#f8f5f0;border-radius:8px;border:1px dashed #d9cebf"><tr><td style="padding:20px"><h2 style="margin:0 0 8px;font-family:'Cormorant Garamond',Georgia,serif;font-size:19px;font-weight:700;color:#1c2a39">Need to make a change?</h2><p style="margin:0 0 14px;font-family:'Plus Jakarta Sans',Arial,sans-serif;font-size:13px;line-height:1.55;color:#5f6b7a">Use your private management link below. Opening it does not automatically change your booking.</p><a href="${safeChangesUrl}" class="link-change" style="font-family:'Plus Jakarta Sans',Arial,sans-serif;font-size:13.5px;font-weight:600;color:#bd4d36;text-decoration:underline">Manage your booking</a></td></tr></table>
 <p style="margin:28px 0 0;font-family:'Plus Jakarta Sans',Arial,sans-serif;font-size:14.5px;line-height:1.6;color:#405162">Warmly,<br><strong style="color:#1c2a39;font-family:'Cormorant Garamond',Georgia,serif;font-size:18px">Shahd Karaeen</strong><br><span style="font-size:13px;color:#707f8f">Re-Embroidered Conversations</span></p>
 </td></tr><tr><td align="center" style="padding:24px 32px;background-color:#f7f3eb;border-top:1px dashed #e0d4c5;text-align:center"><p style="margin:0;font-family:'Cormorant Garamond',Georgia,serif;font-size:16px;font-style:italic;color:#1c2a39">&mdash; Re-Embroidered Conversations &mdash;</p></td></tr>
 </table></td></tr></table></body></html>`;
@@ -127,8 +128,8 @@ ${booking.meetingUrl}
 A little preparation
 ${PREPARATION_GUIDANCE}
 
-Request cancellation or rescheduling:
-${parsedChangesUrl.toString()}
+Manage your booking:
+${managementUrl}
 Opening this link does not automatically change your booking.
 
 Warmly,

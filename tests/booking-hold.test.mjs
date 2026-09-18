@@ -133,6 +133,7 @@ test('claim transaction releases only an exact expired HOLD before inserting', a
       status: 'HOLD',
       expiresAt: { lte: now },
       stripeCheckoutSessionId: null,
+      rescheduleSourceBookingId: null,
     },
     data: { status: 'CANCELLED' },
   }]);

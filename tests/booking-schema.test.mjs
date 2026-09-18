@@ -74,6 +74,25 @@ test(
       assert.equal(emailColumns.rows[0].confirmationEmailSentAt, null);
       assert.equal(emailColumns.rows[0].confirmationEmailId, null);
 
+      const managementColumns = await client.query(
+        `SELECT "cancelledAt", "cancellationRefundDue", "calendarCancelledAt", "stripeRefundId",
+                "stripeRefundStatus", "refundRequestedAt", "refundedAt", "rescheduledAt",
+                "rescheduleSourceBookingId"
+         FROM bookings WHERE id = $1`,
+        [first.rows[0].id],
+      );
+      assert.deepEqual(managementColumns.rows[0], {
+        cancelledAt: null,
+        cancellationRefundDue: null,
+        calendarCancelledAt: null,
+        stripeRefundId: null,
+        stripeRefundStatus: null,
+        refundRequestedAt: null,
+        refundedAt: null,
+        rescheduledAt: null,
+        rescheduleSourceBookingId: null,
+      });
+
       await rejectsConstraint(
         () => insertBooking(),
         'bookings_active_start_at_key',

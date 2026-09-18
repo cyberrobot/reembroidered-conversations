@@ -48,11 +48,14 @@ test('partially omitted ranges use server defaults while preserving explicit bou
 });
 
 test('booking UI requests server-default availability without encoding a horizon', async () => {
-  const source = await readFile(new URL('../src/components/BookingSection.tsx', import.meta.url), 'utf8');
-  assert.match(source, /fetch\(['"]\/api\/availability['"]/);
-  assert.doesNotMatch(source, /maximumBookingHorizonDays/);
-  assert.doesNotMatch(source, /addCalendarDays\(initialAvailabilityDate/);
-  assert.doesNotMatch(source, /api\/availability\?from=/);
+  const hook = await readFile(new URL('../src/hooks/useAvailability.ts', import.meta.url), 'utf8');
+  const booking = await readFile(new URL('../src/components/BookingSection.tsx', import.meta.url), 'utf8');
+  assert.match(booking, /useAvailability\(\)/);
+  assert.match(hook, /fetch\(['"]\/api\/availability['"]/);
+  assert.match(hook, /cache:\s*['"]no-store['"]/);
+  assert.doesNotMatch(hook, /maximumBookingHorizonDays/);
+  assert.doesNotMatch(hook, /addCalendarDays\(initialAvailabilityDate/);
+  assert.doesNotMatch(hook, /api\/availability\?from=/);
 });
 
 test('valid requests return only customer-safe grouped available slots without caching', async () => {

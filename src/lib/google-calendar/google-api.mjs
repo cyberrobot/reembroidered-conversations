@@ -6,7 +6,7 @@ import {
 } from './constants.mjs';
 
 export class GoogleApiError extends Error {
-  /** @param {'authorization' | 'unavailable' | 'invalid_response' | 'conflict'} category */
+  /** @param {'authorization' | 'unavailable' | 'invalid_response' | 'conflict' | 'not_found'} category */
   constructor(category) {
     super('Google Calendar request failed.');
     this.name = 'GoogleApiError';
@@ -22,6 +22,7 @@ function calendarEventUrl(calendarId, eventId) {
 
 async function calendarEventResponse(response) {
   if (response.ok) return readJson(response);
+  if (response.status === 404 || response.status === 410) throw new GoogleApiError('not_found');
   if (response.status === 409) throw new GoogleApiError('conflict');
   if (response.status === 401 || response.status === 403) {
     if (response.status === 403) {
@@ -39,6 +40,48 @@ async function calendarEventResponse(response) {
     }
     throw new GoogleApiError('authorization');
   }
+  throw new GoogleApiError('unavailable');
+}
+
+export async function updateGoogleCalendarEvent(
+  { accessToken, calendarId, eventId, event },
+  fetchImplementation = fetch,
+) {
+  const url = calendarEventUrl(calendarId, eventId);
+  url.searchParams.set('conferenceDataVersion', '1');
+  url.searchParams.set('sendUpdates', 'all');
+  let response;
+  try {
+    response = await fetchImplementation(url, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(event),
+      cache: 'no-store',
+    });
+  } catch {
+    throw new GoogleApiError('unavailable');
+  }
+  return calendarEventResponse(response);
+}
+
+export async function deleteGoogleCalendarEvent(
+  { accessToken, calendarId, eventId },
+  fetchImplementation = fetch,
+) {
+  const url = calendarEventUrl(calendarId, eventId);
+  url.searchParams.set('sendUpdates', 'all');
+  let response;
+  try {
+    response = await fetchImplementation(url, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+      cache: 'no-store',
+    });
+  } catch {
+    throw new GoogleApiError('unavailable');
+  }
+  if (response.ok || response.status === 404 || response.status === 410) return { removed: true };
+  if (response.status === 401 || response.status === 403) throw new GoogleApiError('authorization');
   throw new GoogleApiError('unavailable');
 }
 

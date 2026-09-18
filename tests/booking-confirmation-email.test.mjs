@@ -25,6 +25,7 @@ const configuration = {
   apiKey: 'test-key',
   from: 'Re-Embroidered Conversations <bookings@example.test>',
   changesUrl: 'https://example.test/request-a-change',
+  managementSecret: 'test-management-secret-with-at-least-32-bytes',
 };
 
 test('renders branded HTML and plain text from authoritative confirmed booking data', () => {
@@ -33,7 +34,7 @@ test('renders branded HTML and plain text from authoritative confirmed booking d
   for (const expected of [
     'Evelyn St. Claire', 'Thursday, 24 September 2026', '14:00', '14:55',
     'Europe/London', 'https://meet.google.com/abc-defg-hij',
-    'Request cancellation or rescheduling', 'There is nothing you need to prepare formally',
+    'Manage your booking', 'There is nothing you need to prepare formally',
     'Re-Embroidered Conversations',
   ]) {
     assert.ok(result.html.includes(expected), `HTML should include ${expected}`);
@@ -55,9 +56,9 @@ test('renders branded HTML and plain text from authoritative confirmed booking d
   assert.ok(result.html.includes('Your Google Calendar invitation is sent separately'));
   assert.ok(result.text.includes('55-minute session'));
   assert.ok(result.text.includes('Your session is confirmed'));
-  assert.ok(result.html.includes(configuration.changesUrl));
-  assert.ok(result.text.includes(configuration.changesUrl));
-  for (const internal of ['pi_secret_not_for_email', 'rec5a4496557be3432ca124b769e10b50ef', booking().id]) {
+  assert.ok(result.html.includes(`${configuration.changesUrl}/${booking().id}.`));
+  assert.ok(result.text.includes(`${configuration.changesUrl}/${booking().id}.`));
+  for (const internal of ['pi_secret_not_for_email', 'rec5a4496557be3432ca124b769e10b50ef']) {
     assert.equal(result.html.includes(internal), false);
     assert.equal(result.text.includes(internal), false);
   }
@@ -141,10 +142,10 @@ test('Resend boundary uses provider idempotency and normalises failures', async 
 test('email configuration is server-only and requires HTTPS in production', () => {
   assert.deepEqual(getBookingEmailConfiguration({
     NODE_ENV: 'production', RESEND_API_KEY: 'key', BOOKING_EMAIL_FROM: 'Sender <sender@example.test>',
-    BOOKING_CHANGES_URL: 'https://example.test/changes',
-  }), { apiKey: 'key', from: 'Sender <sender@example.test>', changesUrl: 'https://example.test/changes' });
+    BOOKING_CHANGES_URL: 'https://example.test/changes', BOOKING_MANAGEMENT_SECRET: 'a-secret-value-that-is-at-least-32-bytes',
+  }), { apiKey: 'key', from: 'Sender <sender@example.test>', changesUrl: 'https://example.test/changes', managementSecret: 'a-secret-value-that-is-at-least-32-bytes' });
   assert.throws(() => getBookingEmailConfiguration({
     NODE_ENV: 'production', RESEND_API_KEY: 'key', BOOKING_EMAIL_FROM: 'sender@example.test',
-    BOOKING_CHANGES_URL: 'http://example.test/changes',
+    BOOKING_CHANGES_URL: 'http://example.test/changes', BOOKING_MANAGEMENT_SECRET: 'a-secret-value-that-is-at-least-32-bytes',
   }), EmailDeliveryError);
 });

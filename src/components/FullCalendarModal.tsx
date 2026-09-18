@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, X, Calendar as CalendarIcon, Check } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { ChevronLeft, ChevronRight, X, Calendar as CalendarIcon } from 'lucide-react';
 import { DayAvailability } from '../types';
 
 interface FullCalendarModalProps {
@@ -19,20 +19,22 @@ export const FullCalendarModal: React.FC<FullCalendarModalProps> = ({
   selectedDate,
   onSelectDate,
 }) => {
-  if (!isOpen) return null;
-
-  // Initialize displayed month based on selectedDate or first available day
+  const initialDate = selectedDate || availableDays[0]?.date;
   const [viewDate, setViewDate] = useState<Date>(() => {
-    if (selectedDate) {
-      const parts = selectedDate.split('-').map(Number);
-      return new Date(Date.UTC(parts[0], parts[1] - 1, 1));
-    }
-    if (availableDays.length > 0) {
-      const parts = availableDays[0].date.split('-').map(Number);
+    if (initialDate) {
+      const parts = initialDate.split('-').map(Number);
       return new Date(Date.UTC(parts[0], parts[1] - 1, 1));
     }
     return new Date();
   });
+
+  useEffect(() => {
+    if (!isOpen || !initialDate) return;
+    const parts = initialDate.split('-').map(Number);
+    setViewDate(new Date(Date.UTC(parts[0], parts[1] - 1, 1)));
+  }, [initialDate, isOpen]);
+
+  if (!isOpen) return null;
 
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
