@@ -212,6 +212,28 @@ test('reschedule retry observes an already moved event and does not patch again'
   assert.equal(updates, 0);
 });
 
+test('initial Calendar inspection failures are definitely unchanged before PATCH submission', async () => {
+  const managedBooking = { ...booking, calendarEventId: googleEventIdForBooking(booking.id), meetingUrl: 'https://meet.google.com/abc-defg-hij' };
+  const target = { startAt: new Date('2030-01-02T11:00:00.000Z'), endAt: new Date('2030-01-02T11:55:00.000Z'), timezone: 'Europe/London' };
+  const scenarios = [
+    ['unavailable', 'provider_unavailable'],
+    ['not_found', 'invalid_provider_response'],
+    ['invalid_response', 'invalid_provider_response'],
+  ];
+  for (const [category, code] of scenarios) {
+    let updates = 0;
+    await assert.rejects(
+      () => rescheduleBookingCalendarEvent(managedBooking, target, dependencies({
+        getEvent: async () => { throw new GoogleApiError(category); },
+        updateEvent: async () => { updates += 1; },
+      })),
+      (error) => error instanceof CalendarManagementError && error.code === code &&
+        error.outcome === 'definite_unchanged' && error.observedOriginal === false,
+    );
+    assert.equal(updates, 0);
+  }
+});
+
 test('malformed successful PATCH response is uncertain and retains reconciliation state', async () => {
   const managedBooking = { ...booking, calendarEventId: googleEventIdForBooking(booking.id), meetingUrl: 'https://meet.google.com/abc-defg-hij' };
   const target = { startAt: new Date('2030-01-02T11:00:00.000Z'), endAt: new Date('2030-01-02T11:55:00.000Z'), timezone: 'Europe/London' };

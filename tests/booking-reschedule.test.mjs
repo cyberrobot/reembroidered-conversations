@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { CalendarManagementError } from '../src/lib/calendar/booking-event.mjs';
+import {
+  CalendarManagementError,
+  rescheduleBookingCalendarEvent,
+} from '../src/lib/calendar/booking-event.mjs';
+import { GoogleApiError } from '../src/lib/google-calendar/google-api.mjs';
+import { GOOGLE_EVENTS_OWNED_SCOPE } from '../src/lib/google-calendar/constants.mjs';
 import { BookingRescheduleError, rescheduleBooking } from '../src/lib/booking/booking-reschedule.mjs';
 
 const source = (overrides = {}) => ({
@@ -46,6 +51,7 @@ function fixture(options = {}) {
       rescheduleCalendarEvent: async (_booking, hold) => {
         order.push('calendar');
         assert.ok(pending, 'target hold must exist before Calendar is updated');
+        if (options.calendarService) return options.calendarService(_booking, hold);
         if (options.calendarError) throw options.calendarError;
         return { calendarEventId: 'event_existing', meetingUrl: options.meetingUrl ?? 'https://meet.google.com/abc-defg-hij' };
       },
@@ -55,6 +61,18 @@ function fixture(options = {}) {
     pending: () => pending,
     source: () => currentSource,
   };
+}
+
+function calendarServiceWithGetFailure(category) {
+  return (booking, hold) => rescheduleBookingCalendarEvent(booking, hold, {
+    getCredentials: async () => ({
+      calendarId: 'calendar', refreshToken: 'refresh-token', grantedScopes: [GOOGLE_EVENTS_OWNED_SCOPE],
+    }),
+    getOAuthConfig: async () => ({ clientId: 'client-id', clientSecret: 'client-secret' }),
+    refreshAccessToken: async () => ({ accessToken: 'access-token' }),
+    getEvent: async () => { throw new GoogleApiError(category); },
+    updateEvent: async () => { throw new Error('PATCH must not be attempted'); },
+  });
 }
 
 test('reschedule reserves target before Calendar and atomically keeps the same confirmed booking identity and payment', async () => {
@@ -94,15 +112,16 @@ test('unavailable, same-slot and competing targets leave the original booking un
 });
 
 test('definite Calendar failure releases the target while uncertain failure retains both reservations', async () => {
-  const definite = fixture({ calendarError: new CalendarManagementError('reauthorization_required', {
-    outcome: 'definite_unchanged',
-  }) });
-  await assert.rejects(
-    () => rescheduleBooking(source().id, { startAt: target.startAt }, now, definite.dependencies),
-    (error) => error instanceof BookingRescheduleError && error.code === 'calendar_unavailable',
-  );
-  assert.deepEqual(definite.order, ['reserve', 'calendar', 'release']);
-  assert.equal(definite.pending(), null);
+  for (const category of ['unavailable', 'not_found', 'invalid_response']) {
+    const definite = fixture({ calendarService: calendarServiceWithGetFailure(category) });
+    await assert.rejects(
+      () => rescheduleBooking(source().id, { startAt: target.startAt }, now, definite.dependencies),
+      (error) => error instanceof BookingRescheduleError && error.code === 'calendar_unavailable',
+    );
+    assert.deepEqual(definite.order, ['reserve', 'calendar', 'release']);
+    assert.equal(definite.pending(), null);
+    assert.equal(definite.source().startAt.toISOString(), source().startAt.toISOString());
+  }
 
   const uncertain = fixture({ calendarError: new CalendarManagementError('provider_unavailable') });
   await assert.rejects(
@@ -125,14 +144,14 @@ test('malformed PATCH results and post-PATCH validation failures retain the targ
   }
 });
 
-test('a pending retry releases only after Calendar positively observed the original slot', async () => {
+test('a pending retry retains an unobserved GET failure and releases only after Calendar positively observed the original slot', async () => {
   const pending = {
     id: 'target-hold', status: 'HOLD', rescheduleSourceBookingId: source().id,
     startAt: new Date(target.startAt), endAt: new Date(target.endAt), timezone: 'Europe/London',
   };
   const unknown = fixture({
     pending,
-    calendarError: new CalendarManagementError('reauthorization_required', { outcome: 'definite_unchanged' }),
+    calendarError: new CalendarManagementError('provider_unavailable', { outcome: 'definite_unchanged' }),
   });
   await assert.rejects(
     () => rescheduleBooking(source().id, { startAt: target.startAt }, now, unknown.dependencies),

@@ -226,10 +226,13 @@ export async function rescheduleBookingCalendarEvent(sourceBooking, target, depe
         throw new CalendarManagementError('reauthorization_required', { outcome: 'definite_unchanged' });
       }
       if (error.category === 'not_found' || error.category === 'invalid_response') {
-        throw new CalendarManagementError('invalid_provider_response', { outcome: 'uncertain' });
+        throw new CalendarManagementError('invalid_provider_response', { outcome: 'definite_unchanged' });
       }
     }
-    throw new CalendarManagementError('provider_unavailable', { outcome: 'uncertain' });
+    // No PATCH has been submitted. This invocation cannot have moved the
+    // remote event, so a newly reserved target may be released. A retry with
+    // an existing hold remains protected by the orchestrator's resume guard.
+    throw new CalendarManagementError('provider_unavailable', { outcome: 'definite_unchanged' });
   }
   if (current?.id !== sourceBooking.calendarEventId ||
       current?.extendedProperties?.private?.bookingId !== sourceBooking.id) {
