@@ -1,61 +1,115 @@
 // @ts-check
 
-import 'server-only';
-import { isUsableGoogleMeetUrl } from '../calendar/booking-event.mjs';
-import { getBookingEmailConfiguration, sendEmailWithResend } from '../email/resend.mjs';
-import { buildBookingManagementLink } from './booking-management-token.mjs';
-import { SESSION_PRODUCT } from './session-product.mjs';
+import "server-only";
+import { isUsableGoogleMeetUrl } from "../calendar/booking-event.mjs";
+import {
+  getBookingEmailConfiguration,
+  sendEmailWithResend,
+} from "../email/resend.mjs";
+import { buildBookingManagementLink } from "./booking-management-token.mjs";
+import { SESSION_PRODUCT } from "./session-product.mjs";
 
-export const BOOKING_CONFIRMATION_SUBJECT = 'Your Re-Embroidered Conversation is confirmed';
-export const PREPARATION_GUIDANCE = 'There is nothing you need to prepare formally. Find somewhere private and comfortable where you can speak freely. You may want a glass of water and a few quiet minutes beforehand.';
+export const BOOKING_CONFIRMATION_SUBJECT =
+  "Your Re-Embroidered Conversation is confirmed";
+export const PREPARATION_GUIDANCE =
+  "There is nothing you need to prepare formally. Find somewhere private and comfortable where you can speak freely. You may want a glass of water and a few quiet minutes beforehand.";
 
 export class BookingConfirmationEmailError extends Error {
   /** @param {'ineligible_booking' | 'invalid_configuration'} code */
   constructor(code) {
     super(`Booking confirmation email failed: ${code}.`);
-    this.name = 'BookingConfirmationEmailError';
+    this.name = "BookingConfirmationEmailError";
     this.code = code;
   }
 }
 
 function escapeHtml(value) {
-  return String(value).replace(/[&<>'"]/g, (character) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
-  })[character]);
+  return String(value).replace(
+    /[&<>'"]/g,
+    (character) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "'": "&#39;",
+        '"': "&quot;",
+      })[character],
+  );
 }
 
 function formatInTimeZone(value, timeZone, options) {
-  return new Intl.DateTimeFormat('en-GB', { timeZone, ...options }).format(value);
+  return new Intl.DateTimeFormat("en-GB", { timeZone, ...options }).format(
+    value,
+  );
 }
 
 function confirmationDetails(booking) {
-  if (booking?.status !== 'CONFIRMED' || typeof booking.id !== 'string' || !booking.id.trim() ||
-      !booking.stripePaymentIntentId || !booking.calendarEventId ||
-      typeof booking.name !== 'string' || !booking.name.trim() ||
-      typeof booking.email !== 'string' || !booking.email.trim() ||
-      typeof booking.timezone !== 'string' || !booking.timezone.trim() ||
-      !isUsableGoogleMeetUrl(booking.meetingUrl)) throw new BookingConfirmationEmailError('ineligible_booking');
-  const startAt = booking.startAt instanceof Date ? booking.startAt : new Date(booking.startAt);
-  const endAt = booking.endAt instanceof Date ? booking.endAt : new Date(booking.endAt);
-  if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime()) || startAt >= endAt) {
-    throw new BookingConfirmationEmailError('ineligible_booking');
+  if (
+    booking?.status !== "CONFIRMED" ||
+    typeof booking.id !== "string" ||
+    !booking.id.trim() ||
+    !booking.stripePaymentIntentId ||
+    !booking.calendarEventId ||
+    typeof booking.name !== "string" ||
+    !booking.name.trim() ||
+    typeof booking.email !== "string" ||
+    !booking.email.trim() ||
+    typeof booking.timezone !== "string" ||
+    !booking.timezone.trim() ||
+    !isUsableGoogleMeetUrl(booking.meetingUrl)
+  )
+    throw new BookingConfirmationEmailError("ineligible_booking");
+  const startAt =
+    booking.startAt instanceof Date
+      ? booking.startAt
+      : new Date(booking.startAt);
+  const endAt =
+    booking.endAt instanceof Date ? booking.endAt : new Date(booking.endAt);
+  if (
+    Number.isNaN(startAt.getTime()) ||
+    Number.isNaN(endAt.getTime()) ||
+    startAt >= endAt
+  ) {
+    throw new BookingConfirmationEmailError("ineligible_booking");
   }
   try {
     return {
-      date: formatInTimeZone(startAt, booking.timezone, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
-      startTime: formatInTimeZone(startAt, booking.timezone, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }),
-      endTime: formatInTimeZone(endAt, booking.timezone, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }),
+      date: formatInTimeZone(startAt, booking.timezone, {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      }),
+      startTime: formatInTimeZone(startAt, booking.timezone, {
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+      }),
+      endTime: formatInTimeZone(endAt, booking.timezone, {
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+      }),
     };
   } catch {
-    throw new BookingConfirmationEmailError('ineligible_booking');
+    throw new BookingConfirmationEmailError("ineligible_booking");
   }
 }
 
-export function renderBookingConfirmationEmail(booking, { changesUrl, managementSecret }) {
+export function renderBookingConfirmationEmail(
+  booking,
+  { changesUrl, managementSecret },
+) {
   const details = confirmationDetails(booking);
   let managementUrl;
-  try { managementUrl = buildBookingManagementLink(booking.id, { baseUrl: changesUrl, secret: managementSecret }); }
-  catch { throw new BookingConfirmationEmailError('invalid_configuration'); }
+  try {
+    managementUrl = buildBookingManagementLink(booking.id, {
+      baseUrl: changesUrl,
+      secret: managementSecret,
+    });
+  } catch {
+    throw new BookingConfirmationEmailError("invalid_configuration");
+  }
   const name = escapeHtml(booking.name.trim());
   const date = escapeHtml(details.date);
   const time = `${escapeHtml(details.startTime)}&ndash;${escapeHtml(details.endTime)}`;
@@ -65,17 +119,27 @@ export function renderBookingConfirmationEmail(booking, { changesUrl, management
   const duration = `${SESSION_PRODUCT.durationMinutes}-minute session`;
   const durationBadge = `${SESSION_PRODUCT.durationMinutes} Minutes`;
   const preparationItems = [
-    ['Nothing formal to prepare', 'There is nothing you need to prepare formally.'],
-    ['Find a comfortable space', 'Find somewhere private and comfortable where you can speak freely.'],
-    ['Have some water nearby', 'You may want a glass of water nearby.'],
-    ['Take a quiet moment', 'Give yourself a few quiet minutes beforehand.'],
+    [
+      "Nothing formal to prepare",
+      "There is nothing you need to prepare formally.",
+    ],
+    [
+      "Find a comfortable space",
+      "Find somewhere private and comfortable where you can speak freely.",
+    ],
+    ["Have some water nearby", "You may want a glass of water nearby."],
+    ["Take a quiet moment", "Give yourself a few quiet minutes beforehand."],
   ];
-  const preparationRows = preparationItems.map(([heading, copy], index) => `
+  const preparationRows = preparationItems
+    .map(
+      ([heading, copy], index) => `
 <tr><td style="padding:10px 0;vertical-align:top;border-bottom:1px dashed #e6dccf">
 <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"><tr>
-<td width="38" style="vertical-align:top;padding-right:12px"><div style="width:26px;height:26px;border-radius:50%;background:#f8efe7;border:1.5px dashed #bd4d36;text-align:center;line-height:24px;font-family:'Plus Jakarta Sans',Arial,sans-serif;font-size:12px;font-weight:700;color:#bd4d36">${String(index + 1).padStart(2, '0')}</div></td>
+<td width="38" style="vertical-align:top;padding-right:12px"><div style="width:26px;height:26px;border-radius:50%;background:#f8efe7;border:1.5px dashed #bd4d36;text-align:center;line-height:24px;font-family:'Plus Jakarta Sans',Arial,sans-serif;font-size:12px;font-weight:700;color:#bd4d36">${String(index + 1).padStart(2, "0")}</div></td>
 <td style="vertical-align:top"><p style="margin:0 0 4px;font-family:'Plus Jakarta Sans',Arial,sans-serif;font-size:14px;font-weight:600;color:#1c2a39">${heading}</p><p style="margin:0;font-family:'Plus Jakarta Sans',Arial,sans-serif;font-size:13px;line-height:1.55;color:#5f6b7a">${copy}</p></td>
-</tr></table></td></tr>`).join('');
+</tr></table></td></tr>`,
+    )
+    .join("");
   const html = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="x-apple-disable-message-reformatting"><title>${BOOKING_CONFIRMATION_SUBJECT}</title>
@@ -139,13 +203,17 @@ Re-Embroidered Conversations`;
 }
 
 export async function sendBookingConfirmationEmail(booking, dependencies = {}) {
-  const configuration = dependencies.configuration ?? getBookingEmailConfiguration();
+  const configuration =
+    dependencies.configuration ?? getBookingEmailConfiguration();
   const rendered = renderBookingConfirmationEmail(booking, configuration);
   const sendEmail = dependencies.sendEmail ?? sendEmailWithResend;
-  return sendEmail({
-    ...rendered,
-    from: configuration.from,
-    to: booking.email,
-    idempotencyKey: `booking-confirmation:${booking.id}`,
-  }, { apiKey: configuration.apiKey });
+  return sendEmail(
+    {
+      ...rendered,
+      from: configuration.from,
+      to: booking.email,
+      idempotencyKey: `booking-confirmation:${booking.id}`,
+    },
+    { apiKey: configuration.apiKey },
+  );
 }

@@ -1,11 +1,11 @@
-export type SessionFormat = 'video' | 'audio';
+export type SessionFormat = "video" | "audio";
 
 export interface TimeSlot {
   id: string;
   startAt: string;
   endAt: string;
   time: string;
-  period: 'morning' | 'afternoon' | 'evening';
+  period: "morning" | "afternoon" | "evening";
 }
 
 export interface DayAvailability {

@@ -1,15 +1,23 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useRef } from 'react';
-import MuxPlayer from '@mux/mux-player-react';
-import type { MuxCSSProperties } from '@mux/mux-player-react';
-import type MuxPlayerElement from '@mux/mux-player';
-import { Play, FileText, Calendar, Clock, ShieldCheck, Video } from 'lucide-react';
-import { HERO_VIDEO_TRANSCRIPT } from '../data/content';
-const laraHeroImg = 'https://image.mux.com/4qvdrc02lmk21KDbxfyWcWyiV7YG9Fljckr5xj5wBzXg/thumbnail.png?height=503&time=96&width=894';
+import React, { useState, useEffect, useRef } from "react";
+import MuxPlayer from "@mux/mux-player-react";
+import type { MuxCSSProperties } from "@mux/mux-player-react";
+import type MuxPlayerElement from "@mux/mux-player";
+import {
+  Play,
+  FileText,
+  Calendar,
+  Clock,
+  ShieldCheck,
+  Video,
+} from "lucide-react";
+import { HERO_VIDEO_TRANSCRIPT } from "../data/content";
+const laraHeroImg =
+  "https://image.mux.com/4qvdrc02lmk21KDbxfyWcWyiV7YG9Fljckr5xj5wBzXg/thumbnail.png?height=503&time=96&width=894";
 
 // Verified, active official Mux stream ID
-const DEFAULT_PLAYBACK_ID = '4qvdrc02lmk21KDbxfyWcWyiV7YG9Fljckr5xj5wBzXg';
+const DEFAULT_PLAYBACK_ID = "4qvdrc02lmk21KDbxfyWcWyiV7YG9Fljckr5xj5wBzXg";
 
 export const HeroVideo: React.FC = () => {
   const [hasStartedPlaying, setHasStartedPlaying] = useState(false);
@@ -21,19 +29,25 @@ export const HeroVideo: React.FC = () => {
   // Validate configured Mux Playback ID if an override is provided in env
   useEffect(() => {
     const rawEnvId = process.env.NEXT_PUBLIC_MUX_PLAYBACK_ID;
-    if (rawEnvId && typeof rawEnvId === 'string') {
-      const candidate = rawEnvId.trim().replace(/^["']|["']$/g, '');
+    if (rawEnvId && typeof rawEnvId === "string") {
+      const candidate = rawEnvId.trim().replace(/^["']|["']$/g, "");
       // If it matches default or empty, no need to re-verify
-      if (!candidate || candidate === DEFAULT_PLAYBACK_ID || candidate === 'oZK3xwREHCqp25emTTBxg8HNuKca701M1mhtSowxmx9M') {
+      if (
+        !candidate ||
+        candidate === DEFAULT_PLAYBACK_ID ||
+        candidate === "oZK3xwREHCqp25emTTBxg8HNuKca701M1mhtSowxmx9M"
+      ) {
         setPlaybackId(DEFAULT_PLAYBACK_ID);
         return;
       }
-      fetch(`https://stream.mux.com/${candidate}.m3u8`, { method: 'HEAD' })
+      fetch(`https://stream.mux.com/${candidate}.m3u8`, { method: "HEAD" })
         .then((res) => {
           if (res.ok) {
             setPlaybackId(candidate);
           } else {
-            console.warn(`[Mux Player] Candidate playback ID returned ${res.status}. Using default.`);
+            console.warn(
+              `[Mux Player] Candidate playback ID returned ${res.status}. Using default.`,
+            );
             setPlaybackId(DEFAULT_PLAYBACK_ID);
           }
         })
@@ -50,18 +64,23 @@ export const HeroVideo: React.FC = () => {
     setTimeout(() => {
       if (playerRef.current) {
         playerRef.current.play().catch((err) => {
-          console.warn('Playback request handled:', err);
+          console.warn("Playback request handled:", err);
         });
       }
     }, 50);
   };
 
   const scrollToBooking = () => {
-    document.getElementById('book-session')?.scrollIntoView({ behavior: 'smooth' });
+    document
+      .getElementById("book-session")
+      ?.scrollIntoView({ behavior: "smooth" });
   };
 
   return (
-    <section id="meet-shahd" className="relative pt-28 pb-20 md:pt-36 md:pb-28 overflow-hidden">
+    <section
+      id="meet-shahd"
+      className="relative pt-28 pb-20 md:pt-36 md:pb-28 overflow-hidden"
+    >
       {/* Background soft ambiance */}
       <div className="max-w-5xl mx-auto px-6">
         {/* Core Headline & Intention */}
@@ -76,8 +95,9 @@ export const HeroVideo: React.FC = () => {
           </h1>
 
           <p className="font-sans text-lg sm:text-xl text-[#68635F] leading-relaxed max-w-2xl mx-auto font-light">
-            A quiet conversation with Shahd Karaeen where you can speak what you’ve carried in silence.
-            No advice, no predetermined agenda, no performance—just space to be heard and understood.
+            A quiet conversation with Shahd Karaeen where you can speak what
+            you’ve carried in silence. No advice, no predetermined agenda, no
+            performance—just space to be heard and understood.
           </p>
 
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -92,8 +112,9 @@ export const HeroVideo: React.FC = () => {
 
             <button
               onClick={() => {
-                const experienceEl = document.getElementById('the-experience');
-                if (experienceEl) experienceEl.scrollIntoView({ behavior: 'smooth' });
+                const experienceEl = document.getElementById("the-experience");
+                if (experienceEl)
+                  experienceEl.scrollIntoView({ behavior: "smooth" });
               }}
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 text-[#68635F] hover:text-[#282524] text-sm font-sans px-5 py-4 cursor-pointer transition-colors"
             >
@@ -108,14 +129,18 @@ export const HeroVideo: React.FC = () => {
               <span>55 mins · £55</span>
             </span>
 
-            <span className="hidden sm:inline text-[#D5CAC0] select-none">•</span>
+            <span className="hidden sm:inline text-[#D5CAC0] select-none">
+              •
+            </span>
 
             <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
               <ShieldCheck className="w-3.5 h-3.5 text-[#78716C] shrink-0" />
               <span>100% Confidential</span>
             </span>
 
-            <span className="hidden sm:inline text-[#D5CAC0] select-none">•</span>
+            <span className="hidden sm:inline text-[#D5CAC0] select-none">
+              •
+            </span>
 
             <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
               <Video className="w-3.5 h-3.5 text-[#78716C] shrink-0" />
@@ -140,12 +165,12 @@ export const HeroVideo: React.FC = () => {
                 placeholder={laraHeroImg}
                 title="A Personal Introduction — Shahd Karaeen"
                 metadata={{
-                  video_id: 'shahd-intro',
-                  video_title: 'A Personal Introduction — Shahd Karaeen',
-                  video_series: 'Re-Embroidered Conversations',
+                  video_id: "shahd-intro",
+                  video_title: "A Personal Introduction — Shahd Karaeen",
+                  video_series: "Re-Embroidered Conversations",
                 }}
                 streamType="on-demand"
-                preload={hasStartedPlaying ? 'auto' : 'none'}
+                preload={hasStartedPlaying ? "auto" : "none"}
                 assetEndTime={300}
                 playsInline
                 crossOrigin="anonymous"
@@ -154,23 +179,30 @@ export const HeroVideo: React.FC = () => {
                 accentColor="#A35048"
                 proudlyDisplayMuxBadge={false}
                 className="w-full h-full object-cover"
-                style={{
-                  '--media-font-family': 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                  '--media-range-bar-color': '#A35048',
-                  '--media-range-track-color': 'rgba(255, 255, 255, 0.25)',
-                  '--media-control-background': 'rgba(31, 29, 28, 0.88)',
-                  '--media-control-hover-background': 'rgba(40, 37, 36, 0.95)',
-                  '--primary-color': '#FAF8F5',
-                  '--secondary-color': '#1F1D1C',
-                  '--accent-color': '#A35048',
-                  width: '100%',
-                  height: '100%',
-                  display: 'block',
-                } as MuxCSSProperties}
+                style={
+                  {
+                    "--media-font-family":
+                      'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                    "--media-range-bar-color": "#A35048",
+                    "--media-range-track-color": "rgba(255, 255, 255, 0.25)",
+                    "--media-control-background": "rgba(31, 29, 28, 0.88)",
+                    "--media-control-hover-background":
+                      "rgba(40, 37, 36, 0.95)",
+                    "--primary-color": "#FAF8F5",
+                    "--secondary-color": "#1F1D1C",
+                    "--accent-color": "#A35048",
+                    width: "100%",
+                    height: "100%",
+                    display: "block",
+                  } as MuxCSSProperties
+                }
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
                 onError={(event) => {
-                  console.warn('[Mux Player] Playback error encountered, reverting to verified stream:', event);
+                  console.warn(
+                    "[Mux Player] Playback error encountered, reverting to verified stream:",
+                    event,
+                  );
                   if (playbackId !== DEFAULT_PLAYBACK_ID) {
                     setPlaybackId(DEFAULT_PLAYBACK_ID);
                   }
@@ -200,7 +232,7 @@ export const HeroVideo: React.FC = () => {
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
+                  if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
                     handleStartPlayback();
                   }
@@ -246,7 +278,8 @@ export const HeroVideo: React.FC = () => {
                   Private & One-to-One
                 </h4>
                 <p className="text-xs text-[#68635F] leading-relaxed">
-                  Direct conversation with Shahd Karaeen on video or private audio call. Completely confidential.
+                  Direct conversation with Shahd Karaeen on video or private
+                  audio call. Completely confidential.
                 </p>
               </div>
             </div>
@@ -258,7 +291,8 @@ export const HeroVideo: React.FC = () => {
                   No Homework or Plans
                 </h4>
                 <p className="text-xs text-[#68635F] leading-relaxed">
-                  No questionnaires to fill in beforehand. No follow-up checklists. You arrive as you are.
+                  No questionnaires to fill in beforehand. No follow-up
+                  checklists. You arrive as you are.
                 </p>
               </div>
             </div>
@@ -270,7 +304,8 @@ export const HeroVideo: React.FC = () => {
                   Gentle & Low-Pressure
                 </h4>
                 <p className="text-xs text-[#68635F] leading-relaxed">
-                  Book a date and time that suits your life. Cancel or reschedule easily if plans change.
+                  Book a date and time that suits your life. Cancel or
+                  reschedule easily if plans change.
                 </p>
               </div>
             </div>

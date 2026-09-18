@@ -322,7 +322,7 @@ Where equivalent behaviour can be preserved using normal links, hash navigation,
 `src/index.css` currently uses Tailwind CSS v4 via:
 
 ```css
-@import 'tailwindcss';
+@import "tailwindcss";
 ```
 
 It defines the existing:

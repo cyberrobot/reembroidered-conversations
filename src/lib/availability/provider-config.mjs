@@ -1,6 +1,6 @@
 // @ts-check
 
-import { BOOKING_TIME_ZONE } from '../booking-date.mjs';
+import { BOOKING_TIME_ZONE } from "../booking-date.mjs";
 
 /** @typedef {{ start: string, end: string }} WorkingWindow */
 /** @typedef {Record<'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday', readonly WorkingWindow[]>} WorkingHours */
@@ -17,8 +17,8 @@ import { BOOKING_TIME_ZONE } from '../booking-date.mjs';
  */
 
 const WEEKDAY_HOURS = Object.freeze([
-  Object.freeze({ start: '10:00', end: '12:30' }),
-  Object.freeze({ start: '14:00', end: '18:00' }),
+  Object.freeze({ start: "10:00", end: "12:30" }),
+  Object.freeze({ start: "14:00", end: "18:00" }),
 ]);
 
 /** @type {Readonly<ProviderAvailabilityConfig>} */

@@ -7,7 +7,6 @@ booking prototype one-to-one listening sessions with Shahd Karaeen.
 
 **Prerequisites:** Node.js 20.9 or later and npm.
 
-
 1. Install dependencies with `npm install`.
 2. Copy `.env.example` to `.env`. Set the server-only `DATABASE_URL` to a
    PostgreSQL connection string. `NEXT_PUBLIC_MUX_PLAYBACK_ID` remains optional.

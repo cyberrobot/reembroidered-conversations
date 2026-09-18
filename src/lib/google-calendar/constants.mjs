@@ -1,24 +1,25 @@
 export const GOOGLE_FREEBUSY_SCOPE =
-  'https://www.googleapis.com/auth/calendar.freebusy';
+  "https://www.googleapis.com/auth/calendar.freebusy";
 export const GOOGLE_EVENTS_OWNED_SCOPE =
-  'https://www.googleapis.com/auth/calendar.events.owned';
+  "https://www.googleapis.com/auth/calendar.events.owned";
 
 export const GOOGLE_OAUTH_SCOPES = Object.freeze([
-  'openid',
-  'email',
-  'https://www.googleapis.com/auth/calendar.calendarlist.readonly',
+  "openid",
+  "email",
+  "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
   GOOGLE_FREEBUSY_SCOPE,
   GOOGLE_EVENTS_OWNED_SCOPE,
 ]);
 
 export const GOOGLE_AUTHORIZATION_ENDPOINT =
-  'https://accounts.google.com/o/oauth2/v2/auth';
-export const GOOGLE_TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
-export const GOOGLE_JWKS_ENDPOINT = 'https://www.googleapis.com/oauth2/v3/certs';
+  "https://accounts.google.com/o/oauth2/v2/auth";
+export const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
+export const GOOGLE_JWKS_ENDPOINT =
+  "https://www.googleapis.com/oauth2/v3/certs";
 export const GOOGLE_CALENDAR_LIST_ENDPOINT =
-  'https://www.googleapis.com/calendar/v3/users/me/calendarList';
+  "https://www.googleapis.com/calendar/v3/users/me/calendarList";
 export const GOOGLE_FREEBUSY_ENDPOINT =
-  'https://www.googleapis.com/calendar/v3/freeBusy';
+  "https://www.googleapis.com/calendar/v3/freeBusy";
 export const GOOGLE_CALENDAR_EVENTS_ENDPOINT =
-  'https://www.googleapis.com/calendar/v3/calendars';
-export const GOOGLE_CONNECTION_ID = 'primary';
+  "https://www.googleapis.com/calendar/v3/calendars";
+export const GOOGLE_CONNECTION_ID = "primary";

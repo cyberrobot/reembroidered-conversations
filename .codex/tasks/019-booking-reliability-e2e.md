@@ -845,19 +845,19 @@ Use real PostgreSQL uniqueness/transactions rather than an in-memory simulation.
 
 PR #19 must leave explicit automated evidence for every requested failure family.
 
-| Failure case | Required layer | Core proof |
-|---|---|---|
-| Two customers choose same slot | PostgreSQL integration | One active owner only |
-| Payment succeeds, Calendar fails | PostgreSQL lifecycle | Durable `PAID`, safe retry to `CONFIRMED` |
-| Duplicate Stripe webhook | PostgreSQL lifecycle | No duplicate external effects |
-| Customer closes Stripe | Integration + browser | Webhook independent of browser return |
-| Hold expires | PostgreSQL + existing browser coverage | Correct release rules |
-| Google token expiry/revocation | Calendar/webhook integration | Refresh or safe `PAID` recovery |
-| Provider adds Calendar event | Availability/hold integration + browser UX | Stale slot rejected before HOLD |
-| DST/timezone changes | Domain/integration | Correct London wall-clock/UTC mapping |
-| Calendar event changed/deleted | Calendar management integration | Fail safe; no silent drift |
-| Refund/cancellation | PostgreSQL lifecycle | Slot releases before provider recovery |
-| Rescheduling collision | PostgreSQL concurrency | One target owner, originals protected |
+| Failure case                     | Required layer                             | Core proof                                |
+| -------------------------------- | ------------------------------------------ | ----------------------------------------- |
+| Two customers choose same slot   | PostgreSQL integration                     | One active owner only                     |
+| Payment succeeds, Calendar fails | PostgreSQL lifecycle                       | Durable `PAID`, safe retry to `CONFIRMED` |
+| Duplicate Stripe webhook         | PostgreSQL lifecycle                       | No duplicate external effects             |
+| Customer closes Stripe           | Integration + browser                      | Webhook independent of browser return     |
+| Hold expires                     | PostgreSQL + existing browser coverage     | Correct release rules                     |
+| Google token expiry/revocation   | Calendar/webhook integration               | Refresh or safe `PAID` recovery           |
+| Provider adds Calendar event     | Availability/hold integration + browser UX | Stale slot rejected before HOLD           |
+| DST/timezone changes             | Domain/integration                         | Correct London wall-clock/UTC mapping     |
+| Calendar event changed/deleted   | Calendar management integration            | Fail safe; no silent drift                |
+| Refund/cancellation              | PostgreSQL lifecycle                       | Slot releases before provider recovery    |
+| Rescheduling collision           | PostgreSQL concurrency                     | One target owner, originals protected     |
 
 A test may satisfy more than one row when it genuinely crosses those boundaries.
 

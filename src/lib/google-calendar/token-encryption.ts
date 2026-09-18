@@ -1,13 +1,16 @@
-import 'server-only';
+import "server-only";
 
-import { getTokenEncryptionKey } from './config.ts';
+import { getTokenEncryptionKey } from "./config.ts";
 import {
   decryptRefreshToken as decrypt,
   encryptRefreshToken as encrypt,
   encryptedRefreshTokenContainsOAuthState as containsOAuthState,
-} from './token-encryption.mjs';
+} from "./token-encryption.mjs";
 
-export function encryptRefreshToken(refreshToken: string, oauthState?: string): string {
+export function encryptRefreshToken(
+  refreshToken: string,
+  oauthState?: string,
+): string {
   return encrypt(refreshToken, getTokenEncryptionKey(), oauthState);
 }
 
