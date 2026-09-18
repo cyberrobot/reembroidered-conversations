@@ -6,7 +6,21 @@ const headers = { 'Cache-Control': 'no-store' };
 
 function sameOrigin(request: Request) {
   const origin = request.headers.get('origin');
-  return !origin || origin === new URL(request.url).origin;
+  if (!origin) return true;
+
+  const requestUrl = new URL(request.url);
+  if (origin === requestUrl.origin) return true;
+
+  // Next may expose its internal bind address in request.url (for example
+  // 0.0.0.0) while the browser correctly sends localhost or a proxy-facing
+  // host. Compare the Origin with that effective external request authority
+  // without accepting an arbitrary origin.
+  const forwardedHost = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
+  const host = forwardedHost || request.headers.get('host');
+  if (!host) return false;
+  const forwardedProtocol = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
+  const protocol = forwardedProtocol || requestUrl.protocol.slice(0, -1);
+  return origin === `${protocol}://${host}`;
 }
 
 function invalidLink() {

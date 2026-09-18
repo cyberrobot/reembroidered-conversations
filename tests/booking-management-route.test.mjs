@@ -50,6 +50,52 @@ test('cancellation requires capability authority and same-origin mutation', asyn
   assert.equal(calls, 1);
 });
 
+test('same-origin mutation accepts the browser-facing host when Next uses an internal bind address', async () => {
+  let calls = 0;
+  const handler = createRescheduleHandler(
+    () => 'booking-id',
+    async () => { calls += 1; return { status: 'rescheduled' }; },
+  );
+  const response = await handler(new Request('http://0.0.0.0:3000/api/bookings/manage/valid/reschedule', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Host: 'localhost:3000',
+      Origin: 'http://localhost:3000',
+    },
+    body: '{"startAt":"2030-01-01T10:00:00.000Z"}',
+  }), 'valid');
+
+  assert.equal(response.status, 200);
+  assert.equal(calls, 1);
+});
+
+test('same-origin mutation accepts a trusted proxy-facing authority but still rejects another origin', async () => {
+  let calls = 0;
+  const handler = createRescheduleHandler(
+    () => 'booking-id',
+    async () => { calls += 1; return { status: 'rescheduled' }; },
+  );
+  const headers = {
+    'Content-Type': 'application/json',
+    Host: 'app:3000',
+    'X-Forwarded-Host': 'bookings.example.test',
+    'X-Forwarded-Proto': 'https',
+  };
+  const valid = await handler(new Request('http://app:3000/api/bookings/manage/valid/reschedule', {
+    method: 'POST', headers: { ...headers, Origin: 'https://bookings.example.test' },
+    body: '{"startAt":"2030-01-01T10:00:00.000Z"}',
+  }), 'valid');
+  const invalid = await handler(new Request('http://app:3000/api/bookings/manage/valid/reschedule', {
+    method: 'POST', headers: { ...headers, Origin: 'https://attacker.example' },
+    body: '{"startAt":"2030-01-01T10:00:00.000Z"}',
+  }), 'valid');
+
+  assert.equal(valid.status, 200);
+  assert.equal(invalid.status, 403);
+  assert.equal(calls, 1);
+});
+
 test('stale cancellation policy returns the authoritative outcome without cancelling', async () => {
   let calls = 0;
   const handler = createCancellationHandler(
