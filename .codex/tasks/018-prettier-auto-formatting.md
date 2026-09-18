@@ -11,7 +11,7 @@
 **Worktree:**  
 N/A
 
-**Dependencies:**  
+**Dependencies:**
 
 - Existing npm-based dependency management via `package-lock.json`
 - Existing GitHub Actions CI workflow at `.github/workflows/ci.yml`

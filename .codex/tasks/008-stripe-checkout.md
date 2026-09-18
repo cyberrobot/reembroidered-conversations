@@ -11,7 +11,7 @@
 **Worktree:**  
 N/A
 
-**Dependencies:**  
+**Dependencies:**
 
 - PR #2 — booking domain + database schema
 - PR #6 — unified availability engine

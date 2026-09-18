@@ -16,7 +16,6 @@ playwright-report
 test-results
 
 # Local configuration and logs
-.codex
 .env*
 *.log
 *.tsbuildinfo
