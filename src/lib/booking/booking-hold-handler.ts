@@ -59,6 +59,7 @@ export function createBookingHoldHandler(
     const now = getNow();
     const candidate = input as { turnstileToken?: unknown };
     let permitId: string | null = null;
+    let permitReleaseAllowed = true;
     try {
       const clientKey = protection.getClientIdentity(request);
       await protection.consumeRateLimit("hold", clientKey, now);
@@ -73,8 +74,18 @@ export function createBookingHoldHandler(
       try {
         await protection.commitPermit(permitId, hold.id);
       } catch (error) {
-        await protection.cancelUntrackedHold(hold.id).catch(() => {});
-        await protection.releasePermit(permitId).catch(() => {});
+        let holdCancelled = false;
+        try {
+          await protection.cancelUntrackedHold(hold.id);
+          holdCancelled = true;
+        } catch {
+          // Preserve the uncommitted permit while the active HOLD survives.
+          permitReleaseAllowed = false;
+        }
+        if (holdCancelled) {
+          await protection.releasePermit(permitId).catch(() => {});
+          permitId = null;
+        }
         throw error;
       }
       return NextResponse.json(
@@ -90,7 +101,8 @@ export function createBookingHoldHandler(
         { status: 201, headers },
       );
     } catch (error) {
-      if (permitId) await protection.releasePermit(permitId).catch(() => {});
+      if (permitId && permitReleaseAllowed)
+        await protection.releasePermit(permitId).catch(() => {});
       if (error instanceof TurnstileVerificationError) {
         const unavailable = error.code === "verification_unavailable";
         return NextResponse.json(

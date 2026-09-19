@@ -278,8 +278,45 @@ test("permit commit failure compensates the newly persisted HOLD", async () => {
     }),
   )(holdRequest());
   assert.equal(response.status, 503);
+  assert.equal(
+    (await response.json()).error.code,
+    "abuse_protection_unavailable",
+  );
   assert.equal(cancelled, 1);
-  assert.ok(released >= 1);
+  assert.equal(released, 1);
+});
+
+test("permit commit compensation retains the permit when cancelling the HOLD fails", async () => {
+  let cancelled = 0;
+  let released = 0;
+  const response = await createBookingHoldHandler(
+    async () => ({
+      id: "5a449655-7be3-432c-a124-b769e10b50ef",
+      startAt: new Date(holdBody.startAt),
+      endAt: new Date("2026-09-21T09:55:00.000Z"),
+      timezone: "Europe/London",
+      expiresAt: new Date(now.getTime() + 15 * 60_000),
+    }),
+    () => now,
+    holdProtection({
+      commitPermit: async () => {
+        throw new AbuseProtectionUnavailableError();
+      },
+      cancelUntrackedHold: async () => {
+        cancelled += 1;
+        throw new Error("booking persistence unavailable");
+      },
+      releasePermit: async () => {
+        released += 1;
+      },
+    }),
+  )(holdRequest());
+  const body = await response.json();
+  assert.equal(response.status, 503);
+  assert.equal(body.error.code, "abuse_protection_unavailable");
+  assert.equal(body.error.message.includes("persistence"), false);
+  assert.equal(cancelled, 1);
+  assert.equal(released, 0);
 });
 
 test("availability rejection occurs before availability/Google service", async () => {
@@ -592,7 +629,9 @@ test(
         );
       }
     } finally {
-      await database.$executeRaw`DELETE FROM "abuse_rate_limits" WHERE "key" LIKE ${`%${prefix}%`}`;
+      await database.abuseRateLimit.deleteMany({
+        where: { key: { contains: prefix } },
+      });
       await database.$disconnect();
     }
   },
@@ -656,7 +695,7 @@ test(
       );
       assert.equal(typeof afterExpiry, "string");
     } finally {
-      await database.$executeRaw`DELETE FROM "abuse_hold_permits" WHERE "clientKey" = ${clientKey}`;
+      await database.abuseHoldPermit.deleteMany({ where: { clientKey } });
       await database.$disconnect();
     }
   },
