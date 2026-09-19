@@ -13,6 +13,21 @@ const valid = {
   name: "Sarah",
   email: "sarah@example.com",
   startAt: "2026-09-16T09:00:00.000Z",
+  turnstileToken: "test-token",
+};
+const bookingInput = {
+  name: valid.name,
+  email: valid.email,
+  startAt: valid.startAt,
+};
+const protection = {
+  getClientIdentity: () => "test-client",
+  consumeRateLimit: async () => {},
+  verifyChallenge: async () => {},
+  acquirePermit: async () => "permit-id",
+  commitPermit: async () => {},
+  releasePermit: async () => {},
+  cancelUntrackedHold: async () => {},
 };
 const request = (body = JSON.stringify(valid)) =>
   new Request("http://localhost/api/bookings/hold", {
@@ -24,7 +39,7 @@ const request = (body = JSON.stringify(valid)) =>
 test("valid POST returns a customer-safe canonical 201 response with no-store", async () => {
   const handler = createBookingHoldHandler(
     async (input, observedNow) => {
-      assert.deepEqual(input, valid);
+      assert.deepEqual(input, bookingInput);
       assert.equal(observedNow, now);
       return {
         id: "5a449655-7be3-432c-a124-b769e10b50ef",
@@ -38,6 +53,7 @@ test("valid POST returns a customer-safe canonical 201 response with no-store", 
       };
     },
     () => now,
+    protection,
   );
   const response = await handler(request());
   assert.equal(response.status, 201);
@@ -58,8 +74,8 @@ test("malformed and invalid requests return stable safe 400 errors", async () =>
     throw new InvalidHoldRequestError();
   };
   for (const response of [
-    await createBookingHoldHandler(never)(request("{")),
-    await createBookingHoldHandler(never)(request()),
+    await createBookingHoldHandler(never, () => now, protection)(request("{")),
+    await createBookingHoldHandler(never, () => now, protection)(request()),
   ]) {
     assert.equal(response.status, 400);
     assert.deepEqual(await response.json(), {
@@ -89,9 +105,13 @@ test("slot, availability, and persistence failures have stable non-leaking respo
   console.error = () => {};
   try {
     for (const [error, status, code] of cases) {
-      const response = await createBookingHoldHandler(async () => {
-        throw error;
-      })(request());
+      const response = await createBookingHoldHandler(
+        async () => {
+          throw error;
+        },
+        () => now,
+        protection,
+      )(request());
       assert.equal(response.status, status);
       const serialized = JSON.stringify(await response.json());
       assert.equal(JSON.parse(serialized).error.code, code);

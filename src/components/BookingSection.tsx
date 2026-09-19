@@ -10,6 +10,7 @@ import {
 } from "../types";
 import { AvailabilityPicker } from "./availability/AvailabilityPicker";
 import { useAvailability } from "../hooks/useAvailability";
+import { TurnstileVerification } from "./TurnstileVerification";
 
 export const BookingSection: React.FC = () => {
   const {
@@ -40,6 +41,9 @@ export const BookingSection: React.FC = () => {
     "idle" | "processing" | "redirecting"
   >("idle");
   const [checkoutError, setCheckoutError] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileInvalid, setTurnstileInvalid] = useState(false);
+  const [turnstileAttempt, setTurnstileAttempt] = useState(0);
   const checkoutInFlightRef = useRef(false);
   const nextCheckoutOperationIdRef = useRef(0);
   const activeCheckoutOperationRef = useRef<{
@@ -76,6 +80,13 @@ export const BookingSection: React.FC = () => {
       );
       return;
     }
+    if (!hold && !turnstileToken) {
+      setTurnstileInvalid(true);
+      setErrorMsg(
+        "Please complete the quick security verification before confirming.",
+      );
+      return;
+    }
 
     setErrorMsg("");
     setCheckoutError("");
@@ -103,6 +114,7 @@ export const BookingSection: React.FC = () => {
             name,
             email,
             startAt: selectedSlotData.startAt,
+            turnstileToken,
           }),
           signal: controller.signal,
         });
@@ -110,17 +122,39 @@ export const BookingSection: React.FC = () => {
           BookingHoldResponse | { error?: { code?: string } };
         if (!isCurrentOperation()) return;
         if (!response.ok) {
-          if (response.status === 409) {
-            setSelectedSlot("");
-            setRequiresFreshSelection(true);
-            setErrorMsg(
-              "That time has just become unavailable. Please choose another available time.",
-            );
-            refreshAvailability();
-          } else {
-            setErrorMsg(
-              "Your time has not yet been reserved. Please try again.",
-            );
+          setTurnstileToken(null);
+          setTurnstileInvalid(false);
+          setTurnstileAttempt((value) => value + 1);
+          const errorCode = "error" in body ? body.error?.code : undefined;
+          switch (errorCode) {
+            case "slot_unavailable":
+              setSelectedSlot("");
+              setRequiresFreshSelection(true);
+              setErrorMsg(
+                "That time has just become unavailable. Please choose another available time.",
+              );
+              refreshAvailability();
+              break;
+            case "active_hold_limit":
+              setErrorMsg(
+                "You already have two reserved times. Complete one booking or wait for a hold to expire.",
+              );
+              break;
+            case "rate_limited":
+              setErrorMsg(
+                "Too many booking attempts. Your details are still here; please wait before trying again.",
+              );
+              break;
+            case "verification_failed":
+            case "verification_unavailable":
+              setErrorMsg(
+                "Security verification needs to be completed again. Your booking details have been preserved.",
+              );
+              break;
+            default:
+              setErrorMsg(
+                "Your time has not yet been reserved. Please try again.",
+              );
           }
           finishCurrentOperation();
           return;
@@ -298,6 +332,8 @@ export const BookingSection: React.FC = () => {
                 onSelectSlot={(slotId) => {
                   setSelectedSlot(slotId);
                   if (slotId) setRequiresFreshSelection(false);
+                  setTurnstileToken(null);
+                  setTurnstileInvalid(false);
                 }}
                 disabled={Boolean(hold)}
                 autoSelectSlot={!requiresFreshSelection}
@@ -470,6 +506,16 @@ export const BookingSection: React.FC = () => {
                 </span>
               </label>
             </div>
+
+            <TurnstileVerification
+              token={turnstileToken}
+              onTokenChange={(value) => {
+                setTurnstileToken(value);
+                if (value) setTurnstileInvalid(false);
+              }}
+              resetKey={`${selectedSlot}:${turnstileAttempt}`}
+              invalid={turnstileInvalid}
+            />
 
             {/* Error Message */}
             {errorMsg && (

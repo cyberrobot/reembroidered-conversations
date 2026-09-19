@@ -35,6 +35,23 @@ const availability = {
   })),
 };
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    window.turnstile = {
+      render(container: HTMLElement, options: Record<string, unknown>) {
+        container.innerHTML =
+          '<div style="height:65px;display:flex;align-items:center;justify-content:center;border:1px solid #e8dfd5;border-radius:8px;color:#68635f;font-size:12px">Verification ready</div>';
+        queueMicrotask(() =>
+          (options.callback as (token: string) => void)("visual-test-token"),
+        );
+        return "visual-widget";
+      },
+      reset() {},
+      remove() {},
+    };
+  });
+});
+
 async function openBookingPicker(page: Page) {
   await page.route("**/api/availability", (route) =>
     route.fulfill({ json: availability }),

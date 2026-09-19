@@ -5,6 +5,14 @@ import {
   InvalidHoldRequestError,
   SlotUnavailableError,
 } from "./booking-hold.mjs";
+import { getClientIdentity } from "../security/client-identity.mjs";
+import { getAbuseStore } from "../security/abuse-store.mjs";
+import { protectionErrorResponse } from "../security/protection-responses.ts";
+import {
+  TurnstileVerificationError,
+  verifyTurnstileToken,
+} from "../security/turnstile.mjs";
+import { BOOKING_HOLD_MINUTES } from "./booking-hold.mjs";
 
 type HoldService = typeof createBookingHold;
 const headers = { "Cache-Control": "no-store" };
@@ -12,6 +20,25 @@ const headers = { "Cache-Control": "no-store" };
 export function createBookingHoldHandler(
   service: HoldService,
   getNow = () => new Date(),
+  protection = {
+    getClientIdentity,
+    consumeRateLimit: async (policy: string, key: string, now: Date) =>
+      (await getAbuseStore()).consumeRateLimit(policy, key, now),
+    verifyChallenge: verifyTurnstileToken,
+    acquirePermit: async (key: string, expiresAt: Date, now: Date) =>
+      (await getAbuseStore()).acquireActiveHoldPermit(key, expiresAt, now),
+    commitPermit: async (permitId: string, bookingId: string) =>
+      (await getAbuseStore()).commitActiveHoldPermit(permitId, bookingId),
+    releasePermit: async (reference: string) =>
+      (await getAbuseStore()).releaseActiveHoldPermit(reference),
+    cancelUntrackedHold: async (bookingId: string) => {
+      const { db } = await import("../db.ts");
+      await db.booking.updateMany({
+        where: { id: bookingId, status: "HOLD", stripeCheckoutSessionId: null },
+        data: { status: "CANCELLED" },
+      });
+    },
+  },
 ) {
   return async function bookingHoldHandler(request: Request) {
     let input: unknown;
@@ -29,8 +56,38 @@ export function createBookingHoldHandler(
       );
     }
 
+    const now = getNow();
+    const candidate = input as { turnstileToken?: unknown };
+    let permitId: string | null = null;
+    let permitReleaseAllowed = true;
     try {
-      const hold = await service(input as never, getNow());
+      const clientKey = protection.getClientIdentity(request);
+      await protection.consumeRateLimit("hold", clientKey, now);
+      await protection.verifyChallenge(candidate?.turnstileToken);
+      permitId = await protection.acquirePermit(
+        clientKey,
+        new Date(now.getTime() + BOOKING_HOLD_MINUTES * 60_000),
+        now,
+      );
+      const { turnstileToken: _unused, ...bookingInput } = candidate ?? {};
+      const hold = await service(bookingInput as never, now);
+      try {
+        await protection.commitPermit(permitId, hold.id);
+      } catch (error) {
+        let holdCancelled = false;
+        try {
+          await protection.cancelUntrackedHold(hold.id);
+          holdCancelled = true;
+        } catch {
+          // Preserve the uncommitted permit while the active HOLD survives.
+          permitReleaseAllowed = false;
+        }
+        if (holdCancelled) {
+          await protection.releasePermit(permitId).catch(() => {});
+          permitId = null;
+        }
+        throw error;
+      }
       return NextResponse.json(
         {
           hold: {
@@ -44,6 +101,24 @@ export function createBookingHoldHandler(
         { status: 201, headers },
       );
     } catch (error) {
+      if (permitId && permitReleaseAllowed)
+        await protection.releasePermit(permitId).catch(() => {});
+      if (error instanceof TurnstileVerificationError) {
+        const unavailable = error.code === "verification_unavailable";
+        return NextResponse.json(
+          {
+            error: {
+              code: error.code,
+              message: unavailable
+                ? "Security verification is temporarily unavailable. Please try again."
+                : "Security verification was not accepted. Please try again.",
+            },
+          },
+          { status: unavailable ? 503 : 400, headers },
+        );
+      }
+      const protectedResponse = protectionErrorResponse(error);
+      if (protectedResponse) return protectedResponse;
       if (error instanceof InvalidHoldRequestError) {
         return NextResponse.json(
           {
