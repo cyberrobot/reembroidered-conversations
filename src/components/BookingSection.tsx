@@ -125,36 +125,36 @@ export const BookingSection: React.FC = () => {
           setTurnstileToken(null);
           setTurnstileInvalid(false);
           setTurnstileAttempt((value) => value + 1);
-          if (response.status === 409) {
-            setSelectedSlot("");
-            setRequiresFreshSelection(true);
-            setErrorMsg(
-              "That time has just become unavailable. Please choose another available time.",
-            );
-            refreshAvailability();
-          } else if ("error" in body && body.error?.code === "rate_limited") {
-            setErrorMsg(
-              "Too many booking attempts. Your details are still here; please wait before trying again.",
-            );
-          } else if (
-            "error" in body &&
-            (body.error?.code === "verification_failed" ||
-              body.error?.code === "verification_unavailable")
-          ) {
-            setErrorMsg(
-              "Security verification needs to be completed again. Your booking details have been preserved.",
-            );
-          } else if (
-            "error" in body &&
-            body.error?.code === "active_hold_limit"
-          ) {
-            setErrorMsg(
-              "You already have two reserved times. Complete one booking or wait for a hold to expire.",
-            );
-          } else {
-            setErrorMsg(
-              "Your time has not yet been reserved. Please try again.",
-            );
+          const errorCode = "error" in body ? body.error?.code : undefined;
+          switch (errorCode) {
+            case "slot_unavailable":
+              setSelectedSlot("");
+              setRequiresFreshSelection(true);
+              setErrorMsg(
+                "That time has just become unavailable. Please choose another available time.",
+              );
+              refreshAvailability();
+              break;
+            case "active_hold_limit":
+              setErrorMsg(
+                "You already have two reserved times. Complete one booking or wait for a hold to expire.",
+              );
+              break;
+            case "rate_limited":
+              setErrorMsg(
+                "Too many booking attempts. Your details are still here; please wait before trying again.",
+              );
+              break;
+            case "verification_failed":
+            case "verification_unavailable":
+              setErrorMsg(
+                "Security verification needs to be completed again. Your booking details have been preserved.",
+              );
+              break;
+            default:
+              setErrorMsg(
+                "Your time has not yet been reserved. Please try again.",
+              );
           }
           finishCurrentOperation();
           return;

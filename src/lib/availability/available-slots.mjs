@@ -23,8 +23,11 @@ export const freshAvailabilityDependencies = {
   getCalendarBusyPeriods: getBusyPeriods,
 };
 
-export function getFreshAvailableSlots(input) {
-  return getAvailableSlots(input, freshAvailabilityDependencies);
+export function getFreshAvailableSlots(input, dependencyOverrides = {}) {
+  return getAvailableSlots(input, {
+    ...freshAvailabilityDependencies,
+    ...dependencyOverrides,
+  });
 }
 
 /** @param {{ startAt: string, endAt: string }} left @param {{ startAt: string, endAt: string }} right */

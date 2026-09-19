@@ -17,8 +17,20 @@ import {
   clearBusyPeriodCache,
   getCachedBusyPeriods,
 } from "../src/lib/calendar/busy-period-cache.mjs";
-import { TurnstileVerificationError } from "../src/lib/security/turnstile.mjs";
+import {
+  TurnstileVerificationError,
+  verifyTurnstileToken,
+} from "../src/lib/security/turnstile.mjs";
 import { processStripeWebhookEvent } from "../src/lib/booking/stripe-webhook.mjs";
+import {
+  getAvailableSlots,
+  getFreshAvailableSlots,
+} from "../src/lib/availability/available-slots.mjs";
+import { getProviderCandidateSlotsForDate } from "../src/lib/availability/candidate-slots.mjs";
+import {
+  createBookingHold,
+  SlotUnavailableError,
+} from "../src/lib/booking/booking-hold.mjs";
 
 const now = new Date("2026-09-19T12:00:00.000Z");
 const holdBody = {
@@ -45,6 +57,11 @@ function holdProtection(overrides = {}) {
     cancelUntrackedHold: async () => {},
     ...overrides,
   };
+}
+
+function rejectsWithTurnstileCode(code) {
+  return (error) =>
+    error instanceof TurnstileVerificationError && error.code === code;
 }
 
 test("HOLD rate limiting precedes verification and booking work and returns Retry-After", async () => {
@@ -95,6 +112,117 @@ test("invalid and unavailable Turnstile results fail closed before permit and bo
     assert.equal(response.status, status);
     assert.equal(permitCalls, 0);
     assert.equal(serviceCalls, 0);
+  }
+});
+
+test("Turnstile verifier enforces success, action, hostname, and provider availability", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalSecret = process.env.TURNSTILE_SECRET_KEY;
+  const originalHostname = process.env.TURNSTILE_EXPECTED_HOSTNAME;
+  try {
+    process.env.TURNSTILE_SECRET_KEY = "test-secret";
+    process.env.TURNSTILE_EXPECTED_HOSTNAME = "booking.example.test";
+
+    await t.test("accepts the configured action and hostname", async () => {
+      globalThis.fetch = async () =>
+        new Response(
+          JSON.stringify({
+            success: true,
+            action: "booking_hold",
+            hostname: "booking.example.test",
+          }),
+          { status: 200 },
+        );
+      await verifyTurnstileToken("accepted-token");
+    });
+
+    for (const [name, result] of [
+      [
+        "rejects a wrong action",
+        {
+          success: true,
+          action: "another_action",
+          hostname: "booking.example.test",
+        },
+      ],
+      [
+        "rejects a wrong hostname",
+        {
+          success: true,
+          action: "booking_hold",
+          hostname: "attacker.example.test",
+        },
+      ],
+      [
+        "rejects a failed challenge",
+        {
+          success: false,
+          action: "booking_hold",
+          hostname: "booking.example.test",
+        },
+      ],
+    ]) {
+      await t.test(name, async () => {
+        globalThis.fetch = async () =>
+          new Response(JSON.stringify(result), { status: 200 });
+        await assert.rejects(
+          () => verifyTurnstileToken("rejected-token"),
+          rejectsWithTurnstileCode("verification_failed"),
+        );
+      });
+    }
+
+    await t.test("maps provider HTTP failure to unavailable", async () => {
+      globalThis.fetch = async () =>
+        new Response("unavailable", { status: 503 });
+      await assert.rejects(
+        () => verifyTurnstileToken("provider-token"),
+        rejectsWithTurnstileCode("verification_unavailable"),
+      );
+    });
+
+    await t.test("maps malformed provider JSON to unavailable", async () => {
+      globalThis.fetch = async () => new Response("not-json", { status: 200 });
+      await assert.rejects(
+        () => verifyTurnstileToken("malformed-token"),
+        rejectsWithTurnstileCode("verification_unavailable"),
+      );
+    });
+
+    await t.test("maps network failure to unavailable", async () => {
+      globalThis.fetch = async () => {
+        throw new Error("network unavailable");
+      };
+      await assert.rejects(
+        () => verifyTurnstileToken("network-token"),
+        rejectsWithTurnstileCode("verification_unavailable"),
+      );
+    });
+
+    await t.test(
+      "fails unavailable before fetch when the secret is missing",
+      async () => {
+        delete process.env.TURNSTILE_SECRET_KEY;
+        let calls = 0;
+        globalThis.fetch = async () => {
+          calls += 1;
+          throw new Error("must not be called");
+        };
+        await assert.rejects(
+          () => verifyTurnstileToken("missing-secret-token"),
+          rejectsWithTurnstileCode("verification_unavailable"),
+        );
+        assert.equal(calls, 0);
+        process.env.TURNSTILE_SECRET_KEY = "test-secret";
+      },
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalSecret === undefined) delete process.env.TURNSTILE_SECRET_KEY;
+    else process.env.TURNSTILE_SECRET_KEY = originalSecret;
+    if (originalHostname === undefined)
+      delete process.env.TURNSTILE_EXPECTED_HOSTNAME;
+    else process.env.TURNSTILE_EXPECTED_HOSTNAME = originalHostname;
   }
 });
 
@@ -336,6 +464,139 @@ test("Google busy cache reuses successes, coalesces misses, expires, and never c
   await assert.rejects(getCachedBusyPeriods(from, to, failing));
   assert.equal(failures, 2);
 });
+
+test("fresh HOLD validation bypasses a populated browse-time Google busy cache", async () => {
+  clearBusyPeriodCache();
+  const testNow = new Date("2026-09-19T00:00:00.000Z");
+  const date = "2026-09-21";
+  const targetStartAt = "2026-09-21T09:00:00.000Z";
+  const targetEndAt = "2026-09-21T09:55:00.000Z";
+  const providerKey = `fresh-hold-${crypto.randomUUID()}`;
+  let providerBusyPeriods = [];
+  let googleCalls = 0;
+  let bookingConflictCalls = 0;
+  const getBookingConflicts = async () => {
+    bookingConflictCalls += 1;
+    return [];
+  };
+  const loadGoogleBusyPeriods = async () => {
+    googleCalls += 1;
+    return providerBusyPeriods;
+  };
+
+  const browseSlots = await getAvailableSlots(
+    { fromDate: date, toDate: date, now: testNow },
+    {
+      getCandidates: getProviderCandidateSlotsForDate,
+      getBookingConflicts,
+      getCalendarBusyPeriods: (from, to) =>
+        getCachedBusyPeriods(from, to, {
+          providerKey,
+          now: () => testNow,
+          load: loadGoogleBusyPeriods,
+        }),
+    },
+  );
+  assert.equal(
+    browseSlots.some((slot) => slot.startAt === targetStartAt),
+    true,
+  );
+
+  providerBusyPeriods = [{ startAt: targetStartAt, endAt: targetEndAt }];
+  let persisted = false;
+  await assert.rejects(
+    () =>
+      createBookingHold(
+        {
+          name: "Fresh Calendar Check",
+          email: "fresh-calendar@example.test",
+          startAt: targetStartAt,
+        },
+        testNow,
+        {
+          getAvailableSlots: (input) =>
+            getFreshAvailableSlots(input, {
+              getCandidates: getProviderCandidateSlotsForDate,
+              getBookingConflicts,
+              getCalendarBusyPeriods: loadGoogleBusyPeriods,
+            }),
+          persist: async () => {
+            persisted = true;
+          },
+        },
+      ),
+    SlotUnavailableError,
+  );
+  assert.equal(persisted, false);
+  assert.equal(googleCalls, 2);
+  assert.equal(bookingConflictCalls, 2);
+});
+
+test(
+  "PostgreSQL rate limits enforce every policy boundary and isolate keys and policies",
+  { skip: !process.env.DATABASE_SCHEMA_TEST_URL },
+  async () => {
+    const database = new PrismaClient({
+      adapter: new PrismaPg({
+        connectionString: process.env.DATABASE_SCHEMA_TEST_URL,
+      }),
+    });
+    const store = createPostgresAbuseStore(database);
+    const prefix = `rate-${crypto.randomUUID()}`;
+    const windowTime = new Date("2026-09-19T12:01:00.000Z");
+
+    async function expectLimited(policy, clientKey, retryUpperBound) {
+      try {
+        await store.consumeRateLimit(policy, clientKey, windowTime);
+        assert.fail(`${policy} should have been limited`);
+      } catch (error) {
+        assert.ok(error instanceof RateLimitExceededError);
+        assert.ok(error.retryAfterSeconds > 0);
+        assert.ok(error.retryAfterSeconds <= retryUpperBound);
+      }
+    }
+
+    try {
+      const availabilityKey = `${prefix}-availability`;
+      for (let request = 0; request < 60; request += 1)
+        await store.consumeRateLimit(
+          "availability",
+          availabilityKey,
+          windowTime,
+        );
+      await expectLimited("availability", availabilityKey, 5 * 60);
+      await store.consumeRateLimit(
+        "availability",
+        availabilityKey,
+        new Date(windowTime.getTime() + 5 * 60_000),
+      );
+      await store.consumeRateLimit(
+        "availability",
+        `${prefix}-unrelated-client`,
+        windowTime,
+      );
+      await store.consumeRateLimit("hold", availabilityKey, windowTime);
+
+      for (const [policy, limit] of [
+        ["hold", 10],
+        ["checkout", 10],
+        ["checkoutBooking", 4],
+      ]) {
+        const key = `${prefix}-${policy}`;
+        for (let request = 0; request < limit; request += 1)
+          await store.consumeRateLimit(policy, key, windowTime);
+        await expectLimited(
+          policy,
+          key,
+          policy === "checkoutBooking" ? 5 * 60 : 15 * 60,
+        );
+      }
+    } finally {
+      await database.$executeRaw`DELETE FROM "abuse_rate_limits" WHERE "key" LIKE ${`%${prefix}%`}`;
+      await database.$disconnect();
+    }
+  },
+);
 
 test(
   "PostgreSQL store atomically caps, expires, extends, and releases active HOLD permits",

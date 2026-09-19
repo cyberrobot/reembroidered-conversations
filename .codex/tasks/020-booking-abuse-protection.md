@@ -416,7 +416,7 @@ Rate-limit state must be shared between application instances.
 Do not rely solely on:
 
 ```js
-new Map()
+new Map();
 ```
 
 or another process-local memory cache for enforcement.
@@ -451,12 +451,12 @@ Do not log raw client IP addresses merely for this feature.
 
 Implement these initial server-side defaults:
 
-| Operation | Limit |
-| --- | --- |
-| Availability | 60 requests per 5 minutes per client |
-| Create HOLD | 10 attempts per 15 minutes per client |
-| Checkout | 10 attempts per 15 minutes per client |
-| Checkout for one booking ID | 4 attempts per 5 minutes |
+| Operation                   | Limit                                 |
+| --------------------------- | ------------------------------------- |
+| Availability                | 60 requests per 5 minutes per client  |
+| Create HOLD                 | 10 attempts per 15 minutes per client |
+| Checkout                    | 10 attempts per 15 minutes per client |
+| Checkout for one booking ID | 4 attempts per 5 minutes              |
 
 Keep policies centralized.
 
@@ -2028,16 +2028,16 @@ Summarise:
 
 Report evidence for:
 
-| Threat | Protection |
-| --- | --- |
-| Rapid availability scraping | Availability rate limit |
-| Repeated Google FreeBusy amplification | Rate limit + 30-second cache |
-| Fake HOLDs across all slots | Turnstile + rate limit + max 2 active HOLDs |
-| Slow HOLD exhaustion | Max active-HOLD quota |
-| Repeated Checkout requests | Client + booking-ID limits |
-| Stripe duplicate Session creation | Existing Stripe idempotency |
-| Stale cached Calendar during booking | Fresh HOLD-time Google validation |
-| Limiter/provider outage | Fail-closed mutation behaviour |
+| Threat                                 | Protection                                  |
+| -------------------------------------- | ------------------------------------------- |
+| Rapid availability scraping            | Availability rate limit                     |
+| Repeated Google FreeBusy amplification | Rate limit + 30-second cache                |
+| Fake HOLDs across all slots            | Turnstile + rate limit + max 2 active HOLDs |
+| Slow HOLD exhaustion                   | Max active-HOLD quota                       |
+| Repeated Checkout requests             | Client + booking-ID limits                  |
+| Stripe duplicate Session creation      | Existing Stripe idempotency                 |
+| Stale cached Calendar during booking   | Fresh HOLD-time Google validation           |
+| Limiter/provider outage                | Fail-closed mutation behaviour              |
 
 ### Tests
 

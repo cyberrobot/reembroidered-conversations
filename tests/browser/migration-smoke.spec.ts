@@ -510,6 +510,185 @@ test("rejected verification resets cleanly and preserves booking details for ret
   await expect(page).toHaveURL(/\/booking\/success\?booking_id=/);
 });
 
+test("HOLD rate limiting preserves the form and returns to a retryable idle state", async ({
+  page,
+}) => {
+  let availabilityRequests = 0;
+  await page.route("**/api/availability*", (route) => {
+    availabilityRequests += 1;
+    return route.fulfill({ json: availabilityFixture() });
+  });
+  let holdRequests = 0;
+  await page.route("**/api/bookings/hold", (route) => {
+    holdRequests += 1;
+    return route.fulfill({
+      status: 429,
+      contentType: "application/json",
+      body: JSON.stringify({ error: { code: "rate_limited" } }),
+    });
+  });
+  let checkoutRequests = 0;
+  await page.route("**/api/bookings/checkout", (route) => {
+    checkoutRequests += 1;
+    return route.abort();
+  });
+
+  await page.goto("/");
+  const selectedDate = page.locator(
+    '#book-session button[data-availability-date][aria-pressed="true"]',
+  );
+  const selectedTime = page
+    .locator('#book-session button[aria-pressed="true"]')
+    .filter({ hasText: /AM$|PM$/ });
+  await expect(selectedDate).toHaveCount(1);
+  await expect(selectedTime).toHaveCount(1);
+  await page.locator("#client-name").fill("Rate Limited");
+  await page.locator("#client-email").fill("rate-limited@example.com");
+  await page.locator("#boundaries-checkbox").check();
+  await page.locator("#confirm-booking-button").click();
+
+  await expect.poll(() => holdRequests).toBe(1);
+  expect(checkoutRequests).toBe(0);
+  await expect(page.locator("#client-name")).toHaveValue("Rate Limited");
+  await expect(page.locator("#client-email")).toHaveValue(
+    "rate-limited@example.com",
+  );
+  await expect(selectedDate).toHaveCount(1);
+  await expect(selectedTime).toHaveCount(1);
+  await expect(page.locator("#boundaries-checkbox")).toBeChecked();
+  await expect(
+    page.getByRole("alert").filter({ hasText: "please wait" }),
+  ).toBeVisible();
+  await expect(page.locator("#confirm-booking-button")).toBeEnabled();
+  await expect(page.locator("#confirm-booking-button")).toHaveAttribute(
+    "aria-busy",
+    "false",
+  );
+  expect(availabilityRequests).toBe(1);
+  expect(holdRequests).toBe(1);
+});
+
+test("Checkout rate limiting keeps and manually reuses the existing HOLD", async ({
+  page,
+}) => {
+  let availabilityRequests = 0;
+  await page.route("**/api/availability*", (route) => {
+    availabilityRequests += 1;
+    return route.fulfill({ json: availabilityFixture() });
+  });
+  let holdRequests = 0;
+  await page.route("**/api/bookings/hold", (route) => {
+    holdRequests += 1;
+    const submitted = route.request().postDataJSON();
+    return route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({
+        hold: {
+          id: "5a449655-7be3-432c-a124-b769e10b50ef",
+          startAt: submitted.startAt,
+          endAt: new Date(
+            Date.parse(submitted.startAt) + 55 * 60_000,
+          ).toISOString(),
+          timezone: "Europe/London",
+          expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+        },
+      }),
+    });
+  });
+  let checkoutRequests = 0;
+  await page.route("**/api/bookings/checkout", (route) => {
+    checkoutRequests += 1;
+    return route.fulfill({
+      status: 429,
+      contentType: "application/json",
+      body: JSON.stringify({ error: { code: "rate_limited" } }),
+    });
+  });
+
+  await page.goto("/");
+  const selectedTime = page
+    .locator('#book-session button[aria-pressed="true"]')
+    .filter({ hasText: /AM$|PM$/ });
+  await page.locator("#client-name").fill("Checkout Limited");
+  await page.locator("#client-email").fill("checkout-limited@example.com");
+  await page.locator("#boundaries-checkbox").check();
+  await page.locator("#confirm-booking-button").click();
+
+  await expect.poll(() => checkoutRequests).toBe(1);
+  expect(holdRequests).toBe(1);
+  expect(availabilityRequests).toBe(1);
+  await expect(page.locator("#client-name")).toHaveValue("Checkout Limited");
+  await expect(page.locator("#client-email")).toHaveValue(
+    "checkout-limited@example.com",
+  );
+  await expect(page.locator("#client-name")).toBeDisabled();
+  await expect(selectedTime).toHaveCount(1);
+  await expect(
+    page.getByRole("alert").filter({ hasText: "Your time is still held" }),
+  ).toBeVisible();
+  await expect(page.locator("#confirm-booking-button")).toBeEnabled();
+  expect(checkoutRequests).toBe(1);
+
+  await page.locator("#confirm-booking-button").click();
+  await expect.poll(() => checkoutRequests).toBe(2);
+  expect(holdRequests).toBe(1);
+  expect(availabilityRequests).toBe(1);
+  await expect(selectedTime).toHaveCount(1);
+});
+
+test("active HOLD limit preserves the selected slot without refreshing availability", async ({
+  page,
+}) => {
+  let availabilityRequests = 0;
+  await page.route("**/api/availability*", (route) => {
+    availabilityRequests += 1;
+    return route.fulfill({ json: availabilityFixture() });
+  });
+  let holdRequests = 0;
+  await page.route("**/api/bookings/hold", (route) => {
+    holdRequests += 1;
+    return route.fulfill({
+      status: 409,
+      contentType: "application/json",
+      body: JSON.stringify({ error: { code: "active_hold_limit" } }),
+    });
+  });
+  let checkoutRequests = 0;
+  await page.route("**/api/bookings/checkout", (route) => {
+    checkoutRequests += 1;
+    return route.abort();
+  });
+
+  await page.goto("/");
+  const selectedDate = page.locator(
+    '#book-session button[data-availability-date][aria-pressed="true"]',
+  );
+  const selectedTime = page
+    .locator('#book-session button[aria-pressed="true"]')
+    .filter({ hasText: /AM$|PM$/ });
+  await page.locator("#client-name").fill("Two Holds");
+  await page.locator("#client-email").fill("two-holds@example.com");
+  await page.locator("#boundaries-checkbox").check();
+  await page.locator("#confirm-booking-button").click();
+
+  await expect.poll(() => holdRequests).toBe(1);
+  expect(checkoutRequests).toBe(0);
+  expect(availabilityRequests).toBe(1);
+  await expect(selectedDate).toHaveCount(1);
+  await expect(selectedTime).toHaveCount(1);
+  await expect(page.locator("#client-name")).toHaveValue("Two Holds");
+  await expect(page.locator("#client-email")).toHaveValue(
+    "two-holds@example.com",
+  );
+  await expect(
+    page.getByRole("alert").filter({ hasText: "already have two reserved" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("alert").filter({ hasText: "just become unavailable" }),
+  ).toHaveCount(0);
+});
+
 test("lost-slot and temporary hold failures preserve form state and allow recovery", async ({
   page,
 }) => {
