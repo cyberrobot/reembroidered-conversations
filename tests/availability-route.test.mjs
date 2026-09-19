@@ -15,7 +15,10 @@ const today = getCalendarDateInTimeZone(testNow, "Europe/London");
 const tomorrow = addCalendarDays(today, 1);
 
 function createHandler(service, config = PROVIDER_AVAILABILITY_CONFIG) {
-  return createAvailabilityHandler(service, config, () => testNow);
+  return createAvailabilityHandler(service, config, () => testNow, {
+    getClientIdentity: () => "test-client",
+    consumeRateLimit: async () => {},
+  });
 }
 
 function request(from = tomorrow, to = tomorrow) {

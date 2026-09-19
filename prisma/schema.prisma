@@ -65,3 +65,22 @@ model GoogleCalendarConnection {
 
   @@map("google_calendar_connections")
 }
+
+model AbuseRateLimit {
+  key         String
+  windowStart DateTime @db.Timestamptz(3)
+  count       Int
+  expiresAt   DateTime @db.Timestamptz(3)
+  @@id([key, windowStart])
+  @@index([expiresAt], map: "abuse_rate_limits_expires_at_idx")
+  @@map("abuse_rate_limits")
+}
+
+model AbuseHoldPermit {
+  id        String   @id @db.Uuid
+  clientKey String
+  bookingId String?  @unique(map: "abuse_hold_permits_booking_id_key") @db.Uuid
+  expiresAt DateTime @db.Timestamptz(3)
+  @@index([clientKey, expiresAt], map: "abuse_hold_permits_client_expiry_idx")
+  @@map("abuse_hold_permits")
+}

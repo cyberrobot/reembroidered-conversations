@@ -4,6 +4,7 @@ import "server-only";
 
 import { addCalendarDays } from "../booking-date.mjs";
 import { getBusyPeriods } from "../calendar/busy-periods.mjs";
+import { getCachedBusyPeriods } from "../calendar/busy-period-cache.mjs";
 import { getProviderCandidateSlotsForDate } from "./candidate-slots.mjs";
 import { PROVIDER_AVAILABILITY_CONFIG } from "./provider-config.mjs";
 import {
@@ -14,8 +15,17 @@ import {
 const defaultDependencies = {
   getCandidates: getProviderCandidateSlotsForDate,
   getBookingConflicts: getActiveBookingConflicts,
+  getCalendarBusyPeriods: getCachedBusyPeriods,
+};
+
+export const freshAvailabilityDependencies = {
+  ...defaultDependencies,
   getCalendarBusyPeriods: getBusyPeriods,
 };
+
+export function getFreshAvailableSlots(input) {
+  return getAvailableSlots(input, freshAvailabilityDependencies);
+}
 
 /** @param {{ startAt: string, endAt: string }} left @param {{ startAt: string, endAt: string }} right */
 export function intervalsOverlap(left, right) {

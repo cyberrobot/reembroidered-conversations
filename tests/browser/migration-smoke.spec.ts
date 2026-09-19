@@ -5,6 +5,30 @@ import { invalidPlaybackId } from "../../playwright.config";
 
 const defaultPlaybackId = "4qvdrc02lmk21KDbxfyWcWyiV7YG9Fljckr5xj5wBzXg";
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    let latestOptions: Record<string, unknown> | undefined;
+    window.turnstile = {
+      render(container: HTMLElement, options: Record<string, unknown>) {
+        latestOptions = options;
+        container.textContent = "Turnstile test challenge";
+        queueMicrotask(() =>
+          (options.callback as (token: string) => void)("browser-test-token"),
+        );
+        return "test-widget";
+      },
+      reset() {
+        queueMicrotask(() =>
+          (latestOptions?.callback as ((token: string) => void) | undefined)?.(
+            "browser-test-token",
+          ),
+        );
+      },
+      remove() {},
+    };
+  });
+});
+
 function collectBrowserFailures(page: Page) {
   const failures: string[] = [];
 
@@ -407,6 +431,7 @@ test("one booking action creates a hold and automatically redirects to Checkout"
     name: "Browser Smoke",
     email: "browser.smoke@example.com",
     startAt: expect.any(String),
+    turnstileToken: "browser-test-token",
   });
   releaseHold?.();
   await expect.poll(() => checkoutRequests).toBe(1);
@@ -422,6 +447,67 @@ test("one booking action creates a hold and automatically redirects to Checkout"
     page.getByText("We couldn’t verify this booking link."),
   ).toBeVisible();
   expect(failures).toEqual([]);
+});
+
+test("rejected verification resets cleanly and preserves booking details for retry", async ({
+  page,
+}) => {
+  await mockAvailability(page);
+  let holdRequests = 0;
+  let checkoutRequests = 0;
+  await page.route("**/api/bookings/hold", (route) => {
+    holdRequests += 1;
+    const submitted = route.request().postDataJSON();
+    return route.fulfill({
+      status: holdRequests === 1 ? 400 : 201,
+      contentType: "application/json",
+      body: JSON.stringify(
+        holdRequests === 1
+          ? { error: { code: "verification_failed" } }
+          : {
+              hold: {
+                id: "5a449655-7be3-432c-a124-b769e10b50ef",
+                startAt: submitted.startAt,
+                endAt: new Date(
+                  Date.parse(submitted.startAt) + 55 * 60_000,
+                ).toISOString(),
+                timezone: "Europe/London",
+                expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+              },
+            },
+      ),
+    });
+  });
+  await page.route("**/api/bookings/checkout", (route) => {
+    checkoutRequests += 1;
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        checkout: {
+          url: "/payment?booking_id=5a449655-7be3-432c-a124-b769e10b50ef",
+          expiresAt: new Date(Date.now() + 31 * 60_000).toISOString(),
+        },
+      }),
+    });
+  });
+  await page.goto("/");
+  await page.locator("#client-name").fill("Verification Retry");
+  await page.locator("#client-email").fill("retry@example.com");
+  await page.locator("#boundaries-checkbox").check();
+  await page.locator("#confirm-booking-button").click();
+  await expect(
+    page.getByRole("alert").filter({ hasText: "completed again" }),
+  ).toBeVisible();
+  await expect(page.locator("#client-name")).toHaveValue("Verification Retry");
+  expect(checkoutRequests).toBe(0);
+  await expect(
+    page.getByText("Verification successful. You can proceed with booking."),
+  ).toBeVisible();
+  await page.locator("#confirm-booking-button").click();
+  await expect.poll(() => holdRequests).toBe(2);
+  await expect.poll(() => checkoutRequests).toBe(1);
+  await expect(page).toHaveURL(/\/booking\/success\?booking_id=/);
 });
 
 test("lost-slot and temporary hold failures preserve form state and allow recovery", async ({

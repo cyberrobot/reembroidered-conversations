@@ -3,7 +3,7 @@
 import "server-only";
 
 import { getCalendarDateInTimeZone } from "../booking-date.mjs";
-import { getAvailableSlots } from "../availability/available-slots.mjs";
+import { getFreshAvailableSlots } from "../availability/available-slots.mjs";
 import { PROVIDER_AVAILABILITY_CONFIG } from "../availability/provider-config.mjs";
 
 export const BOOKING_HOLD_MINUTES = 15;
@@ -129,7 +129,7 @@ export function createHoldPersistence(database) {
 }
 
 const defaultDependencies = {
-  getAvailableSlots,
+  getAvailableSlots: getFreshAvailableSlots,
   persist: async (input) => {
     const { db } = await import("../db.ts");
     return createHoldPersistence(db)(input);
