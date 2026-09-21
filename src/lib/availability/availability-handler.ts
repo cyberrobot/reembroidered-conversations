@@ -5,6 +5,9 @@ import {
 } from "../booking-date.mjs";
 import { getAvailableSlots } from "./available-slots.mjs";
 import { PROVIDER_AVAILABILITY_CONFIG } from "./provider-config.mjs";
+import { getClientIdentity } from "../security/client-identity.mjs";
+import { getAbuseStore } from "../security/abuse-store.mjs";
+import { protectionErrorResponse } from "../security/protection-responses.ts";
 
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
@@ -23,6 +26,11 @@ export function createAvailabilityHandler(
   service: AvailabilityService,
   config = PROVIDER_AVAILABILITY_CONFIG,
   getNow = () => new Date(),
+  protection = {
+    getClientIdentity,
+    consumeRateLimit: async (policy: string, key: string, now: Date) =>
+      (await getAbuseStore()).consumeRateLimit(policy, key, now),
+  },
 ) {
   return async function availabilityHandler(request: Request) {
     const now = getNow();
@@ -50,6 +58,13 @@ export function createAvailabilityHandler(
         },
         { status: 400, headers: { "Cache-Control": "no-store" } },
       );
+    }
+
+    try {
+      const clientKey = protection.getClientIdentity(request);
+      await protection.consumeRateLimit("availability", clientKey, now);
+    } catch (error) {
+      return protectionErrorResponse(error)!;
     }
 
     try {

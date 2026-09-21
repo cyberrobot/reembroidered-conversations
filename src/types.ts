@@ -49,6 +49,7 @@ export interface BookingFormData {
   timeZone: string;
   optionalNote?: string;
   confirmedBoundaries: boolean;
+  turnstileToken: string;
 }
 
 export interface BookingConfirmation extends BookingFormData {

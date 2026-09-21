@@ -159,6 +159,7 @@ export async function processStripeWebhookEvent(
   persistence,
   finalizeCalendar,
   sendConfirmationEmail,
+  releaseActiveHoldPermit,
 ) {
   if (
     event?.type !== "checkout.session.completed" &&
@@ -199,6 +200,7 @@ export async function processStripeWebhookEvent(
     ) {
       throw new StripeWebhookReconciliationError();
     }
+    await releaseActiveHoldPermit?.(bookingId).catch(() => {});
     if (booking.status === "CONFIRMED") {
       let expectedEventId;
       try {
@@ -279,13 +281,18 @@ export async function processStripeWebhookEvent(
     bookingId,
     sessionId: session.id,
   });
-  if (result.count === 1) return;
+  if (result.count === 1) {
+    await releaseActiveHoldPermit?.(bookingId).catch(() => {});
+    return;
+  }
   const booking = await persistence.findBooking(bookingId);
   if (
     booking?.stripeCheckoutSessionId === session.id &&
     ["CANCELLED", "PAID", "CONFIRMED", "REFUNDED"].includes(booking.status)
-  )
+  ) {
+    await releaseActiveHoldPermit?.(bookingId).catch(() => {});
     return;
+  }
   throw new StripeWebhookReconciliationError();
 }
 
@@ -295,10 +302,13 @@ export async function processStripeWebhook(event) {
     await import("../calendar/booking-event.mjs");
   const { sendBookingConfirmationEmail } =
     await import("./booking-confirmation-email.mjs");
+  const { getAbuseStore } = await import("../security/abuse-store.mjs");
   return processStripeWebhookEvent(
     event,
     createStripeWebhookPersistence(db),
     reconcileBookingCalendarEvent,
     sendBookingConfirmationEmail,
+    async (bookingId) =>
+      (await getAbuseStore()).releaseActiveHoldPermit(bookingId),
   );
 }
