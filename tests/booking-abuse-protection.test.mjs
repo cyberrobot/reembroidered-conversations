@@ -116,10 +116,15 @@ test("invalid and unavailable Turnstile results fail closed before permit and bo
 });
 
 test("Turnstile verifier enforces success, action, hostname, and provider availability", async (t) => {
+  const alwaysPassTestSitekey = "1x00000000000000000000AA";
+  const alwaysPassTestSecret = "1x0000000000000000000000000000000AA";
   const originalFetch = globalThis.fetch;
   const originalSecret = process.env.TURNSTILE_SECRET_KEY;
   const originalHostname = process.env.TURNSTILE_EXPECTED_HOSTNAME;
+  const originalNodeEnv = process.env.NODE_ENV;
+  const originalSitekey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
   try {
+    process.env.NODE_ENV = "test";
     process.env.TURNSTILE_SECRET_KEY = "test-secret";
     process.env.TURNSTILE_EXPECTED_HOSTNAME = "booking.example.test";
 
@@ -135,6 +140,88 @@ test("Turnstile verifier enforces success, action, hostname, and provider availa
         );
       await verifyTurnstileToken("accepted-token");
     });
+
+    await t.test(
+      "accepts Cloudflare's official always-pass response outside production",
+      async () => {
+        process.env.TURNSTILE_SECRET_KEY = alwaysPassTestSecret;
+        process.env.TURNSTILE_EXPECTED_HOSTNAME = "localhost";
+        globalThis.fetch = async () =>
+          new Response(
+            JSON.stringify({
+              success: true,
+              hostname: "localhost",
+              "error-codes": [],
+              action: "test",
+              cdata: "test-data",
+            }),
+            { status: 200 },
+          );
+        await verifyTurnstileToken("official-test-token");
+      },
+    );
+
+    await t.test(
+      "still checks the hostname for Cloudflare's official test response",
+      async () => {
+        globalThis.fetch = async () =>
+          new Response(
+            JSON.stringify({
+              success: true,
+              hostname: "wrong.example",
+              action: "test",
+            }),
+            { status: 200 },
+          );
+        await assert.rejects(
+          () => verifyTurnstileToken("wrong-hostname-test-token"),
+          rejectsWithTurnstileCode("verification_failed"),
+        );
+      },
+    );
+
+    await t.test("rejects the test action for a normal secret", async () => {
+      process.env.TURNSTILE_SECRET_KEY = "test-secret";
+      process.env.TURNSTILE_EXPECTED_HOSTNAME = "booking.example.test";
+      globalThis.fetch = async () =>
+        new Response(
+          JSON.stringify({
+            success: true,
+            hostname: "booking.example.test",
+            action: "test",
+          }),
+          { status: 200 },
+        );
+      await assert.rejects(
+        () => verifyTurnstileToken("normal-secret-test-token"),
+        rejectsWithTurnstileCode("verification_failed"),
+      );
+    });
+
+    await t.test(
+      "rejects official test credentials in production",
+      async () => {
+        process.env.NODE_ENV = "production";
+        process.env.TURNSTILE_SECRET_KEY = alwaysPassTestSecret;
+        process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = alwaysPassTestSitekey;
+        let calls = 0;
+        globalThis.fetch = async () => {
+          calls += 1;
+          throw new Error("must not be called");
+        };
+        await assert.rejects(
+          () => verifyTurnstileToken("production-test-token"),
+          rejectsWithTurnstileCode("verification_unavailable"),
+        );
+        assert.equal(calls, 0);
+        process.env.NODE_ENV = "test";
+        process.env.TURNSTILE_SECRET_KEY = "test-secret";
+        process.env.TURNSTILE_EXPECTED_HOSTNAME = "booking.example.test";
+        if (originalSitekey === undefined)
+          delete process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+        else process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = originalSitekey;
+      },
+    );
 
     for (const [name, result] of [
       [
@@ -223,6 +310,11 @@ test("Turnstile verifier enforces success, action, hostname, and provider availa
     if (originalHostname === undefined)
       delete process.env.TURNSTILE_EXPECTED_HOSTNAME;
     else process.env.TURNSTILE_EXPECTED_HOSTNAME = originalHostname;
+    if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = originalNodeEnv;
+    if (originalSitekey === undefined)
+      delete process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+    else process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = originalSitekey;
   }
 });
 

@@ -136,15 +136,6 @@ export function TurnstileVerification({
             >
               Retry verification
             </button>
-            {process.env.NODE_ENV === "development" && (
-              <button
-                type="button"
-                onClick={() => onTokenChange("local-turnstile-test-token")}
-                className="font-medium underline underline-offset-4"
-              >
-                Bypass for local testing
-              </button>
-            )}
           </div>
         </div>
       ) : (
