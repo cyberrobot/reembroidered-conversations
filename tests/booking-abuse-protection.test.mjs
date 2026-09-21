@@ -142,7 +142,7 @@ test("Turnstile verifier enforces success, action, hostname, and provider availa
     });
 
     await t.test(
-      "accepts Cloudflare's official always-pass response outside production",
+      "accepts Cloudflare's observed official test response outside production",
       async () => {
         process.env.TURNSTILE_SECRET_KEY = alwaysPassTestSecret;
         process.env.TURNSTILE_EXPECTED_HOSTNAME = "localhost";
@@ -150,10 +150,9 @@ test("Turnstile verifier enforces success, action, hostname, and provider availa
           new Response(
             JSON.stringify({
               success: true,
-              hostname: "localhost",
+              hostname: "example.com",
               "error-codes": [],
-              action: "test",
-              cdata: "test-data",
+              action: null,
             }),
             { status: 200 },
           );
@@ -162,23 +161,27 @@ test("Turnstile verifier enforces success, action, hostname, and provider availa
     );
 
     await t.test(
-      "still checks the hostname for Cloudflare's official test response",
+      "accepts successful official test responses without metadata",
       async () => {
-        globalThis.fetch = async () =>
-          new Response(
-            JSON.stringify({
-              success: true,
-              hostname: "wrong.example",
-              action: "test",
-            }),
-            { status: 200 },
-          );
-        await assert.rejects(
-          () => verifyTurnstileToken("wrong-hostname-test-token"),
-          rejectsWithTurnstileCode("verification_failed"),
-        );
+        for (const result of [
+          { success: true },
+          { success: true, action: null, hostname: null },
+        ]) {
+          globalThis.fetch = async () =>
+            new Response(JSON.stringify(result), { status: 200 });
+          await verifyTurnstileToken("metadata-free-test-token");
+        }
       },
     );
+
+    await t.test("rejects failed official test verification", async () => {
+      globalThis.fetch = async () =>
+        new Response(JSON.stringify({ success: false }), { status: 200 });
+      await assert.rejects(
+        () => verifyTurnstileToken("failed-official-test-token"),
+        rejectsWithTurnstileCode("verification_failed"),
+      );
+    });
 
     await t.test("rejects the test action for a normal secret", async () => {
       process.env.TURNSTILE_SECRET_KEY = "test-secret";
@@ -224,6 +227,21 @@ test("Turnstile verifier enforces success, action, hostname, and provider availa
     );
 
     for (const [name, result] of [
+      [
+        "rejects a missing action",
+        {
+          success: true,
+          hostname: "booking.example.test",
+        },
+      ],
+      [
+        "rejects a null action",
+        {
+          success: true,
+          action: null,
+          hostname: "booking.example.test",
+        },
+      ],
       [
         "rejects a wrong action",
         {

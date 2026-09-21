@@ -26,10 +26,8 @@ export async function verifyTurnstileToken(token) {
   ) {
     throw new TurnstileVerificationError("verification_unavailable");
   }
-  const expectedAction =
-    !production && secret === TURNSTILE_ALWAYS_PASS_TEST_SECRET
-      ? "test"
-      : "booking_hold";
+  const usingOfficialTestSecret =
+    !production && secret === TURNSTILE_ALWAYS_PASS_TEST_SECRET;
   let response;
   try {
     response = await fetch(
@@ -58,8 +56,9 @@ export async function verifyTurnstileToken(token) {
   const expectedHostname = process.env.TURNSTILE_EXPECTED_HOSTNAME;
   if (
     result.success !== true ||
-    result.action !== expectedAction ||
-    (expectedHostname && result.hostname !== expectedHostname)
+    (!usingOfficialTestSecret &&
+      (result.action !== "booking_hold" ||
+        (expectedHostname && result.hostname !== expectedHostname)))
   ) {
     console.warn("Turnstile verification rejected.", {
       success: result.success === true,
@@ -68,8 +67,11 @@ export async function verifyTurnstileToken(token) {
         : [],
       action: typeof result.action === "string" ? result.action : null,
       hostname: typeof result.hostname === "string" ? result.hostname : null,
-      expectedAction,
-      expectedHostname: expectedHostname || null,
+      testCredentials: usingOfficialTestSecret,
+      expectedAction: usingOfficialTestSecret ? null : "booking_hold",
+      expectedHostname: usingOfficialTestSecret
+        ? null
+        : expectedHostname || null,
     });
     throw new TurnstileVerificationError();
   }
