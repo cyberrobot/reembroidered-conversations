@@ -13,11 +13,11 @@ permissions:
     effect: deny
 
   - action: shell
-    resource: "git status*"
+    resource: "git status *"
     effect: allow
 
   - action: shell
-    resource: "git diff*"
+    resource: "git diff *"
     effect: allow
 
   - action: subagent
