@@ -10,6 +10,7 @@ import {
 import { AvailabilityPicker } from "./availability/AvailabilityPicker";
 import { useAvailability } from "../hooks/useAvailability";
 import { TurnstileVerification } from "./TurnstileVerification";
+import { LegalLink } from "./LegalLink";
 
 export const BookingSection: React.FC = () => {
   const {
@@ -377,6 +378,19 @@ export const BookingSection: React.FC = () => {
                 />
               </div>
             </div>
+            <div className="mt-5 rounded-xl border border-[#E8DFD5] bg-[#F5EFE9]/60 p-4 text-xs leading-relaxed text-[#68635F]">
+              We use your name and email to reserve and manage your session,
+              process payment, create your Google Calendar/Meet invitation and
+              send booking emails. Our{" "}
+              <LegalLink
+                document="privacy"
+                className="font-medium text-[#A35048] underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#A35048]"
+              >
+                Privacy Notice
+              </LegalLink>{" "}
+              explains who receives this information, how long it is kept and
+              your rights.
+            </div>
           </div>
 
           {/* Step 3: Consent & Security */}
@@ -441,6 +455,23 @@ export const BookingSection: React.FC = () => {
             )}
 
             {/* Submit CTA */}
+            <p className="mb-4 text-xs leading-relaxed text-[#68635F]">
+              By booking and paying, you enter into a contract subject to our{" "}
+              <LegalLink
+                document="terms"
+                className="font-medium text-[#A35048] underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#A35048]"
+              >
+                Terms
+              </LegalLink>
+              . See our{" "}
+              <LegalLink
+                document="privacy"
+                className="font-medium text-[#A35048] underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#A35048]"
+              >
+                Privacy Notice
+              </LegalLink>{" "}
+              for how your information is used.
+            </p>
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
               <div className="text-xs text-[#78716C] text-center sm:text-left">
                 <span>Private listening session · </span>

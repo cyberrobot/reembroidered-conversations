@@ -135,7 +135,7 @@ export const HeroVideo: React.FC = () => {
 
             <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
               <ShieldCheck className="w-3.5 h-3.5 text-[#78716C] shrink-0" />
-              <span>100% Confidential</span>
+              <span>Private one-to-one</span>
             </span>
 
             <span className="hidden sm:inline text-[#D5CAC0] select-none">
@@ -170,6 +170,9 @@ export const HeroVideo: React.FC = () => {
                   video_series: "Re-Embroidered Conversations",
                 }}
                 streamType="on-demand"
+                disableCookies
+                noVolumePref
+                noMutedPref
                 preload={hasStartedPlaying ? "auto" : "none"}
                 assetEndTime={300}
                 playsInline
@@ -278,8 +281,8 @@ export const HeroVideo: React.FC = () => {
                   Private & One-to-One
                 </h4>
                 <p className="text-xs text-[#68635F] leading-relaxed">
-                  Direct conversation with Shahd Karaeen in a private Google
-                  Meet. Completely confidential.
+                  A private one-to-one Google Meet with Shahd Karaeen. We do not
+                  record sessions.
                 </p>
               </div>
             </div>
