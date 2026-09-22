@@ -270,13 +270,17 @@ test(
     const ids = [firstId, secondId];
     const firstStart = new Date("2046-01-03T10:00:00.000Z");
     const secondStart = new Date("2046-01-04T10:00:00.000Z");
+    const acceptedAt = new Date("2046-01-01T07:59:00.000Z");
     const remote = new Map();
     let logicalCreates = 0;
     let emailSends = 0;
     try {
       await db.booking.deleteMany({ where: { id: { in: ids } } });
       await db.booking.createMany({
-        data: [data(firstId, firstStart), data(secondId, secondStart)],
+        data: [
+          data(firstId, firstStart, { boundariesAcceptedAt: acceptedAt }),
+          data(secondId, secondStart, { boundariesAcceptedAt: acceptedAt }),
+        ],
       });
       const preexisting = data(secondId, secondStart);
       remote.set(googleEventIdForBooking(secondId), {
@@ -345,6 +349,12 @@ test(
       assert.equal(logicalCreates, 1, "pre-existing event must be reused");
       assert.equal(remote.size, 2);
       assert.equal(emailSends, 2);
+      assert.deepEqual(
+        confirmed.map(({ boundariesAcceptedAt }) =>
+          boundariesAcceptedAt.toISOString(),
+        ),
+        [acceptedAt.toISOString(), acceptedAt.toISOString()],
+      );
 
       const replay = await runBookingReconciliation(
         now,
@@ -352,6 +362,16 @@ test(
       );
       assert.equal(replay.scanned, 0);
       assert.equal(remote.size, 2);
+      const replayed = await db.booking.findMany({
+        where: { id: { in: ids } },
+        orderBy: { id: "asc" },
+      });
+      assert.deepEqual(
+        replayed.map(({ boundariesAcceptedAt }) =>
+          boundariesAcceptedAt.toISOString(),
+        ),
+        [acceptedAt.toISOString(), acceptedAt.toISOString()],
+      );
       const conflicts = await getActiveBookingConflicts(
         {
           from: firstStart,

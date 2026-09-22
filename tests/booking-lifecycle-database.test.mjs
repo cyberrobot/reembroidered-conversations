@@ -42,6 +42,7 @@ test(
       adapter: new PrismaPg({ connectionString: schemaTestUrl }),
     });
     const now = new Date("2040-01-02T12:00:00.000Z");
+    const acceptedAt = new Date("2040-01-02T11:59:00.000Z");
     const providerDate = "2040-01-09";
     const checkoutSessionId = "cs_test_lifecycle";
     const paymentIntentId = "pi_test_lifecycle";
@@ -77,6 +78,7 @@ test(
         endAt: new Date(selectedSlot.endAt),
         timezone: PROVIDER_AVAILABILITY_CONFIG.timezone,
         expiresAt: new Date(now.getTime() + 15 * 60_000),
+        boundariesAcceptedAt: acceptedAt,
         now,
       });
       bookingId = hold.id;
@@ -90,6 +92,10 @@ test(
       assert.equal(initial.calendarEventId, null);
       assert.equal(initial.meetingUrl, null);
       assert.equal(initial.confirmationEmailSentAt, null);
+      assert.equal(
+        initial.boundariesAcceptedAt.toISOString(),
+        acceptedAt.toISOString(),
+      );
 
       const checkoutExpiry = new Date(now.getTime() + 31 * 60_000);
       const stripeCreateCalls = [];
@@ -133,6 +139,10 @@ test(
       assert.equal(withCheckout.id, initial.id);
       assert.equal(withCheckout.status, "HOLD");
       assert.equal(withCheckout.stripeCheckoutSessionId, checkoutSessionId);
+      assert.equal(
+        withCheckout.boundariesAcceptedAt.toISOString(),
+        acceptedAt.toISOString(),
+      );
       assert.equal(await db.booking.count({ where: { id: bookingId } }), 1);
 
       const paidEvent = {
@@ -167,6 +177,10 @@ test(
             checkoutSessionId,
           );
           assert.equal(persistedPaid.stripePaymentIntentId, paymentIntentId);
+          assert.equal(
+            persistedPaid.boundariesAcceptedAt.toISOString(),
+            acceptedAt.toISOString(),
+          );
 
           return reconcileBookingCalendarEvent(paidBooking, {
             getCredentials: async () => ({
@@ -233,6 +247,10 @@ test(
       assert.equal(confirmed.meetingUrl, meetingUrl);
       assert.ok(confirmed.confirmationEmailSentAt instanceof Date);
       assert.equal(confirmed.confirmationEmailId, "email_lifecycle");
+      assert.equal(
+        confirmed.boundariesAcceptedAt.toISOString(),
+        acceptedAt.toISOString(),
+      );
       assert.equal(confirmationEmailCount, 1);
       assert.equal(calendarInsertCount, 1);
       assert.equal(confirmed.id, initial.id);
