@@ -3,6 +3,7 @@
 import "server-only";
 import { cancelBookingCalendarEvent } from "../calendar/booking-event.mjs";
 import { getCancellationPolicy } from "./cancellation-policy.mjs";
+import { SESSION_PRODUCT } from "./session-product.mjs";
 
 export class BookingCancellationError extends Error {
   /** @param {'invalid_cancellation_request' | 'booking_not_cancellable' | 'refund_policy_changed' | 'management_unavailable'} code */
@@ -103,7 +104,15 @@ export function createBookingCancellationPersistence(database) {
   };
 }
 
-function refundView(booking) {
+const refundStatuses = new Set([
+  "pending",
+  "requires_action",
+  "succeeded",
+  "failed",
+  "canceled",
+]);
+
+function refundView(booking, reconciliationOutcome) {
   if (booking.cancellationRefundDue === false)
     return { eligible: false, status: "not_applicable" };
   if (booking.cancellationRefundDue !== true)
@@ -114,6 +123,9 @@ function refundView(booking) {
       booking.refundedAt ||
       booking.status === "REFUNDED")
   ) {
+    return { eligible: true, status: "needs_attention" };
+  }
+  if (reconciliationOutcome === "manual_attention") {
     return { eligible: true, status: "needs_attention" };
   }
   if (
@@ -136,8 +148,8 @@ function refundView(booking) {
   return { eligible: true, status: "pending" };
 }
 
-function cancellationView(booking) {
-  const refund = refundView(booking);
+function cancellationView(booking, refundReconciliationOutcome) {
+  const refund = refundView(booking, refundReconciliationOutcome);
   return {
     status: booking.status === "REFUNDED" ? "refunded" : "cancelled",
     cancelledAt: booking.cancelledAt?.toISOString() ?? null,
@@ -148,6 +160,108 @@ function cancellationView(booking) {
       (refund.eligible &&
         !["refunded", "not_applicable"].includes(refund.status)),
   };
+}
+
+function validRefundForBooking(refund, booking) {
+  return (
+    refund?.object === "refund" &&
+    typeof refund.id === "string" &&
+    refund.id.length > 0 &&
+    refund.payment_intent === booking.stripePaymentIntentId &&
+    refund.metadata?.bookingId === booking.id &&
+    refund.amount === SESSION_PRODUCT.amountMinor &&
+    (refund.currency === undefined ||
+      refund.currency === SESSION_PRODUCT.currency) &&
+    refundStatuses.has(refund.status)
+  );
+}
+
+async function persistRefund(bookingId, booking, refund, dependencies) {
+  if (!validRefundForBooking(refund, booking)) {
+    return { booking, outcome: "manual_attention" };
+  }
+  try {
+    return {
+      booking: await dependencies.persistence.recordRefund({
+        bookingId,
+        refund,
+        now: dependencies.getNow(),
+      }),
+      outcome: "recovered",
+    };
+  } catch {
+    return { booking, outcome: "deferred" };
+  }
+}
+
+async function reconcileRefund(bookingId, booking, dependencies) {
+  if (
+    booking.cancellationRefundDue !== true ||
+    !booking.stripePaymentIntentId
+  ) {
+    return { booking, outcome: "already_reconciled" };
+  }
+
+  if (booking.stripeRefundId) {
+    let refund;
+    try {
+      refund = await dependencies.stripe.refunds.retrieve(
+        booking.stripeRefundId,
+      );
+    } catch {
+      return { booking, outcome: "deferred" };
+    }
+    if (refund?.id !== booking.stripeRefundId) {
+      return { booking, outcome: "manual_attention" };
+    }
+    return persistRefund(bookingId, booking, refund, dependencies);
+  }
+
+  if (
+    booking.stripeRefundStatus != null ||
+    booking.refundedAt ||
+    booking.status === "REFUNDED"
+  ) {
+    return { booking, outcome: "manual_attention" };
+  }
+
+  let refunds;
+  try {
+    refunds = await dependencies.stripe.refunds.list({
+      payment_intent: booking.stripePaymentIntentId,
+      limit: 100,
+    });
+  } catch {
+    return { booking, outcome: "deferred" };
+  }
+  if (
+    refunds?.object !== "list" ||
+    !Array.isArray(refunds.data) ||
+    refunds.has_more !== false
+  ) {
+    return { booking, outcome: "manual_attention" };
+  }
+  if (refunds.data.length > 1) {
+    return { booking, outcome: "manual_attention" };
+  }
+  if (refunds.data.length === 1) {
+    return persistRefund(bookingId, booking, refunds.data[0], dependencies);
+  }
+
+  let created;
+  try {
+    created = await dependencies.stripe.refunds.create(
+      {
+        payment_intent: booking.stripePaymentIntentId,
+        reason: "requested_by_customer",
+        metadata: { bookingId: booking.id },
+      },
+      { idempotencyKey: `booking-cancellation-refund:${booking.id}` },
+    );
+  } catch {
+    return { booking, outcome: "deferred" };
+  }
+  return persistRefund(bookingId, booking, created, dependencies);
 }
 
 async function reconcileCancellationProviders(
@@ -168,42 +282,8 @@ async function reconcileCancellationProviders(
     }
   }
 
-  const mayCreateRefund =
-    !current.stripeRefundId &&
-    current.stripeRefundStatus == null &&
-    !current.refundedAt &&
-    current.status !== "REFUNDED";
-  if (
-    current.cancellationRefundDue === true &&
-    current.stripePaymentIntentId &&
-    (current.stripeRefundId || mayCreateRefund)
-  ) {
-    try {
-      const refund = current.stripeRefundId
-        ? await dependencies.stripe.refunds.retrieve(current.stripeRefundId)
-        : await dependencies.stripe.refunds.create(
-            {
-              payment_intent: current.stripePaymentIntentId,
-              reason: "requested_by_customer",
-              metadata: { bookingId: current.id },
-            },
-            { idempotencyKey: `booking-cancellation-refund:${current.id}` },
-          );
-      if (
-        typeof refund?.id === "string" &&
-        typeof refund?.status === "string"
-      ) {
-        current = await dependencies.persistence.recordRefund({
-          bookingId,
-          refund,
-          now: dependencies.getNow(),
-        });
-      }
-    } catch {
-      // The persisted decision is retained and the same idempotency key is reused.
-    }
-  }
-  return current;
+  const refundResult = await reconcileRefund(bookingId, current, dependencies);
+  return refundResult;
 }
 
 export async function cancelBooking(bookingId, input, now, dependencies) {
@@ -242,12 +322,12 @@ export async function cancelBooking(bookingId, input, now, dependencies) {
     }
   }
 
-  booking = await reconcileCancellationProviders(
+  const reconciled = await reconcileCancellationProviders(
     bookingId,
     booking,
     dependencies,
   );
-  return cancellationView(booking);
+  return cancellationView(reconciled.booking, reconciled.outcome);
 }
 
 export async function reconcileCancelledBooking(bookingId, now, dependencies) {
@@ -260,12 +340,12 @@ export async function reconcileCancelledBooking(bookingId, now, dependencies) {
   if (!booking || !["CANCELLED", "REFUNDED"].includes(booking.status)) {
     throw new BookingCancellationError("booking_not_cancellable");
   }
-  booking = await reconcileCancellationProviders(
+  const reconciled = await reconcileCancellationProviders(
     bookingId,
     booking,
     dependencies,
   );
-  return cancellationView(booking);
+  return cancellationView(reconciled.booking, reconciled.outcome);
 }
 
 async function defaultDependencies() {

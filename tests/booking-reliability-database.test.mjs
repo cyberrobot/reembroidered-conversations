@@ -558,6 +558,7 @@ test(
     const persistence = createBookingCancellationPersistence(db);
     let providersHealthy = false;
     let calendarCalls = 0;
+    let listRefundCalls = 0;
     let createRefundCalls = 0;
     let retrieveRefundCalls = 0;
     const idempotencyKeys = [];
@@ -570,15 +571,36 @@ test(
       },
       stripe: {
         refunds: {
+          list: async () => {
+            listRefundCalls += 1;
+            if (!providersHealthy) throw new Error("temporary Stripe failure");
+            return { object: "list", data: [], has_more: false };
+          },
           create: async (_input, options) => {
             createRefundCalls += 1;
             idempotencyKeys.push(options.idempotencyKey);
             if (!providersHealthy) throw new Error("temporary Stripe failure");
-            return { id: "re_test_reliability", status: "pending" };
+            return {
+              object: "refund",
+              id: "re_test_reliability",
+              payment_intent: "pi_test_cancel_reliability",
+              metadata: { bookingId },
+              amount: 5500,
+              currency: "gbp",
+              status: "pending",
+            };
           },
           retrieve: async () => {
             retrieveRefundCalls += 1;
-            return { id: "re_test_reliability", status: "succeeded" };
+            return {
+              object: "refund",
+              id: "re_test_reliability",
+              payment_intent: "pi_test_cancel_reliability",
+              metadata: { bookingId },
+              amount: 5500,
+              currency: "gbp",
+              status: "succeeded",
+            };
           },
         },
       },
@@ -681,10 +703,10 @@ test(
         "pi_test_cancel_reliability",
       );
       assert.equal(calendarCalls, 2);
-      assert.equal(createRefundCalls, 2);
+      assert.equal(listRefundCalls, 2);
+      assert.equal(createRefundCalls, 1);
       assert.equal(retrieveRefundCalls, 1);
       assert.deepEqual(idempotencyKeys, [
-        `booking-cancellation-refund:${bookingId}`,
         `booking-cancellation-refund:${bookingId}`,
       ]);
 

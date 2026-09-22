@@ -620,7 +620,16 @@ test(
         cancelCalendarEvent: async () => ({ cancelled: true }),
         stripe: {
           refunds: {
-            create: async () => ({ id: "re_recovered", status: "succeeded" }),
+            list: async () => ({ object: "list", data: [], has_more: false }),
+            create: async () => ({
+              object: "refund",
+              id: "re_recovered",
+              payment_intent: `pi_${cancelledId}`,
+              metadata: { bookingId: cancelledId },
+              amount: 5500,
+              currency: "gbp",
+              status: "succeeded",
+            }),
             retrieve: async () => assert.fail("refund is newly created"),
           },
         },
@@ -682,6 +691,88 @@ test(
       assert.equal(retained.rescheduleSourceBookingId, uncertainSourceId);
     } finally {
       await db.booking.deleteMany({ where: { id: { in: ids } } });
+      await db.$disconnect();
+    }
+  },
+);
+
+test(
+  "scheduled recovery adopts an existing remote refund after local persistence loss",
+  { skip },
+  async () => {
+    const db = client();
+    const id = "5a449655-7be3-432c-a124-b769e10b5531";
+    const startAt = new Date("2046-01-20T10:00:00.000Z");
+    const remoteRefund = {
+      object: "refund",
+      id: "re_remote_recovery",
+      payment_intent: `pi_${id}`,
+      metadata: { bookingId: id },
+      amount: 5500,
+      currency: "gbp",
+      status: "succeeded",
+    };
+    let creates = 0;
+    try {
+      await db.booking.deleteMany({ where: { id } });
+      await db.booking.create({
+        data: data(id, startAt, {
+          status: "CANCELLED",
+          cancelledAt: now,
+          cancellationRefundDue: true,
+          calendarCancelledAt: now,
+          stripeRefundId: null,
+          stripeRefundStatus: null,
+          refundRequestedAt: null,
+          refundedAt: null,
+        }),
+      });
+      const cancellationDependencies = {
+        persistence: createBookingCancellationPersistence(db),
+        cancelCalendarEvent: async () => assert.fail("Calendar is reconciled"),
+        stripe: {
+          refunds: {
+            list: async () => ({
+              object: "list",
+              data: [remoteRefund],
+              has_more: false,
+            }),
+            create: async () => {
+              creates += 1;
+              return remoteRefund;
+            },
+            retrieve: async () => remoteRefund,
+          },
+        },
+        getNow: () => now,
+      };
+      const candidate = await db.booking.findUniqueOrThrow({ where: { id } });
+      const persistence = scopedPersistence(db, {
+        cancellation: [candidate],
+      });
+      const dependencies = runnerDependencies(db, persistence, {
+        reconcileCancellation: (bookingId, at) =>
+          reconcileCancelledBooking(bookingId, at, cancellationDependencies),
+      });
+
+      const [first, second] = await Promise.all([
+        runBookingReconciliation(now, dependencies),
+        runBookingReconciliation(now, dependencies),
+      ]);
+      assert.equal(first.recovered, 1);
+      assert.ok(
+        second.recovered === 1 || second.alreadyReconciled === 1,
+        "overlapping recovery must converge safely",
+      );
+      assert.equal(creates, 0);
+      const recovered = await db.booking.findUniqueOrThrow({ where: { id } });
+      assert.equal(recovered.status, "REFUNDED");
+      assert.equal(recovered.stripeRefundId, remoteRefund.id);
+      assert.equal(recovered.stripeRefundStatus, "succeeded");
+      assert.ok(recovered.refundRequestedAt instanceof Date);
+      assert.ok(recovered.refundedAt instanceof Date);
+    } finally {
+      await db.booking.deleteMany({ where: { id } });
       await db.$disconnect();
     }
   },

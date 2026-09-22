@@ -32,6 +32,7 @@ function fixture(initial = booking(), options = {}) {
   const calls = {
     cancel: 0,
     calendar: 0,
+    listRefunds: 0,
     createRefund: 0,
     retrieveRefund: 0,
     createInput: null,
@@ -53,8 +54,9 @@ function fixture(initial = booking(), options = {}) {
     },
     recordCalendarCancelled: async ({ now }) =>
       (stored = { ...stored, calendarCancelledAt: now }),
-    recordRefund: async ({ refund, now }) =>
-      (stored = {
+    recordRefund: async ({ refund, now }) => {
+      if (options.recordRefundFails) throw new Error("database unavailable");
+      stored = {
         ...stored,
         stripeRefundId: refund.id,
         stripeRefundStatus: refund.status,
@@ -62,8 +64,20 @@ function fixture(initial = booking(), options = {}) {
         ...(refund.status === "succeeded"
           ? { status: "REFUNDED", refundedAt: now }
           : {}),
-      }),
+      };
+      return stored;
+    },
   };
+  const refund = (overrides = {}) => ({
+    object: "refund",
+    id: "re_123",
+    payment_intent: stored.stripePaymentIntentId,
+    metadata: { bookingId: stored.id },
+    amount: 5500,
+    currency: "gbp",
+    status: options.refundStatus ?? "succeeded",
+    ...overrides,
+  });
   const dependencies = {
     persistence,
     cancelCalendarEvent: async () => {
@@ -72,20 +86,30 @@ function fixture(initial = booking(), options = {}) {
     },
     stripe: {
       refunds: {
+        list: async () => {
+          calls.listRefunds += 1;
+          if (options.listFails)
+            throw new Error("private stripe lookup failure");
+          return {
+            object: "list",
+            data: options.remoteRefunds ?? [],
+            has_more: options.listHasMore ?? false,
+          };
+        },
         create: async (input, requestOptions) => {
           calls.createRefund += 1;
           calls.createInput = input;
           calls.createOptions = requestOptions;
           calls.idempotencyKeys.push(requestOptions.idempotencyKey);
           if (options.stripeFails) throw new Error("private stripe failure");
-          return { id: "re_123", status: options.refundStatus ?? "succeeded" };
+          return refund();
         },
         retrieve: async () => {
           calls.retrieveRefund += 1;
-          return {
+          return refund({
             id: stored.stripeRefundId,
             status: options.retrieveRefundStatus ?? stored.stripeRefundStatus,
-          };
+          });
         },
       },
     },
@@ -285,6 +309,175 @@ test("an existing Stripe refund is retrieved and reconciled instead of recreated
   assert.equal(retry.stored().status, "REFUNDED");
   assert.equal(result.refund.status, "refunded");
 });
+
+test("a remotely accepted refund is discovered after local persistence loss", async () => {
+  const cancelled = booking({
+    status: "CANCELLED",
+    cancelledAt: new Date("2030-01-01T12:00:00.000Z"),
+    cancellationRefundDue: true,
+    calendarCancelledAt: new Date("2030-01-01T12:01:00.000Z"),
+  });
+  const attempt = fixture(cancelled, { recordRefundFails: true });
+  const first = await reconcileCancelledBooking(
+    cancelled.id,
+    new Date("2030-01-01T12:05:00.000Z"),
+    attempt.dependencies,
+  );
+  assert.equal(attempt.calls.listRefunds, 1);
+  assert.equal(attempt.calls.createRefund, 1);
+  assert.equal(first.refund.status, "pending");
+  assert.equal(attempt.stored().stripeRefundId, null);
+
+  attempt.controls.recordRefundFails = false;
+  attempt.controls.remoteRefunds = [
+    {
+      object: "refund",
+      id: "re_123",
+      payment_intent: cancelled.stripePaymentIntentId,
+      metadata: { bookingId: cancelled.id },
+      amount: 5500,
+      currency: "gbp",
+      status: "succeeded",
+    },
+  ];
+  const recovered = await reconcileCancelledBooking(
+    cancelled.id,
+    new Date("2030-01-01T12:10:00.000Z"),
+    attempt.dependencies,
+  );
+  assert.equal(attempt.calls.listRefunds, 2);
+  assert.equal(attempt.calls.createRefund, 1);
+  assert.equal(attempt.stored().stripeRefundId, "re_123");
+  assert.equal(attempt.stored().status, "REFUNDED");
+  assert.equal(recovered.refund.status, "refunded");
+});
+
+test("a positive empty refund lookup permits one deterministic refund creation", async () => {
+  const cancelled = booking({
+    status: "CANCELLED",
+    cancelledAt: new Date("2030-01-01T12:00:00.000Z"),
+    cancellationRefundDue: true,
+    calendarCancelledAt: new Date("2030-01-01T12:01:00.000Z"),
+  });
+  const attempt = fixture(cancelled);
+  await reconcileCancelledBooking(
+    cancelled.id,
+    new Date("2030-01-01T12:05:00.000Z"),
+    attempt.dependencies,
+  );
+  assert.equal(attempt.calls.listRefunds, 1);
+  assert.equal(attempt.calls.createRefund, 1);
+  assert.equal(
+    attempt.calls.createOptions.idempotencyKey,
+    `booking-cancellation-refund:${cancelled.id}`,
+  );
+  assert.equal(attempt.stored().stripeRefundId, "re_123");
+});
+
+test("an unavailable refund lookup defers without creating a refund", async () => {
+  const cancelled = booking({
+    status: "CANCELLED",
+    cancelledAt: new Date("2030-01-01T12:00:00.000Z"),
+    cancellationRefundDue: true,
+    calendarCancelledAt: new Date("2030-01-01T12:01:00.000Z"),
+  });
+  const attempt = fixture(cancelled, { listFails: true });
+  const result = await reconcileCancelledBooking(
+    cancelled.id,
+    new Date("2030-01-01T12:05:00.000Z"),
+    attempt.dependencies,
+  );
+  assert.equal(attempt.calls.createRefund, 0);
+  assert.equal(attempt.stored().status, "CANCELLED");
+  assert.equal(result.refund.status, "pending");
+  assert.equal(result.externalFollowUpPending, true);
+});
+
+for (const [name, remoteRefunds] of [
+  [
+    "multiple matching refunds",
+    [
+      {
+        object: "refund",
+        id: "re_one",
+        payment_intent: "pi_persisted",
+        metadata: { bookingId: booking().id },
+        amount: 5500,
+        currency: "gbp",
+        status: "succeeded",
+      },
+      {
+        object: "refund",
+        id: "re_two",
+        payment_intent: "pi_persisted",
+        metadata: { bookingId: booking().id },
+        amount: 5500,
+        currency: "gbp",
+        status: "succeeded",
+      },
+    ],
+  ],
+  [
+    "a PaymentIntent mismatch",
+    [
+      {
+        object: "refund",
+        id: "re_wrong_payment",
+        payment_intent: "pi_other",
+        metadata: { bookingId: booking().id },
+        amount: 5500,
+        currency: "gbp",
+        status: "succeeded",
+      },
+    ],
+  ],
+  [
+    "a booking metadata mismatch",
+    [
+      {
+        object: "refund",
+        id: "re_wrong_booking",
+        payment_intent: "pi_persisted",
+        metadata: { bookingId: "5a449655-7be3-432c-a124-b769e10b50aa" },
+        amount: 5500,
+        currency: "gbp",
+        status: "succeeded",
+      },
+    ],
+  ],
+  [
+    "an unexpected partial refund",
+    [
+      {
+        object: "refund",
+        id: "re_partial",
+        payment_intent: "pi_persisted",
+        metadata: { bookingId: booking().id },
+        amount: 1000,
+        currency: "gbp",
+        status: "succeeded",
+      },
+    ],
+  ],
+]) {
+  test(`${name} requires attention and never creates or adopts`, async () => {
+    const cancelled = booking({
+      status: "CANCELLED",
+      cancelledAt: new Date("2030-01-01T12:00:00.000Z"),
+      cancellationRefundDue: true,
+      calendarCancelledAt: new Date("2030-01-01T12:01:00.000Z"),
+    });
+    const attempt = fixture(cancelled, { remoteRefunds });
+    const result = await reconcileCancelledBooking(
+      cancelled.id,
+      new Date("2030-01-01T12:05:00.000Z"),
+      attempt.dependencies,
+    );
+    assert.equal(attempt.calls.createRefund, 0);
+    assert.equal(attempt.stored().stripeRefundId, null);
+    assert.equal(result.refund.status, "needs_attention");
+  });
+}
 
 for (const refundStatus of [
   "succeeded",
