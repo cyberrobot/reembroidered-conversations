@@ -113,12 +113,22 @@ test(
       await first.booking.deleteMany({ where: { startAt: new Date(startAt) } });
       const attempts = [
         createBookingHold(
-          { name: "First Listener", email: "first@example.test", startAt },
+          {
+            name: "First Listener",
+            email: "first@example.test",
+            startAt,
+            acceptedBoundaries: true,
+          },
           now,
           { getAvailableSlots, persist: createHoldPersistence(first) },
         ),
         createBookingHold(
-          { name: "Second Listener", email: "second@example.test", startAt },
+          {
+            name: "Second Listener",
+            email: "second@example.test",
+            startAt,
+            acceptedBoundaries: true,
+          },
           now,
           { getAvailableSlots, persist: createHoldPersistence(second) },
         ),
@@ -331,6 +341,7 @@ test(
             name: "Stale Availability Listener",
             email: "stale-availability@example.test",
             startAt: selected.startAt,
+            acceptedBoundaries: true,
           }),
         SlotUnavailableError,
       );

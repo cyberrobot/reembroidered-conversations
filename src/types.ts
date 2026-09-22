@@ -1,5 +1,3 @@
-export type SessionFormat = "video" | "audio";
-
 export interface TimeSlot {
   id: string;
   startAt: string;
@@ -37,26 +35,6 @@ export interface BookingHoldResponse {
 
 export interface BookingCheckoutResponse {
   checkout: { url: string; expiresAt: string };
-}
-
-export interface BookingFormData {
-  date: string;
-  time: string;
-  format: SessionFormat;
-  clientName: string;
-  clientEmail: string;
-  clientPhone?: string;
-  timeZone: string;
-  optionalNote?: string;
-  confirmedBoundaries: boolean;
-  turnstileToken: string;
-}
-
-export interface BookingConfirmation extends BookingFormData {
-  bookingId: string;
-  createdAt: string;
-  calendarLinkGoogle: string;
-  calendarLinkIcs: string;
 }
 
 export interface SpokenVideoCue {

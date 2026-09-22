@@ -93,6 +93,7 @@ export function createHoldPersistence(database) {
     endAt,
     timezone,
     expiresAt,
+    boundariesAcceptedAt,
     now,
   }) {
     return database.$transaction(async (transaction) => {
@@ -115,6 +116,7 @@ export function createHoldPersistence(database) {
           timezone,
           status: "HOLD",
           expiresAt,
+          boundariesAcceptedAt,
         },
         select: {
           id: true,
@@ -137,7 +139,7 @@ const defaultDependencies = {
 };
 
 /**
- * @param {{ name?: unknown, email?: unknown, startAt?: unknown }} input
+ * @param {{ name?: unknown, email?: unknown, startAt?: unknown, acceptedBoundaries?: unknown }} input
  * @param {Date} now
  * @param {typeof defaultDependencies} [dependencies]
  * @param {typeof PROVIDER_AVAILABILITY_CONFIG} [config]
@@ -151,6 +153,7 @@ export async function createBookingHold(
   const name = typeof input?.name === "string" ? input.name.trim() : "";
   const email = typeof input?.email === "string" ? input.email.trim() : "";
   if (
+    input?.acceptedBoundaries !== true ||
     !name ||
     name.length > NAME_MAX_LENGTH ||
     !email ||
@@ -196,6 +199,7 @@ export async function createBookingHold(
       endAt: new Date(canonicalSlot.endAt),
       timezone: config.timezone,
       expiresAt: new Date(now.getTime() + BOOKING_HOLD_MINUTES * 60_000),
+      boundariesAcceptedAt: now,
       now,
     });
   } catch (error) {

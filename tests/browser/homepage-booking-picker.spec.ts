@@ -39,6 +39,10 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     window.turnstile = {
       render(container: HTMLElement, options: Record<string, unknown>) {
+        Object.assign(window, {
+          __bookingTurnstileCallback: options.callback,
+          __bookingTurnstileExpiredCallback: options["expired-callback"],
+        });
         container.innerHTML =
           '<div style="height:65px;display:flex;align-items:center;justify-content:center;border:1px solid #e8dfd5;border-radius:8px;color:#68635f;font-size:12px">Verification ready</div>';
         queueMicrotask(() =>
@@ -68,6 +72,14 @@ async function openBookingPicker(page: Page) {
   await page.goto("/");
   const form = page.locator("#book-session form");
   await expect(form.getByText("Upcoming available days")).toBeVisible();
+  await page.evaluate(() => {
+    (
+      window as typeof window & {
+        __bookingTurnstileExpiredCallback: () => void;
+      }
+    ).__bookingTurnstileExpiredCallback();
+  });
+  await expect(form.getByText("Verification successful")).toHaveCount(0);
   await page.addStyleTag({
     content:
       "#main-nav { display: none !important; } *, *::before, *::after { animation: none !important; transition: none !important; }",
@@ -178,4 +190,109 @@ test("full-calendar later-date selection scrolls its date card into the visible 
       }),
     )
     .toBe(true);
+});
+
+test("booking form exposes only the Google Meet product and submits consent without discarded fields", async ({
+  page,
+}) => {
+  const form = await openBookingPicker(page);
+  await expect(form.getByText("Step 1 of 3")).toBeVisible();
+  await expect(form.getByText("Step 2 of 3")).toBeVisible();
+  await expect(form.getByText("Step 3 of 3")).toBeVisible();
+  await expect(
+    form.getByText("55-minute private video conversation via Google Meet"),
+  ).toBeVisible();
+  for (const unsupported of [
+    "Audio-Only Call",
+    "Google Meet or Zoom",
+    "Phone / Mobile number",
+    "Anything Shahd Karaeen should know beforehand?",
+  ]) {
+    await expect(form.getByText(unsupported, { exact: false })).toHaveCount(0);
+  }
+  await expect(form.locator("#client-phone, #client-note")).toHaveCount(0);
+  await expect(form.getByLabel(/Your name/)).toBeVisible();
+  await expect(form.getByLabel(/Email address/)).toBeVisible();
+
+  const consent = form.getByRole("checkbox", {
+    name: /I understand that this is a private listening session/,
+  });
+  const turnstile = form.getByTestId("turnstile-verification");
+  const submit = form.getByRole("button", { name: "Book & pay £55" });
+  await expect(turnstile).toBeVisible();
+  const order = await form
+    .locator(
+      "#boundaries-checkbox, [data-testid='turnstile-verification'], #confirm-booking-button",
+    )
+    .evaluateAll((elements) =>
+      elements.map(
+        (element) =>
+          element.id || element.getAttribute("data-testid") || "unknown",
+      ),
+    );
+  expect(order).toEqual([
+    "boundaries-checkbox",
+    "turnstile-verification",
+    "confirm-booking-button",
+  ]);
+
+  let holdRequests = 0;
+  let holdPayload: Record<string, unknown> | undefined;
+  await page.route("**/api/bookings/hold", async (route) => {
+    holdRequests += 1;
+    holdPayload = route.request().postDataJSON();
+    await route.fulfill({
+      status: 201,
+      json: {
+        hold: {
+          id: "5a449655-7be3-432c-a124-b769e10b50ef",
+          startAt: availability.days[0].slots[0].startAt,
+          endAt: availability.days[0].slots[0].endAt,
+          timezone: availability.timezone,
+          expiresAt: "2035-01-07T12:15:00.000Z",
+        },
+      },
+    });
+  });
+  await page.route("**/api/bookings/checkout", (route) =>
+    route.fulfill({
+      status: 503,
+      json: { error: { code: "checkout_unavailable" } },
+    }),
+  );
+  await form.getByLabel(/Your name/).fill("Sarah");
+  await form.getByLabel(/Email address/).fill("sarah@example.test");
+  await submit.click();
+  await expect(form.getByRole("alert")).toContainText(
+    "Please confirm that you understand",
+  );
+  expect(holdRequests).toBe(0);
+
+  await consent.check();
+  await page.evaluate(() => {
+    (
+      window as typeof window & {
+        __bookingTurnstileCallback: (token: string) => void;
+      }
+    ).__bookingTurnstileCallback("visual-test-token");
+  });
+  await submit.click();
+  await expect.poll(() => holdRequests).toBe(1);
+  expect(holdPayload).toEqual({
+    name: "Sarah",
+    email: "sarah@example.test",
+    startAt: availability.days[0].slots[0].startAt,
+    acceptedBoundaries: true,
+    turnstileToken: "visual-test-token",
+  });
+  for (const discarded of [
+    "sessionFormat",
+    "format",
+    "phone",
+    "clientPhone",
+    "optionalNote",
+    "reflectionNote",
+  ]) {
+    expect(holdPayload).not.toHaveProperty(discarded);
+  }
 });

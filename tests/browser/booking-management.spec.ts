@@ -122,8 +122,19 @@ test("confirmed booking renders authoritative details, secure headers, keyboard 
     "10:00–10:55",
     "55 min",
     "£55.00",
+    "Private video meeting via Google Meet",
   ])
     await expect(page.getByText(text, { exact: false })).toBeVisible();
+  for (const unsupported of [
+    "Audio-Only",
+    "Phone call",
+    "Zoom",
+    "Preset:",
+    "Simulate",
+    "visual-fixture",
+  ])
+    await expect(page.getByText(unsupported, { exact: false })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /format/i })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Reschedule/ })).toBeVisible();
   await expect(
     page.getByRole("button", { name: /Cancel booking/ }),

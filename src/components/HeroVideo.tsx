@@ -144,7 +144,7 @@ export const HeroVideo: React.FC = () => {
 
             <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
               <Video className="w-3.5 h-3.5 text-[#78716C] shrink-0" />
-              <span>Video or Phone</span>
+              <span>Google Meet</span>
             </span>
           </div>
         </div>
@@ -278,8 +278,8 @@ export const HeroVideo: React.FC = () => {
                   Private & One-to-One
                 </h4>
                 <p className="text-xs text-[#68635F] leading-relaxed">
-                  Direct conversation with Shahd Karaeen on video or private
-                  audio call. Completely confidential.
+                  Direct conversation with Shahd Karaeen in a private Google
+                  Meet. Completely confidential.
                 </p>
               </div>
             </div>

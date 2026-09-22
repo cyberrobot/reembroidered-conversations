@@ -15,6 +15,53 @@ import {
 const connectionString = process.env.DATABASE_SCHEMA_TEST_URL;
 
 test(
+  "accepted public HOLD stores server consent time and preserves it through payment",
+  {
+    skip: connectionString
+      ? false
+      : "DATABASE_SCHEMA_TEST_URL is not configured",
+  },
+  async () => {
+    const db = new PrismaClient({
+      adapter: new PrismaPg({ connectionString }),
+    });
+    const startAt = new Date("2039-01-04T10:00:00.000Z");
+    const now = new Date("2039-01-03T10:00:00.000Z");
+    try {
+      const hold = await createHoldPersistence(db)({
+        name: "Consent Test",
+        email: "consent@example.test",
+        startAt,
+        endAt: new Date("2039-01-04T10:55:00.000Z"),
+        timezone: "Europe/London",
+        expiresAt: new Date("2039-01-03T10:15:00.000Z"),
+        boundariesAcceptedAt: now,
+        now,
+      });
+      const persisted = await db.booking.findUniqueOrThrow({
+        where: { id: hold.id },
+      });
+      assert.equal(
+        persisted.boundariesAcceptedAt.toISOString(),
+        now.toISOString(),
+      );
+
+      await db.booking.update({
+        where: { id: hold.id },
+        data: { status: "PAID" },
+      });
+      const paid = await db.booking.findUniqueOrThrow({
+        where: { id: hold.id },
+      });
+      assert.equal(paid.boundariesAcceptedAt.toISOString(), now.toISOString());
+    } finally {
+      await db.booking.deleteMany({ where: { startAt } });
+      await db.$disconnect();
+    }
+  },
+);
+
+test(
   "Prisma exposes the active-slot partial-index collision and the classifier recognizes it",
   {
     skip: connectionString

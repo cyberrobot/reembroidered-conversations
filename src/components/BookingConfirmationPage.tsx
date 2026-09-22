@@ -39,7 +39,7 @@ export function BookingConfirmationPage({
       <Navigation />
 
       <main className="mx-auto max-w-3xl px-4 pt-28 sm:px-6 sm:pt-32">
-        <article className="relative overflow-hidden rounded-3xl border border-[#E8DFD5] bg-[#FDFCFB] p-6 shadow-sm sm:p-12">
+        <article className="relative overflow-hidden rounded-3xl bg-[#FDFCFB] p-6 sm:p-12">
           <div className="absolute left-0 top-0 h-2 w-full bg-gradient-to-r from-[#8C4038] via-[#A35048] to-[#C47065]" />
           <div className="mx-auto max-w-xl space-y-4 text-center">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-[#E8DFD5] bg-[#FAF2EB] text-[#A35048] shadow-xs">
@@ -48,7 +48,7 @@ export function BookingConfirmationPage({
                 aria-hidden="true"
               />
             </div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#E8DFD5] bg-[#FAF2EB] px-3.5 py-1 text-xs font-medium text-[#8C4038]">
+            <div className="inline-flex items-center gap-2 text-xs font-medium text-[#8C4038]">
               <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
               Reservation confirmed &amp; secured
             </div>
@@ -67,7 +67,7 @@ export function BookingConfirmationPage({
 
           <section
             aria-label="Booking details"
-            className="mt-8 space-y-5 rounded-2xl border border-[#E8DFD5] bg-[#FAF8F5] p-5 sm:p-6"
+            className="mt-8 space-y-5 border-y border-[#E8DFD5] py-6"
           >
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E8DFD5] pb-4 text-xs">
               <span className="flex items-center gap-1.5 text-[#78716C]">
@@ -77,7 +77,7 @@ export function BookingConfirmationPage({
                 />
                 Payment status
               </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-[#D0E7D7] bg-[#EAF5EE] px-3 py-1 font-medium text-[#2E6B48]">
+              <span className="inline-flex items-center gap-1.5 font-medium text-[#2E6B48]">
                 <span
                   className="h-1.5 w-1.5 rounded-full bg-[#2E6B48]"
                   aria-hidden="true"
@@ -110,8 +110,7 @@ export function BookingConfirmationPage({
           </section>
 
           <div className="relative my-8 text-left">
-            <div className="absolute inset-0 -z-10 translate-x-1.5 translate-y-1.5 rounded-2xl border border-[#E3D5C5] bg-[#F1E7DD]" />
-            <div className="rounded-2xl border border-[#EAE0D5] border-l-4 border-l-[#A35048] bg-gradient-to-br from-[#FDFBF8] via-[#FAF6F1] to-[#F5EEE6] p-6 shadow-xs sm:p-7">
+            <div className="border-l-2 border-l-[#A35048] bg-[#FAF8F5] p-6 sm:p-7">
               <div className="mb-2.5 flex items-center gap-2 font-serif text-xs uppercase tracking-wider text-[#A35048]">
                 <Coffee className="h-4 w-4" aria-hidden="true" />A quiet note
                 before our conversation

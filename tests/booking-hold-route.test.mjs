@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { createBookingHoldHandler } from "../src/lib/booking/booking-hold-handler.ts";
 import {
+  createBookingHold,
   HoldAvailabilityError,
   InvalidHoldRequestError,
   SlotUnavailableError,
@@ -13,12 +14,14 @@ const valid = {
   name: "Sarah",
   email: "sarah@example.com",
   startAt: "2026-09-16T09:00:00.000Z",
+  acceptedBoundaries: true,
   turnstileToken: "test-token",
 };
 const bookingInput = {
   name: valid.name,
   email: valid.email,
   startAt: valid.startAt,
+  acceptedBoundaries: true,
 };
 const protection = {
   getClientIdentity: () => "test-client",
@@ -50,6 +53,7 @@ test("valid POST returns a customer-safe canonical 201 response with no-store", 
         name: "private",
         email: "private@example.com",
         status: "HOLD",
+        boundariesAcceptedAt: now,
       };
     },
     () => now,
@@ -67,6 +71,37 @@ test("valid POST returns a customer-safe canonical 201 response with no-store", 
       expiresAt: "2026-09-14T12:15:00.000Z",
     },
   });
+});
+
+test("missing or false boundaries consent returns the safe 400 response", async () => {
+  for (const acceptedBoundaries of [undefined, false]) {
+    let availabilityCalls = 0;
+    let persistenceCalls = 0;
+    const service = (input, observedNow) =>
+      createBookingHold(input, observedNow, {
+        getAvailableSlots: async () => {
+          availabilityCalls += 1;
+          return [];
+        },
+        persist: async () => {
+          persistenceCalls += 1;
+        },
+      });
+    const body = {
+      ...valid,
+      ...(acceptedBoundaries === undefined ? {} : { acceptedBoundaries }),
+    };
+    if (acceptedBoundaries === undefined) delete body.acceptedBoundaries;
+    const response = await createBookingHoldHandler(
+      service,
+      () => now,
+      protection,
+    )(request(JSON.stringify(body)));
+    assert.equal(response.status, 400);
+    assert.equal((await response.json()).error.code, "invalid_hold_request");
+    assert.equal(availabilityCalls, 0);
+    assert.equal(persistenceCalls, 0);
+  }
 });
 
 test("malformed and invalid requests return stable safe 400 errors", async () => {
