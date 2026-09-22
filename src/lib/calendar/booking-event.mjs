@@ -294,6 +294,7 @@ export async function rescheduleBookingCalendarEvent(
   sourceBooking,
   target,
   dependencies = defaultDependencies,
+  { allowUpdate = true } = {},
 ) {
   if (
     typeof sourceBooking?.calendarEventId !== "string" ||
@@ -373,6 +374,12 @@ export async function rescheduleBookingCalendarEvent(
     if (!eventMatchesTime(current, sourceBooking)) {
       throw new CalendarManagementError("event_mismatch", {
         outcome: "uncertain",
+      });
+    }
+    if (!allowUpdate) {
+      throw new CalendarManagementError("invalid_booking", {
+        outcome: "definite_unchanged",
+        observedOriginal: true,
       });
     }
     try {

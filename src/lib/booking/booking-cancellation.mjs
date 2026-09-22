@@ -160,7 +160,16 @@ async function reconcileCancellationProviders(
     }
   }
 
-  if (current.cancellationRefundDue === true && current.stripePaymentIntentId) {
+  const terminalRefundStatus = [
+    "failed",
+    "canceled",
+    "requires_action",
+  ].includes(current.stripeRefundStatus);
+  if (
+    current.cancellationRefundDue === true &&
+    current.stripePaymentIntentId &&
+    (current.stripeRefundId || !terminalRefundStatus)
+  ) {
     try {
       const refund = current.stripeRefundId
         ? await dependencies.stripe.refunds.retrieve(current.stripeRefundId)

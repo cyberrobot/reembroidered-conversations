@@ -8,6 +8,7 @@ import { GoogleApiError } from "../src/lib/google-calendar/google-api.mjs";
 import { GOOGLE_EVENTS_OWNED_SCOPE } from "../src/lib/google-calendar/constants.mjs";
 import {
   BookingRescheduleError,
+  reconcilePendingReschedule,
   rescheduleBooking,
 } from "../src/lib/booking/booking-reschedule.mjs";
 
@@ -336,4 +337,99 @@ test("database failure after Calendar update retains the hold and retry resumes 
     retry.dependencies,
   );
   assert.deepEqual(retry.order, ["calendar", "commit"]);
+});
+
+test("scheduled pending-reschedule recovery commits target, releases definite outcomes, and retains uncertainty", async () => {
+  const pending = {
+    id: "target-hold",
+    status: "HOLD",
+    rescheduleSourceBookingId: source().id,
+    startAt: new Date(target.startAt),
+    endAt: new Date(target.endAt),
+    timezone: "Europe/London",
+  };
+
+  const moved = fixture({ pending });
+  const committed = await reconcilePendingReschedule(source().id, now, {
+    ...moved.dependencies,
+    rescheduleCalendarEvent: async () => ({ meetingUrl: source().meetingUrl }),
+  });
+  assert.equal(committed.outcome, "recovered");
+  assert.equal(moved.pending(), null);
+  assert.equal(moved.source().startAt.toISOString(), target.startAt);
+
+  const definite = fixture({ pending });
+  const released = await reconcilePendingReschedule(source().id, now, {
+    ...definite.dependencies,
+    rescheduleCalendarEvent: async () => {
+      throw new CalendarManagementError("reauthorization_required", {
+        outcome: "definite_unchanged",
+        observedOriginal: true,
+      });
+    },
+  });
+  assert.equal(released.outcome, "recovered");
+  assert.equal(definite.pending(), null);
+  assert.equal(
+    definite.source().startAt.toISOString(),
+    source().startAt.toISOString(),
+  );
+
+  for (const [error, expectedOutcome] of [
+    [
+      new CalendarManagementError("provider_unavailable", {
+        outcome: "uncertain",
+      }),
+      "deferred",
+    ],
+    [
+      new CalendarManagementError("event_mismatch", { outcome: "uncertain" }),
+      "manual_attention",
+    ],
+  ]) {
+    const uncertain = fixture({ pending });
+    const result = await reconcilePendingReschedule(source().id, now, {
+      ...uncertain.dependencies,
+      rescheduleCalendarEvent: async () => {
+        throw error;
+      },
+    });
+    assert.equal(result.outcome, expectedOutcome);
+    assert.equal(uncertain.pending().status, "HOLD");
+  }
+});
+
+test("scheduled reschedule recovery retires cancelled-source and past definitely-unmoved targets", async () => {
+  const pending = {
+    id: "target-hold",
+    status: "HOLD",
+    rescheduleSourceBookingId: source().id,
+    startAt: new Date(target.startAt),
+    endAt: new Date(target.endAt),
+    timezone: "Europe/London",
+  };
+  const cancelled = fixture({ pending, source: { status: "CANCELLED" } });
+  const inactive = await reconcilePendingReschedule(source().id, now, {
+    ...cancelled.dependencies,
+    rescheduleCalendarEvent: async () =>
+      assert.fail("Calendar must not run after cancellation"),
+  });
+  assert.equal(inactive.outcome, "recovered");
+  assert.equal(cancelled.pending(), null);
+
+  const pastNow = new Date("2030-01-09T10:00:00.000Z");
+  const past = fixture({ pending });
+  const result = await reconcilePendingReschedule(source().id, pastNow, {
+    ...past.dependencies,
+    rescheduleCalendarEvent: async (_source, _hold, options) => {
+      assert.equal(options.allowUpdate, false);
+      throw new CalendarManagementError("invalid_booking", {
+        outcome: "definite_unchanged",
+        observedOriginal: true,
+      });
+    },
+  });
+  assert.equal(result.outcome, "manual_attention");
+  assert.equal(result.reason, "reschedule_source_time_passed");
+  assert.equal(past.pending(), null);
 });
