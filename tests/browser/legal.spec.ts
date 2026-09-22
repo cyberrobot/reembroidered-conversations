@@ -22,43 +22,6 @@ async function prepare(page: Page) {
   await page.goto("/");
 }
 
-async function markVisibleFocusBoundaries(page: Page) {
-  const dialog = page.getByRole("dialog");
-  const result = await dialog.evaluate((container) => {
-    container
-      .querySelectorAll("[data-testid^='visible-focus-']")
-      .forEach((element) => element.removeAttribute("data-testid"));
-    const selector =
-      'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
-    const focusable = Array.from(
-      container.querySelectorAll<HTMLElement>(selector),
-    ).filter((element) => {
-      const style = window.getComputedStyle(element);
-      return (
-        !element.hasAttribute("disabled") &&
-        element.getAttribute("aria-disabled") !== "true" &&
-        !element.closest(
-          "[inert], [aria-hidden='true'], details:not([open])",
-        ) &&
-        style.display !== "none" &&
-        style.visibility !== "hidden" &&
-        style.visibility !== "collapse" &&
-        element.getClientRects().length > 0
-      );
-    });
-    const first = focusable[0];
-    const last = focusable.at(-1);
-    first?.setAttribute("data-testid", "visible-focus-first");
-    last?.setAttribute("data-testid", "visible-focus-last");
-    return { count: focusable.length };
-  });
-  expect(result.count).toBeGreaterThan(1);
-  return {
-    first: dialog.getByTestId("visible-focus-first"),
-    last: dialog.getByTestId("visible-focus-last"),
-  };
-}
-
 test("footer links open canonical documents and restore focus on close", async ({
   page,
 }) => {
@@ -171,9 +134,7 @@ test("close uses the active history entry after Back and Forward navigation", as
   await expect(page).toHaveURL(/\/$/);
 });
 
-test("dialog traps focus and search announces and navigates results", async ({
-  page,
-}) => {
+test("dialog search announces and navigates results", async ({ page }) => {
   await page.goto("/?legal=privacy");
   const dialog = page.getByRole("dialog", { name: "Privacy Notice" });
   const search = dialog.getByRole("searchbox", {
@@ -190,19 +151,62 @@ test("dialog traps focus and search announces and navigates results", async ({
   await expect(status).toHaveText("0 matches found");
   await dialog.getByRole("button", { name: "Clear" }).click();
   await expect(dialog.locator("mark")).toHaveCount(0);
+});
 
-  for (const viewport of [
-    { width: 1280, height: 900 },
-    { width: 390, height: 844 },
-  ]) {
-    await page.setViewportSize(viewport);
-    const { first, last } = await markVisibleFocusBoundaries(page);
-    await last.focus();
-    await page.keyboard.press("Tab");
-    await expect(first).toBeFocused();
-    await page.keyboard.press("Shift+Tab");
-    await expect(last).toBeFocused();
-  }
+test("desktop focus wraps without including the hidden mobile navigation", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/?legal=privacy");
+  const dialog = page.getByRole("dialog", { name: "Privacy Notice" });
+  const first = dialog.getByRole("button", { name: "Print" });
+  const desktopNavigation = dialog.locator("aside");
+  const last = desktopNavigation.getByRole("link").last();
+  const mobileSummary = dialog.locator("details > summary");
+
+  await expect(mobileSummary).toBeHidden();
+  await last.focus();
+  await page.keyboard.press("Tab");
+  await expect(first).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(last).toBeFocused();
+});
+
+test("mobile summary participates in focus order and closed details hide their links", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/?legal=privacy");
+  const dialog = page.getByRole("dialog", { name: "Privacy Notice" });
+  const first = dialog.locator("header button").first();
+  const beforeSummary = dialog.getByRole("searchbox", {
+    name: "Search this document",
+  });
+  const details = dialog.locator("details");
+  const summary = details.locator("summary");
+  const sectionLinks = details.getByRole("link");
+
+  await expect(summary).toBeVisible();
+  await expect(details).not.toHaveAttribute("open", "");
+  await expect(sectionLinks.first()).toBeHidden();
+
+  await beforeSummary.focus();
+  await page.keyboard.press("Tab");
+  await expect(summary).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(first).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(summary).toBeFocused();
+
+  await summary.press("Enter");
+  await expect(details).toHaveAttribute("open", "");
+  await expect(sectionLinks.first()).toBeVisible();
+  const lastSectionLink = sectionLinks.last();
+  await lastSectionLink.focus();
+  await page.keyboard.press("Tab");
+  await expect(first).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(lastSectionLink).toBeFocused();
 });
 
 test("print action is invoked and Mux privacy properties are effective", async ({

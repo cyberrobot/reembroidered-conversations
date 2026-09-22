@@ -27,13 +27,17 @@ import {
 import { currentLegalNavigationState, LegalLink } from "./LegalLink";
 
 const focusableSelector =
-  'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  'a[href], button:not([disabled]), input:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
 
 function isActuallyFocusable(element: HTMLElement) {
+  const closedDetails = element.closest("details:not([open])");
+  const isClosedDetailsSummary =
+    element.tagName === "SUMMARY" && element.parentElement === closedDetails;
   if (
     element.hasAttribute("disabled") ||
     element.getAttribute("aria-disabled") === "true" ||
-    element.closest("[inert], [aria-hidden='true'], details:not([open])")
+    element.closest("[inert], [aria-hidden='true']") ||
+    (closedDetails && !isClosedDetailsSummary)
   ) {
     return false;
   }
