@@ -10,8 +10,6 @@ export const PUBLIC_COMPANY = {
     "Mildenhall, Mildenhall",
     "Suffolk, IP28 7DE",
   ],
-  contactEmail: "hello@peaceisthesong.org",
-  privacyEmail: "privacy@peaceisthesong.org",
 } as const;
 
 export const PUBLIC_REGISTERED_OFFICE =
@@ -141,7 +139,7 @@ export const TERMS: LegalDocument = {
       id: "complaints-contact",
       title: "Complaints and contact",
       paragraphs: [
-        `Contact ${PUBLIC_COMPANY.legalName} at ${PUBLIC_COMPANY.contactEmail} or write to ${PUBLIC_REGISTERED_OFFICE}. Please include enough information for us to identify the booking and understand your concern.`,
+        `Contact ${PUBLIC_COMPANY.legalName} in writing at its registered office: ${PUBLIC_REGISTERED_OFFICE}. Please include enough information for us to identify the booking and understand your concern.`,
       ],
     },
     {
@@ -207,6 +205,7 @@ export const PRIVACY_NOTICE: LegalDocument = {
       paragraphs: [
         "We use data to take and administer bookings, supply the purchased session, process and reconcile payment, create and update Calendar and Meet information, send booking correspondence, and respond to cancellation or rescheduling requests. Contract, or steps requested before a contract, is generally the relevant basis for this processing.",
         "We use limited data to prevent abuse and protect service reliability and security, and to handle complaints or establish, exercise or defend legal rights, based on legitimate interests where those interests are not overridden by your rights. We retain records needed for legal, accounting and tax obligations where processing is required by law.",
+        "We use Mux to deliver the introduction video and limited cookie-less playback analytics to understand video performance and maintain the reliability of the video and service. Our intended lawful basis is our legitimate interests in operating, understanding and maintaining that video and service, where those interests are not overridden by your rights and interests.",
         "The boundaries acknowledgement records that you understood the service boundaries. It is not UK GDPR consent for the processing described in this notice.",
       ],
     },
@@ -229,8 +228,8 @@ export const PRIVACY_NOTICE: LegalDocument = {
       id: "retention",
       title: "Retention",
       paragraphs: [
-        "The application does not currently promise automatic deletion of booking rows after a fixed period. Booking, payment, Calendar and email records are retained according to operational needs and applicable accounting, legal, dispute-resolution and security requirements, taking account of whether the record remains necessary and relevant limitation periods.",
-        "Temporary booking holds and rate-limit or hold-security records are comparatively short-lived for their operational purpose. They are distinct from longer-lived booking and transaction records. Complaints or legal-claim records may need to be kept while a matter is active and for a reasonable period afterwards.",
+        "The application does not currently automatically delete booking rows after a fixed period. Booking, payment, Calendar and email records are retained according to operational needs and applicable accounting, legal, dispute-resolution and security requirements, taking account of whether the record remains necessary and relevant limitation periods.",
+        "The active HOLD or temporary-reservation period is short-lived, as are abuse-protection and rate-limit permit records for their operational purpose. The associated booking row contains booking information and may remain in the booking database after the hold expires or is cancelled; expiry or cancellation does not automatically delete that row. Complaints or legal-claim records may need to be kept while a matter is active and for a reasonable period afterwards.",
       ],
     },
     {
@@ -253,14 +252,14 @@ export const PRIVACY_NOTICE: LegalDocument = {
       title: "Your individual rights",
       paragraphs: [
         "Depending on the circumstances, you may have rights of access, correction, erasure, restriction, objection and portability, and a right to withdraw consent where a particular activity genuinely relies on consent. These rights are not all absolute and may be limited by lawful retention or other requirements.",
-        `To exercise a right, contact ${PUBLIC_COMPANY.privacyEmail}. You also have the right to complain to the Information Commissioner's Office at ico.org.uk.`,
+        `To exercise a right, write to ${PUBLIC_COMPANY.legalName} at its registered office: ${PUBLIC_REGISTERED_OFFICE}. You also have the right to complain to the Information Commissioner's Office at ico.org.uk.`,
       ],
     },
     {
       id: "complaints-contact",
       title: "Complaints and contact",
       paragraphs: [
-        `Raise a privacy concern with ${PUBLIC_COMPANY.legalName} at ${PUBLIC_COMPANY.privacyEmail}, or write to ${PUBLIC_REGISTERED_OFFICE}. You may also complain to the Information Commissioner's Office.`,
+        `Raise a privacy concern by writing to ${PUBLIC_COMPANY.legalName} at its registered office: ${PUBLIC_REGISTERED_OFFICE}. You may also complain to the Information Commissioner's Office.`,
       ],
     },
     {

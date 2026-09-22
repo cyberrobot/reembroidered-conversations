@@ -61,9 +61,39 @@ test("Privacy Notice describes actual data flows without inventing consent or de
     assert.match(privacy, new RegExp(expected.replace("/", "\\/"), "i"));
   }
   assert.match(privacy, /not UK GDPR consent/i);
-  assert.match(privacy, /does not currently promise automatic deletion/i);
+  assert.match(
+    privacy,
+    /does not currently automatically delete booking rows/i,
+  );
+  assert.match(
+    privacy,
+    /active HOLD or temporary-reservation period is short-lived/i,
+  );
+  assert.match(
+    privacy,
+    /booking row.*may remain.*after the hold expires or is cancelled/i,
+  );
+  assert.match(
+    privacy,
+    /expiry or cancellation does not automatically delete/i,
+  );
   assert.doesNotMatch(privacy, /automatically deleted after/i);
+  assert.match(privacy, /cookie-less playback analytics/i);
+  assert.match(privacy, /video performance/i);
+  assert.match(
+    privacy,
+    /legitimate interests in operating, understanding and maintaining/i,
+  );
   assert.equal(PUBLIC_COMPANY.companyNumber, "16883201");
+});
+
+test("legal documents publish the registered office but no unconfirmed email", () => {
+  const legalText = Object.values(LEGAL_DOCUMENTS).map(text).join("\n");
+  assert.match(legalText, /82a James Carter Road/);
+  assert.doesNotMatch(legalText, /hello@peaceisthesong\.org/i);
+  assert.doesNotMatch(legalText, /privacy@peaceisthesong\.org/i);
+  assert.equal("contactEmail" in PUBLIC_COMPANY, false);
+  assert.equal("privacyEmail" in PUBLIC_COMPANY, false);
 });
 
 test("public copy no longer contains obsolete absolute confidentiality claims", async () => {

@@ -22,6 +22,43 @@ async function prepare(page: Page) {
   await page.goto("/");
 }
 
+async function markVisibleFocusBoundaries(page: Page) {
+  const dialog = page.getByRole("dialog");
+  const result = await dialog.evaluate((container) => {
+    container
+      .querySelectorAll("[data-testid^='visible-focus-']")
+      .forEach((element) => element.removeAttribute("data-testid"));
+    const selector =
+      'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const focusable = Array.from(
+      container.querySelectorAll<HTMLElement>(selector),
+    ).filter((element) => {
+      const style = window.getComputedStyle(element);
+      return (
+        !element.hasAttribute("disabled") &&
+        element.getAttribute("aria-disabled") !== "true" &&
+        !element.closest(
+          "[inert], [aria-hidden='true'], details:not([open])",
+        ) &&
+        style.display !== "none" &&
+        style.visibility !== "hidden" &&
+        style.visibility !== "collapse" &&
+        element.getClientRects().length > 0
+      );
+    });
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    first?.setAttribute("data-testid", "visible-focus-first");
+    last?.setAttribute("data-testid", "visible-focus-last");
+    return { count: focusable.length };
+  });
+  expect(result.count).toBeGreaterThan(1);
+  return {
+    first: dialog.getByTestId("visible-focus-first"),
+    last: dialog.getByTestId("visible-focus-last"),
+  };
+}
+
 test("footer links open canonical documents and restore focus on close", async ({
   page,
 }) => {
@@ -101,6 +138,39 @@ test("direct document and section links support browser history", async ({
   ).toBeVisible();
 });
 
+test("close uses the active history entry after Back and Forward navigation", async ({
+  page,
+}) => {
+  await prepare(page);
+  const termsLink = page.locator("footer").getByRole("link", { name: "Terms" });
+
+  await termsLink.click();
+  await page
+    .getByRole("dialog", { name: "Terms and Conditions" })
+    .getByRole("link", { name: "Privacy Notice" })
+    .click();
+  await page.goBack();
+  const terms = page.getByRole("dialog", { name: "Terms and Conditions" });
+  await expect(terms).toBeVisible();
+  await terms.getByRole("button", { name: "Close legal document" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page).toHaveURL(/\/$/);
+  await expect(termsLink).toBeFocused();
+
+  await termsLink.click();
+  await page
+    .getByRole("dialog", { name: "Terms and Conditions" })
+    .getByRole("link", { name: "Privacy Notice" })
+    .click();
+  await page.goBack();
+  await page.goForward();
+  const privacy = page.getByRole("dialog", { name: "Privacy Notice" });
+  await expect(privacy).toBeVisible();
+  await privacy.getByRole("button", { name: "Close legal document" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page).toHaveURL(/\/$/);
+});
+
 test("dialog traps focus and search announces and navigates results", async ({
   page,
 }) => {
@@ -121,15 +191,18 @@ test("dialog traps focus and search announces and navigates results", async ({
   await dialog.getByRole("button", { name: "Clear" }).click();
   await expect(dialog.locator("mark")).toHaveCount(0);
 
-  await dialog.getByRole("button", { name: "Close legal document" }).focus();
-  await page.keyboard.press("Shift+Tab");
-  await expect(dialog.locator(":focus")).toBeVisible();
-  for (let index = 0; index < 20; index += 1) await page.keyboard.press("Tab");
-  expect(
-    await dialog.evaluate((element) =>
-      element.contains(document.activeElement),
-    ),
-  ).toBe(true);
+  for (const viewport of [
+    { width: 1280, height: 900 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    const { first, last } = await markVisibleFocusBoundaries(page);
+    await last.focus();
+    await page.keyboard.press("Tab");
+    await expect(first).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expect(last).toBeFocused();
+  }
 });
 
 test("print action is invoked and Mux privacy properties are effective", async ({
@@ -149,6 +222,31 @@ test("print action is invoked and Mux privacy properties are effective", async (
   );
   await page.getByRole("button", { name: "Print" }).click();
   await expect(printed).resolves.toBe(true);
+  await page.emulateMedia({ media: "print" });
+  await expect(page.locator("#site-content")).toBeHidden();
+  await expect(page.locator(".legal-modal-controls")).toBeHidden();
+  const legalDocument = page.locator(".legal-document");
+  await expect(legalDocument).toBeVisible();
+  await expect(
+    legalDocument.getByRole("heading", {
+      name: /Changes and document version/,
+    }),
+  ).toBeVisible();
+  const printCompanyDisclosure = legalDocument.locator("footer");
+  await expect(
+    printCompanyDisclosure.getByText(/Company number 16883201/),
+  ).toBeVisible();
+  await expect(
+    printCompanyDisclosure.getByText(/82a James Carter Road/),
+  ).toBeVisible();
+  await expect(legalDocument.getByText(/Version 1\.0/).first()).toBeVisible();
+  expect(
+    await page.evaluate(() => ({
+      html: getComputedStyle(document.documentElement).overflow,
+      body: getComputedStyle(document.body).overflow,
+    })),
+  ).toEqual({ html: "visible", body: "visible" });
+  await page.emulateMedia({ media: "screen" });
   await page.keyboard.press("Escape");
 
   const player = page.locator("mux-player");

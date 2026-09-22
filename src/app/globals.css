@@ -90,9 +90,12 @@
 }
 
 @media print {
+  html,
   body {
     background: white !important;
     color: black !important;
+    height: auto !important;
+    overflow: visible !important;
   }
 
   #site-content,

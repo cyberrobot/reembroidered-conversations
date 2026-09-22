@@ -24,10 +24,33 @@ import {
   type LegalDocumentId,
   type LegalSection,
 } from "../data/legal";
-import { LegalLink } from "./LegalLink";
+import { currentLegalNavigationState, LegalLink } from "./LegalLink";
 
 const focusableSelector =
   'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function isActuallyFocusable(element: HTMLElement) {
+  if (
+    element.hasAttribute("disabled") ||
+    element.getAttribute("aria-disabled") === "true" ||
+    element.closest("[inert], [aria-hidden='true'], details:not([open])")
+  ) {
+    return false;
+  }
+  const style = window.getComputedStyle(element);
+  return (
+    style.display !== "none" &&
+    style.visibility !== "hidden" &&
+    style.visibility !== "collapse" &&
+    element.getClientRects().length > 0
+  );
+}
+
+function visibleFocusableElements(container: HTMLElement) {
+  return Array.from(
+    container.querySelectorAll<HTMLElement>(focusableSelector),
+  ).filter(isActuallyFocusable);
+}
 
 function legalState() {
   const params = new URL(window.location.href).searchParams;
@@ -61,8 +84,6 @@ export function LegalModal() {
   const dialogRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
-  const openedFromPageRef = useRef(false);
-  const legalHistoryDepthRef = useRef(0);
   const restoreFocusRef = useRef(false);
 
   const syncFromUrl = useCallback(() => {
@@ -76,10 +97,6 @@ export function LegalModal() {
         ?.opener;
       if (opener && !dialogRef.current?.contains(opener)) {
         openerRef.current = opener;
-        openedFromPageRef.current = true;
-        legalHistoryDepthRef.current = 0;
-      } else if (opener && dialogRef.current?.contains(opener)) {
-        legalHistoryDepthRef.current += 1;
       }
       syncFromUrl();
     };
@@ -163,16 +180,23 @@ export function LegalModal() {
 
   const close = useCallback(() => {
     restoreFocusRef.current = true;
-    if (openedFromPageRef.current) {
-      openedFromPageRef.current = false;
-      window.history.go(-(legalHistoryDepthRef.current + 1));
-      legalHistoryDepthRef.current = 0;
+    const navigation = currentLegalNavigationState();
+    if (
+      navigation?.hasOriginEntry &&
+      navigation.index > 0 &&
+      navigation.stackId
+    ) {
+      window.history.go(-navigation.index);
       return;
     }
-    const url = new URL(window.location.href);
+    const url = navigation?.originUrl
+      ? new URL(navigation.originUrl)
+      : new URL(window.location.href);
     url.searchParams.delete("legal");
     url.searchParams.delete("legalSection");
-    window.history.replaceState(window.history.state, "", url);
+    const nextState = { ...window.history.state };
+    delete nextState.legalNavigation;
+    window.history.replaceState(nextState, "", url);
     setState({ document: null, section: null });
   }, []);
 
@@ -185,9 +209,7 @@ export function LegalModal() {
         return;
       }
       if (event.key !== "Tab" || !dialogRef.current) return;
-      const focusable = Array.from(
-        dialogRef.current.querySelectorAll<HTMLElement>(focusableSelector),
-      ).filter((element) => !element.hasAttribute("disabled"));
+      const focusable = visibleFocusableElements(dialogRef.current);
       if (!focusable.length) return;
       const first = focusable[0];
       const last = focusable.at(-1)!;
