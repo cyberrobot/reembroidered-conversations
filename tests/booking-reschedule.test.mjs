@@ -358,9 +358,9 @@ test("scheduled pending-reschedule recovery commits target, releases definite ou
   assert.equal(moved.pending(), null);
   assert.equal(moved.source().startAt.toISOString(), target.startAt);
 
-  const definite = fixture({ pending });
-  const released = await reconcilePendingReschedule(source().id, now, {
-    ...definite.dependencies,
+  const authorization = fixture({ pending });
+  const attention = await reconcilePendingReschedule(source().id, now, {
+    ...authorization.dependencies,
     rescheduleCalendarEvent: async () => {
       throw new CalendarManagementError("reauthorization_required", {
         outcome: "definite_unchanged",
@@ -368,10 +368,11 @@ test("scheduled pending-reschedule recovery commits target, releases definite ou
       });
     },
   });
-  assert.equal(released.outcome, "recovered");
-  assert.equal(definite.pending(), null);
+  assert.equal(attention.outcome, "manual_attention");
+  assert.equal(attention.reason, "reschedule_calendar_authorization");
+  assert.equal(authorization.pending().status, "HOLD");
   assert.equal(
-    definite.source().startAt.toISOString(),
+    authorization.source().startAt.toISOString(),
     source().startAt.toISOString(),
   );
 

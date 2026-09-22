@@ -341,6 +341,15 @@ export async function reconcilePendingReschedule(bookingId, now, dependencies) {
   } catch (error) {
     if (
       error instanceof CalendarManagementError &&
+      ["not_connected", "reauthorization_required"].includes(error.code)
+    ) {
+      return {
+        outcome: "manual_attention",
+        reason: "reschedule_calendar_authorization",
+      };
+    }
+    if (
+      error instanceof CalendarManagementError &&
       error.outcome === "definite_unchanged" &&
       error.observedOriginal
     ) {
@@ -365,15 +374,6 @@ export async function reconcilePendingReschedule(bookingId, now, dependencies) {
       return {
         outcome: "manual_attention",
         reason: "reschedule_calendar_mismatch",
-      };
-    }
-    if (
-      error instanceof CalendarManagementError &&
-      ["not_connected", "reauthorization_required"].includes(error.code)
-    ) {
-      return {
-        outcome: "manual_attention",
-        reason: "reschedule_calendar_authorization",
       };
     }
     return { outcome: "deferred", reason: "reschedule_calendar_unavailable" };

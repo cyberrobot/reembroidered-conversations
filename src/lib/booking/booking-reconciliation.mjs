@@ -18,6 +18,7 @@ import { SESSION_PRODUCT } from "./session-product.mjs";
 
 export const BOOKING_RECONCILIATION_BATCH_SIZE = 20;
 export const CONFIRMATION_EMAIL_RETRY_WINDOW_MS = 24 * 60 * 60 * 1000;
+export const BOOKING_RECONCILIATION_INTERVAL_MS = 10 * 60 * 1000;
 
 const outcomes = [
   "recovered",
@@ -62,76 +63,72 @@ const bookingSelection = {
 };
 
 export function createBookingReconciliationPersistence(database) {
-  const oldest = { createdAt: "asc" };
+  const orderBy = [{ createdAt: "asc" }, { id: "asc" }];
+  const listCandidates = async (where, { now, take }) => {
+    const total = await database.booking.count({ where });
+    if (total === 0) return [];
+    return database.booking.findMany({
+      where,
+      select: bookingSelection,
+      orderBy,
+      skip: reconciliationPageOffset(total, take, now),
+      take,
+    });
+  };
   return {
     findBooking: (id) =>
       database.booking.findUnique({
         where: { id },
         select: bookingSelection,
       }),
-    listPaid: ({ take }) =>
-      database.booking.findMany({
-        where: { status: "PAID" },
-        select: bookingSelection,
-        orderBy: oldest,
-        take,
-      }),
-    listConfirmationEmail: ({ take }) =>
-      database.booking.findMany({
-        where: { status: "CONFIRMED", confirmationEmailSentAt: null },
-        select: bookingSelection,
-        orderBy: oldest,
-        take,
-      }),
-    listCheckoutHolds: ({ now, take }) =>
-      database.booking.findMany({
-        where: {
+    listPaid: (options) => listCandidates({ status: "PAID" }, options),
+    listConfirmationEmail: (options) =>
+      listCandidates(
+        { status: "CONFIRMED", confirmationEmailSentAt: null },
+        options,
+      ),
+    listCheckoutHolds: (options) =>
+      listCandidates(
+        {
           status: "HOLD",
           stripeCheckoutSessionId: { not: null },
           rescheduleSourceBookingId: null,
-          expiresAt: { lte: now },
+          expiresAt: { lte: options.now },
         },
-        select: bookingSelection,
-        orderBy: oldest,
-        take,
-      }),
-    listCancellations: ({ take }) =>
-      database.booking.findMany({
-        where: {
+        options,
+      ),
+    listCancellations: (options) =>
+      listCandidates(
+        {
           status: { in: ["CANCELLED", "REFUNDED"] },
           OR: [
             { calendarEventId: { not: null }, calendarCancelledAt: null },
             {
-              AND: [
-                { cancellationRefundDue: true },
-                { stripePaymentIntentId: { not: null } },
-                { refundedAt: null },
-                {
-                  OR: [
-                    { stripeRefundStatus: null },
-                    { stripeRefundStatus: { not: "succeeded" } },
-                  ],
-                },
-              ],
+              cancellationRefundDue: true,
+              stripePaymentIntentId: { not: null },
+              OR: [{ stripeRefundId: null }, { refundedAt: null }],
             },
           ],
         },
-        select: bookingSelection,
-        orderBy: oldest,
-        take,
-      }),
-    listReschedules: ({ now, take }) =>
-      database.booking.findMany({
-        where: {
+        options,
+      ),
+    listReschedules: (options) =>
+      listCandidates(
+        {
           status: "HOLD",
           rescheduleSourceBookingId: { not: null },
-          expiresAt: { lte: now },
+          expiresAt: { lte: options.now },
         },
-        select: bookingSelection,
-        orderBy: oldest,
-        take,
-      }),
+        options,
+      ),
   };
+}
+
+export function reconciliationPageOffset(total, take, now) {
+  if (total <= take) return 0;
+  const pageCount = Math.ceil(total / take);
+  const window = Math.floor(now.getTime() / BOOKING_RECONCILIATION_INTERVAL_MS);
+  return (window % pageCount) * take;
 }
 
 function emptyCounts() {
@@ -168,9 +165,13 @@ function safeResult(outcome, reason) {
   return { outcome, reason };
 }
 
-function isTerminalRefund(booking) {
-  return ["failed", "canceled", "requires_action"].includes(
-    booking.stripeRefundStatus,
+function hasContradictoryRefundState(booking) {
+  return Boolean(
+    booking.cancellationRefundDue === true &&
+    !booking.stripeRefundId &&
+    (booking.stripeRefundStatus != null ||
+      booking.refundedAt ||
+      booking.status === "REFUNDED"),
   );
 }
 
@@ -342,9 +343,9 @@ async function processCancellation(candidate, now, dependencies) {
   if (!before || !["CANCELLED", "REFUNDED"].includes(before.status)) {
     return safeResult("already_reconciled", "cancellation_state_changed");
   }
-  const terminalRefund = isTerminalRefund(before);
+  const contradictoryRefund = hasContradictoryRefundState(before);
   const view = await dependencies.reconcileCancellation(candidate.id, now);
-  if (terminalRefund || view?.refund?.status === "needs_attention") {
+  if (contradictoryRefund || view?.refund?.status === "needs_attention") {
     return safeResult("manual_attention", "cancellation_refund_terminal");
   }
   if (view?.externalFollowUpPending) {
@@ -406,13 +407,13 @@ export async function runBookingReconciliation(
     BOOKING_RECONCILIATION_BATCH_SIZE,
     Math.max(1, batchSize),
   );
-  const candidates = await Promise.all([
-    dependencies.persistence.listPaid({ now, take }),
-    dependencies.persistence.listConfirmationEmail({ now, take }),
-    dependencies.persistence.listCheckoutHolds({ now, take }),
-    dependencies.persistence.listCancellations({ now, take }),
-    dependencies.persistence.listReschedules({ now, take }),
-  ]);
+  const loaders = [
+    dependencies.persistence.listPaid,
+    dependencies.persistence.listConfirmationEmail,
+    dependencies.persistence.listCheckoutHolds,
+    dependencies.persistence.listCancellations,
+    dependencies.persistence.listReschedules,
+  ];
   const processors = [
     processPaid,
     processConfirmationEmail,
@@ -429,7 +430,23 @@ export async function runBookingReconciliation(
   ) {
     const category = categories[categoryIndex];
     const categoryCounts = summary.categories[category];
-    for (const candidate of candidates[categoryIndex]) {
+    let candidates;
+    try {
+      candidates = await loaders[categoryIndex]({ now, take });
+    } catch {
+      countOutcome(summary, "failed");
+      countOutcome(categoryCounts, "failed");
+      dependencies.logger?.warn?.(
+        "Booking reconciliation category selection failed.",
+        {
+          category,
+          outcome: "failed",
+          reason: `${category}_selection_failed`,
+        },
+      );
+      continue;
+    }
+    for (const candidate of candidates) {
       summary.scanned += 1;
       categoryCounts.scanned += 1;
       let result;

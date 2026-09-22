@@ -60,11 +60,31 @@ function fixture(initialBookings, options = {}) {
       if (options.findFailsFor === id) throw new Error("database unavailable");
       return stored.get(id) ? { ...stored.get(id) } : null;
     },
-    listPaid: async () => candidates.paid ?? [],
-    listConfirmationEmail: async () => candidates.confirmationEmail ?? [],
-    listCheckoutHolds: async () => candidates.checkoutHold ?? [],
-    listCancellations: async () => candidates.cancellation ?? [],
-    listReschedules: async () => candidates.reschedule ?? [],
+    listPaid: async () => {
+      if (options.selectionFailures?.includes("paid"))
+        throw new Error("private paid query failure");
+      return candidates.paid ?? [];
+    },
+    listConfirmationEmail: async () => {
+      if (options.selectionFailures?.includes("confirmationEmail"))
+        throw new Error("private email query failure");
+      return candidates.confirmationEmail ?? [];
+    },
+    listCheckoutHolds: async () => {
+      if (options.selectionFailures?.includes("checkoutHold"))
+        throw new Error("private hold query failure");
+      return candidates.checkoutHold ?? [];
+    },
+    listCancellations: async () => {
+      if (options.selectionFailures?.includes("cancellation"))
+        throw new Error("private cancellation query failure");
+      return candidates.cancellation ?? [];
+    },
+    listReschedules: async () => {
+      if (options.selectionFailures?.includes("reschedule"))
+        throw new Error("private reschedule query failure");
+      return candidates.reschedule ?? [];
+    },
   };
   const stripePersistence = {
     findBooking: persistence.findBooking,
@@ -354,6 +374,26 @@ test("cancellation and reschedule candidates delegate and preserve operational c
   assert.equal(attempt.calls.reschedule, 1);
 });
 
+test("contradictory terminal refund state is surfaced as manual attention", async () => {
+  const cancelled = booking({
+    status: "CANCELLED",
+    cancellationRefundDue: true,
+    stripeRefundId: null,
+    stripeRefundStatus: "succeeded",
+  });
+  const attempt = fixture([cancelled], {
+    candidates: { cancellation: [cancelled] },
+    cancellationView: {
+      externalFollowUpPending: true,
+      refund: { status: "needs_attention" },
+    },
+  });
+  const result = await runBookingReconciliation(now, attempt.dependencies);
+  assert.equal(result.manualAttention, 1);
+  assert.equal(result.categories.cancellation.manualAttention, 1);
+  assert.equal(attempt.calls.cancellation, 1);
+});
+
 test("one candidate failure does not abort another category and aggregate counts stay correct", async () => {
   const broken = booking({ id: "5a449655-7be3-432c-a124-b769e10b5404" });
   const oldEmail = booking({
@@ -376,6 +416,41 @@ test("one candidate failure does not abort another category and aggregate counts
   assert.equal(result.categories.paid.failed, 1);
   assert.equal(result.categories.confirmationEmail.manualAttention, 1);
   assert.equal(attempt.calls.warnings.length, 2);
+});
+
+test("one category selection failure does not prevent another category from recovering", async () => {
+  const recoverable = booking();
+  const attempt = fixture([recoverable], {
+    candidates: { paid: [recoverable] },
+    selectionFailures: ["confirmationEmail"],
+  });
+  const result = await runBookingReconciliation(now, attempt.dependencies);
+  assert.equal(result.recovered, 1);
+  assert.equal(result.failed, 1);
+  assert.equal(result.categories.paid.recovered, 1);
+  assert.equal(result.categories.confirmationEmail.failed, 1);
+  assert.equal(attempt.stored().status, "CONFIRMED");
+  assert.equal(attempt.calls.warnings.length, 1);
+  assert.equal(attempt.calls.warnings[0][1].bookingId, undefined);
+});
+
+test("multiple category selection failures leave unaffected categories usable", async () => {
+  const oldEmail = booking({
+    status: "CONFIRMED",
+    calendarEventId: googleEventIdForBooking(bookingId),
+    meetingUrl,
+    createdAt: new Date("2029-12-01T00:00:00.000Z"),
+  });
+  const attempt = fixture([oldEmail], {
+    candidates: { confirmationEmail: [oldEmail] },
+    selectionFailures: ["paid", "checkoutHold", "cancellation"],
+  });
+  const result = await runBookingReconciliation(now, attempt.dependencies);
+  assert.equal(result.manualAttention, 1);
+  assert.equal(result.failed, 3);
+  assert.equal(result.categories.confirmationEmail.manualAttention, 1);
+  assert.equal(result.categories.reschedule.failed, 0);
+  assert.equal(attempt.calls.warnings.length, 4);
 });
 
 test("every recovery category receives its own bounded batch", async () => {

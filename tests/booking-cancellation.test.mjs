@@ -286,23 +286,30 @@ test("an existing Stripe refund is retrieved and reconciled instead of recreated
   assert.equal(result.refund.status, "refunded");
 });
 
-test("a terminal failed refund is never replaced with a second refund", async () => {
-  const cancelled = booking({
-    status: "CANCELLED",
-    cancelledAt: new Date("2030-01-01T12:00:00.000Z"),
-    cancellationRefundDue: true,
-    stripeRefundId: null,
-    stripeRefundStatus: "failed",
+for (const refundStatus of [
+  "succeeded",
+  "failed",
+  "canceled",
+  "requires_action",
+]) {
+  test(`a ${refundStatus} refund status without an ID is never replaced`, async () => {
+    const cancelled = booking({
+      status: "CANCELLED",
+      cancelledAt: new Date("2030-01-01T12:00:00.000Z"),
+      cancellationRefundDue: true,
+      stripeRefundId: null,
+      stripeRefundStatus: refundStatus,
+    });
+    const attempt = fixture(cancelled);
+    const result = await reconcileCancelledBooking(
+      cancelled.id,
+      new Date("2030-01-01T12:05:00.000Z"),
+      attempt.dependencies,
+    );
+    assert.equal(attempt.calls.createRefund, 0);
+    assert.equal(attempt.calls.retrieveRefund, 0);
+    assert.equal(attempt.calls.calendar, 1);
+    assert.equal(result.refund.status, "needs_attention");
+    assert.equal(attempt.stored().status, "CANCELLED");
   });
-  const attempt = fixture(cancelled);
-  const result = await reconcileCancelledBooking(
-    cancelled.id,
-    new Date("2030-01-01T12:05:00.000Z"),
-    attempt.dependencies,
-  );
-  assert.equal(attempt.calls.createRefund, 0);
-  assert.equal(attempt.calls.retrieveRefund, 0);
-  assert.equal(attempt.calls.calendar, 1);
-  assert.equal(result.refund.status, "pending");
-  assert.equal(attempt.stored().status, "CANCELLED");
-});
+}

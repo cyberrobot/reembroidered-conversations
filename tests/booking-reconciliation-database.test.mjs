@@ -9,7 +9,9 @@ import {
   reconcileCancelledBooking,
 } from "../src/lib/booking/booking-cancellation.mjs";
 import {
+  BOOKING_RECONCILIATION_INTERVAL_MS,
   createBookingReconciliationPersistence,
+  reconciliationPageOffset,
   runBookingReconciliation,
 } from "../src/lib/booking/booking-reconciliation.mjs";
 import {
@@ -56,6 +58,20 @@ function data(id, startAt, overrides = {}) {
   };
 }
 
+function uuid(index) {
+  return `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`;
+}
+
+function firstPageWindow(base, total, take) {
+  let candidate = base;
+  while (reconciliationPageOffset(total, take, candidate) !== 0) {
+    candidate = new Date(
+      candidate.getTime() + BOOKING_RECONCILIATION_INTERVAL_MS,
+    );
+  }
+  return candidate;
+}
+
 function scopedPersistence(database, candidates = {}) {
   const base = createBookingReconciliationPersistence(database);
   return {
@@ -100,6 +116,149 @@ function runnerDependencies(database, persistence, overrides = {}) {
     logger: { warn: () => {} },
   };
 }
+
+test(
+  "real reconciliation queries rotate deterministic pages across every category",
+  { skip },
+  async () => {
+    const db = client();
+    const categorySize = 21;
+    const take = 20;
+    const createdAt = new Date("2000-01-01T00:00:00.000Z");
+    const expiresAt = new Date("2045-12-31T00:00:00.000Z");
+    const firstWindow = firstPageWindow(now, categorySize, take);
+    const secondWindow = new Date(
+      firstWindow.getTime() + BOOKING_RECONCILIATION_INTERVAL_MS,
+    );
+    const groups = {
+      paid: Array.from({ length: categorySize }, (_, index) =>
+        uuid(100 + index),
+      ),
+      confirmationEmail: Array.from({ length: categorySize }, (_, index) =>
+        uuid(200 + index),
+      ),
+      checkoutHold: Array.from({ length: categorySize }, (_, index) =>
+        uuid(300 + index),
+      ),
+      cancellation: Array.from({ length: categorySize }, (_, index) =>
+        uuid(400 + index),
+      ),
+      source: Array.from({ length: categorySize }, (_, index) =>
+        uuid(500 + index),
+      ),
+      reschedule: Array.from({ length: categorySize }, (_, index) =>
+        uuid(600 + index),
+      ),
+    };
+    const ids = Object.values(groups).flat();
+    let slot = 0;
+    const nextStart = () => {
+      const start =
+        new Date("2046-02-01T00:00:00.000Z").getTime() + slot * 60 * 60_000;
+      slot += 1;
+      return new Date(start);
+    };
+    try {
+      await db.booking.deleteMany({ where: { id: { in: ids } } });
+      await db.booking.createMany({
+        data: [
+          ...groups.paid.map((id) =>
+            data(id, nextStart(), { createdAt, expiresAt, status: "PAID" }),
+          ),
+          ...groups.confirmationEmail.map((id) =>
+            data(id, nextStart(), {
+              createdAt,
+              expiresAt,
+              status: "CONFIRMED",
+              calendarEventId: `event_${id}`,
+              meetingUrl,
+            }),
+          ),
+          ...groups.checkoutHold.map((id) =>
+            data(id, nextStart(), {
+              createdAt,
+              expiresAt,
+              status: "HOLD",
+              stripePaymentIntentId: null,
+            }),
+          ),
+          ...groups.cancellation.map((id) =>
+            data(id, nextStart(), {
+              createdAt,
+              expiresAt,
+              status: "CANCELLED",
+              cancelledAt: now,
+              cancellationRefundDue: true,
+              calendarCancelledAt: now,
+              stripeRefundStatus: "succeeded",
+            }),
+          ),
+          ...groups.source.map((id) =>
+            data(id, nextStart(), {
+              createdAt,
+              expiresAt,
+              status: "CONFIRMED",
+              calendarEventId: `source_event_${id}`,
+              meetingUrl,
+              confirmationEmailSentAt: now,
+              confirmationEmailId: `email_${id}`,
+            }),
+          ),
+        ],
+      });
+      await db.booking.createMany({
+        data: groups.reschedule.map((id, index) =>
+          data(id, nextStart(), {
+            createdAt,
+            expiresAt,
+            status: "HOLD",
+            stripeCheckoutSessionId: null,
+            stripePaymentIntentId: null,
+            rescheduleSourceBookingId: groups.source[index],
+          }),
+        ),
+      });
+
+      const persistence = createBookingReconciliationPersistence(db);
+      const listMethods = {
+        paid: persistence.listPaid,
+        confirmationEmail: persistence.listConfirmationEmail,
+        checkoutHold: persistence.listCheckoutHolds,
+        cancellation: persistence.listCancellations,
+        reschedule: persistence.listReschedules,
+      };
+      for (const [category, list] of Object.entries(listMethods)) {
+        const first = await list({ now: firstWindow, take });
+        const second = await list({ now: secondWindow, take });
+        assert.deepEqual(
+          first.map(({ id }) => id),
+          groups[category].slice(0, take),
+          `${category} first page must use the stable ID tie-breaker`,
+        );
+        assert.deepEqual(
+          second
+            .map(({ id }) => id)
+            .filter((id) => groups[category].includes(id)),
+          groups[category].slice(take),
+          `${category} must rotate beyond permanently unresolved first-page rows`,
+        );
+      }
+
+      const contradictory = await persistence.listCancellations({
+        now: secondWindow,
+        take,
+      });
+      const contradictoryRow = contradictory.find(
+        ({ id }) => id === groups.cancellation.at(-1),
+      );
+      assert.equal(contradictoryRow.stripeRefundStatus, "succeeded");
+      assert.equal(contradictoryRow.stripeRefundId, null);
+    } finally {
+      await db.booking.deleteMany({ where: { id: { in: ids } } });
+      await db.$disconnect();
+    }
+  },
+);
 
 test(
   "scheduled PAID recovery reuses deterministic Calendar events and remains idempotent",

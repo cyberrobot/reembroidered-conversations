@@ -109,6 +109,14 @@ function refundView(booking) {
   if (booking.cancellationRefundDue !== true)
     return { eligible: false, status: "not_decided" };
   if (
+    !booking.stripeRefundId &&
+    (booking.stripeRefundStatus != null ||
+      booking.refundedAt ||
+      booking.status === "REFUNDED")
+  ) {
+    return { eligible: true, status: "needs_attention" };
+  }
+  if (
     booking.refundedAt ||
     booking.stripeRefundStatus === "succeeded" ||
     booking.status === "REFUNDED"
@@ -160,15 +168,15 @@ async function reconcileCancellationProviders(
     }
   }
 
-  const terminalRefundStatus = [
-    "failed",
-    "canceled",
-    "requires_action",
-  ].includes(current.stripeRefundStatus);
+  const mayCreateRefund =
+    !current.stripeRefundId &&
+    current.stripeRefundStatus == null &&
+    !current.refundedAt &&
+    current.status !== "REFUNDED";
   if (
     current.cancellationRefundDue === true &&
     current.stripePaymentIntentId &&
-    (current.stripeRefundId || !terminalRefundStatus)
+    (current.stripeRefundId || mayCreateRefund)
   ) {
     try {
       const refund = current.stripeRefundId
