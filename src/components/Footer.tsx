@@ -124,12 +124,20 @@ export const Footer: React.FC = () => {
                 Registered in {PUBLIC_COMPANY.jurisdiction}
               </span>
               <span className="block">{PUBLIC_COMPANY.companyType}</span>
-              <span className="block pt-1">Registered office:</span>
-              {PUBLIC_COMPANY.registeredOfficeLines.map((line, index) => (
-                <span key={`${line}-${index}`} className="block">
-                  {line}
-                </span>
-              ))}
+              <span className="block pt-1">
+                Registered office:
+                <br />
+                {PUBLIC_COMPANY.registeredOfficeLines.map((line, index) => (
+                  <React.Fragment key={`${line}-${index}`}>
+                    {line}
+                    {index < PUBLIC_COMPANY.registeredOfficeLines.length - 1
+                      ? ","
+                      : ""}
+                    {index <
+                      PUBLIC_COMPANY.registeredOfficeLines.length - 1 && <br />}
+                  </React.Fragment>
+                ))}
+              </span>
             </address>
           </div>
         </div>
