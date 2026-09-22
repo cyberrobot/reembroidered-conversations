@@ -59,6 +59,7 @@ export function createStripeWebhookPersistence(database) {
           meetingUrl: true,
           confirmationEmailSentAt: true,
           confirmationEmailId: true,
+          createdAt: true,
         },
       }),
     confirm: ({
@@ -92,7 +93,7 @@ export function createStripeWebhookPersistence(database) {
   };
 }
 
-function correlation(session) {
+export function checkoutSessionBookingId(session) {
   const metadataId = session?.metadata?.bookingId;
   if (
     typeof metadataId !== "string" ||
@@ -103,10 +104,11 @@ function correlation(session) {
   return metadataId;
 }
 
-async function deliverConfirmationEmail(
+export async function reconcileBookingConfirmationEmail(
   booking,
   persistence,
   sendConfirmationEmail,
+  getNow = () => new Date(),
 ) {
   if (!sendConfirmationEmail || booking.confirmationEmailSentAt) return;
   let result;
@@ -136,7 +138,7 @@ async function deliverConfirmationEmail(
     recorded = await persistence.recordConfirmationEmail({
       bookingId: booking.id,
       messageId: result.messageId,
-      acceptedAt: new Date(),
+      acceptedAt: getNow(),
     });
   } catch {
     throw new StripeWebhookReconciliationError(
@@ -152,6 +154,168 @@ async function deliverConfirmationEmail(
     "Confirmation email persistence is pending.",
     "email_persistence_pending",
   );
+}
+
+export async function reconcilePaidBooking(
+  { bookingId, sessionId, paymentIntentId },
+  persistence,
+  finalizeCalendar,
+  sendConfirmationEmail,
+  getNow = () => new Date(),
+  onValidated,
+) {
+  const booking = await persistence.findBooking(bookingId);
+  if (
+    !booking ||
+    !["PAID", "CONFIRMED"].includes(booking.status) ||
+    booking.stripeCheckoutSessionId !== sessionId ||
+    booking.stripePaymentIntentId !== paymentIntentId
+  ) {
+    throw new StripeWebhookReconciliationError();
+  }
+  await onValidated?.(booking);
+  if (booking.status === "CONFIRMED") {
+    let expectedEventId;
+    try {
+      expectedEventId = googleEventIdForBooking(booking.id);
+    } catch {
+      throw new StripeWebhookReconciliationError();
+    }
+    if (
+      booking.calendarEventId !== expectedEventId ||
+      !isUsableGoogleMeetUrl(booking.meetingUrl)
+    ) {
+      throw new StripeWebhookReconciliationError();
+    }
+    return reconcileBookingConfirmationEmail(
+      booking,
+      persistence,
+      sendConfirmationEmail,
+      getNow,
+    );
+  }
+  if (!finalizeCalendar) return;
+  let google;
+  try {
+    google = await finalizeCalendar(booking);
+  } catch {
+    throw new StripeWebhookReconciliationError(
+      "Calendar finalization is pending.",
+    );
+  }
+  if (!google?.calendarEventId || !google?.meetingUrl)
+    throw new StripeWebhookReconciliationError(
+      "Calendar finalization is pending.",
+    );
+  let confirmed;
+  try {
+    confirmed = await persistence.confirm({
+      bookingId,
+      sessionId,
+      paymentIntentId,
+      calendarEventId: google.calendarEventId,
+      meetingUrl: google.meetingUrl,
+    });
+  } catch {
+    throw new StripeWebhookReconciliationError(
+      "Calendar finalization persistence is pending.",
+    );
+  }
+  const current = await persistence.findBooking(bookingId);
+  if (confirmed.count === 1) {
+    if (current?.status !== "CONFIRMED")
+      throw new StripeWebhookReconciliationError();
+    return reconcileBookingConfirmationEmail(
+      current,
+      persistence,
+      sendConfirmationEmail,
+      getNow,
+    );
+  }
+  if (
+    current?.status === "CONFIRMED" &&
+    current.stripeCheckoutSessionId === sessionId &&
+    current.stripePaymentIntentId === paymentIntentId &&
+    current.calendarEventId === google.calendarEventId &&
+    current.meetingUrl === google.meetingUrl
+  ) {
+    return reconcileBookingConfirmationEmail(
+      current,
+      persistence,
+      sendConfirmationEmail,
+      getNow,
+    );
+  }
+  throw new StripeWebhookReconciliationError();
+}
+
+export async function reconcileCompletedCheckoutSession(
+  session,
+  persistence,
+  finalizeCalendar,
+  sendConfirmationEmail,
+  releaseActiveHoldPermit,
+  getNow = () => new Date(),
+) {
+  const bookingId = checkoutSessionBookingId(session);
+  if (
+    session.mode !== "payment" ||
+    (session.status !== undefined && session.status !== "complete") ||
+    session.payment_status !== "paid" ||
+    session.amount_total !== SESSION_PRODUCT.amountMinor ||
+    session.currency !== SESSION_PRODUCT.currency ||
+    typeof session.payment_intent !== "string"
+  ) {
+    throw new StripeWebhookReconciliationError("Unexpected payment details.");
+  }
+  await persistence.markPaid({
+    bookingId,
+    sessionId: session.id,
+    paymentIntentId: session.payment_intent,
+  });
+  return reconcilePaidBooking(
+    {
+      bookingId,
+      sessionId: session.id,
+      paymentIntentId: session.payment_intent,
+    },
+    persistence,
+    finalizeCalendar,
+    sendConfirmationEmail,
+    getNow,
+    async () => releaseActiveHoldPermit?.(bookingId).catch(() => {}),
+  );
+}
+
+export async function reconcileExpiredCheckoutSession(
+  session,
+  persistence,
+  releaseActiveHoldPermit,
+) {
+  const bookingId = checkoutSessionBookingId(session);
+  if (session.status !== undefined && session.status !== "expired")
+    throw new StripeWebhookReconciliationError("Unexpected Session status.");
+  if (session.payment_status === "paid")
+    throw new StripeWebhookReconciliationError(
+      "Paid Session reported expired.",
+    );
+  const result = await persistence.cancelExpired({
+    bookingId,
+    sessionId: session.id,
+  });
+  if (result.count === 1) {
+    await releaseActiveHoldPermit?.(bookingId).catch(() => {});
+    return;
+  }
+  const booking = await persistence.findBooking(bookingId);
+  if (
+    booking?.stripeCheckoutSessionId === session.id &&
+    ["CANCELLED", "PAID", "CONFIRMED", "REFUNDED"].includes(booking.status)
+  ) {
+    await releaseActiveHoldPermit?.(bookingId).catch(() => {});
+    return;
+  }
+  throw new StripeWebhookReconciliationError();
 }
 
 export async function processStripeWebhookEvent(
@@ -174,126 +338,22 @@ export async function processStripeWebhookEvent(
   ) {
     throw new StripeWebhookReconciliationError("Invalid Checkout Session.");
   }
-  const bookingId = correlation(session);
 
   if (event.type === "checkout.session.completed") {
-    if (
-      session.mode !== "payment" ||
-      session.payment_status !== "paid" ||
-      session.amount_total !== SESSION_PRODUCT.amountMinor ||
-      session.currency !== SESSION_PRODUCT.currency ||
-      typeof session.payment_intent !== "string"
-    ) {
-      throw new StripeWebhookReconciliationError("Unexpected payment details.");
-    }
-    await persistence.markPaid({
-      bookingId,
-      sessionId: session.id,
-      paymentIntentId: session.payment_intent,
-    });
-    const booking = await persistence.findBooking(bookingId);
-    if (
-      !booking ||
-      !["PAID", "CONFIRMED"].includes(booking.status) ||
-      booking.stripeCheckoutSessionId !== session.id ||
-      booking.stripePaymentIntentId !== session.payment_intent
-    ) {
-      throw new StripeWebhookReconciliationError();
-    }
-    await releaseActiveHoldPermit?.(bookingId).catch(() => {});
-    if (booking.status === "CONFIRMED") {
-      let expectedEventId;
-      try {
-        expectedEventId = googleEventIdForBooking(booking.id);
-      } catch {
-        throw new StripeWebhookReconciliationError();
-      }
-      if (
-        booking.calendarEventId !== expectedEventId ||
-        !isUsableGoogleMeetUrl(booking.meetingUrl)
-      ) {
-        throw new StripeWebhookReconciliationError();
-      }
-      return deliverConfirmationEmail(
-        booking,
-        persistence,
-        sendConfirmationEmail,
-      );
-    }
-    if (!finalizeCalendar) return;
-    let google;
-    try {
-      google = await finalizeCalendar(booking);
-    } catch {
-      throw new StripeWebhookReconciliationError(
-        "Calendar finalization is pending.",
-      );
-    }
-    if (!google?.calendarEventId || !google?.meetingUrl)
-      throw new StripeWebhookReconciliationError(
-        "Calendar finalization is pending.",
-      );
-    let confirmed;
-    try {
-      confirmed = await persistence.confirm({
-        bookingId,
-        sessionId: session.id,
-        paymentIntentId: session.payment_intent,
-        calendarEventId: google.calendarEventId,
-        meetingUrl: google.meetingUrl,
-      });
-    } catch {
-      throw new StripeWebhookReconciliationError(
-        "Calendar finalization persistence is pending.",
-      );
-    }
-    const current = await persistence.findBooking(bookingId);
-    if (confirmed.count === 1) {
-      if (current?.status !== "CONFIRMED")
-        throw new StripeWebhookReconciliationError();
-      return deliverConfirmationEmail(
-        current,
-        persistence,
-        sendConfirmationEmail,
-      );
-    }
-    if (
-      current?.status === "CONFIRMED" &&
-      current.stripeCheckoutSessionId === session.id &&
-      current.stripePaymentIntentId === session.payment_intent &&
-      current.calendarEventId === google.calendarEventId &&
-      current.meetingUrl === google.meetingUrl
-    ) {
-      return deliverConfirmationEmail(
-        current,
-        persistence,
-        sendConfirmationEmail,
-      );
-    }
-    throw new StripeWebhookReconciliationError();
+    return reconcileCompletedCheckoutSession(
+      session,
+      persistence,
+      finalizeCalendar,
+      sendConfirmationEmail,
+      releaseActiveHoldPermit,
+    );
   }
 
-  if (session.payment_status === "paid")
-    throw new StripeWebhookReconciliationError(
-      "Paid Session reported expired.",
-    );
-  const result = await persistence.cancelExpired({
-    bookingId,
-    sessionId: session.id,
-  });
-  if (result.count === 1) {
-    await releaseActiveHoldPermit?.(bookingId).catch(() => {});
-    return;
-  }
-  const booking = await persistence.findBooking(bookingId);
-  if (
-    booking?.stripeCheckoutSessionId === session.id &&
-    ["CANCELLED", "PAID", "CONFIRMED", "REFUNDED"].includes(booking.status)
-  ) {
-    await releaseActiveHoldPermit?.(bookingId).catch(() => {});
-    return;
-  }
-  throw new StripeWebhookReconciliationError();
+  return reconcileExpiredCheckoutSession(
+    session,
+    persistence,
+    releaseActiveHoldPermit,
+  );
 }
 
 export async function processStripeWebhook(event) {

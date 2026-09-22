@@ -292,6 +292,142 @@ export async function rescheduleBooking(
   }
 }
 
+function sameInstant(left, right) {
+  return left instanceof Date && right instanceof Date
+    ? left.getTime() === right.getTime()
+    : false;
+}
+
+/**
+ * Resume a previously authorised reschedule without requiring customer input.
+ * The linked HOLD remains authoritative until this function can either commit
+ * the target or prove that releasing it is safe.
+ */
+export async function reconcilePendingReschedule(bookingId, now, dependencies) {
+  const persistence = dependencies.persistence;
+  const [source, hold] = await Promise.all([
+    persistence.findSource(bookingId),
+    persistence.findPendingHold(bookingId),
+  ]);
+  if (!hold || hold.status !== "HOLD") {
+    return { outcome: "already_reconciled", reason: "reschedule_not_pending" };
+  }
+  if (!source) {
+    return { outcome: "manual_attention", reason: "reschedule_source_missing" };
+  }
+  if (["CANCELLED", "REFUNDED"].includes(source.status)) {
+    const released = await persistence.releaseTarget({
+      sourceId: source.id,
+      holdId: hold.id,
+    });
+    return {
+      outcome: released.count === 1 ? "recovered" : "already_reconciled",
+      reason: "reschedule_source_inactive",
+    };
+  }
+  if (source.status !== "CONFIRMED") {
+    return {
+      outcome: "manual_attention",
+      reason: "reschedule_source_invalid_state",
+    };
+  }
+
+  const sourcePast = source.startAt <= now;
+  let calendar;
+  try {
+    calendar = await dependencies.rescheduleCalendarEvent(source, hold, {
+      allowUpdate: !sourcePast,
+    });
+  } catch (error) {
+    if (
+      error instanceof CalendarManagementError &&
+      ["not_connected", "reauthorization_required"].includes(error.code)
+    ) {
+      return {
+        outcome: "manual_attention",
+        reason: "reschedule_calendar_authorization",
+      };
+    }
+    if (
+      error instanceof CalendarManagementError &&
+      error.outcome === "definite_unchanged" &&
+      error.observedOriginal
+    ) {
+      const released = await persistence.releaseTarget({
+        sourceId: source.id,
+        holdId: hold.id,
+      });
+      return {
+        outcome: sourcePast ? "manual_attention" : "recovered",
+        reason: sourcePast
+          ? "reschedule_source_time_passed"
+          : released.count === 1
+            ? "reschedule_definitely_unchanged"
+            : "reschedule_already_released",
+      };
+    }
+    if (
+      error instanceof CalendarManagementError &&
+      (error.code === "event_mismatch" ||
+        error.code === "invalid_provider_response")
+    ) {
+      return {
+        outcome: "manual_attention",
+        reason: "reschedule_calendar_mismatch",
+      };
+    }
+    return { outcome: "deferred", reason: "reschedule_calendar_unavailable" };
+  }
+
+  try {
+    await persistence.commitTarget({
+      source,
+      hold,
+      meetingUrl: calendar.meetingUrl,
+      now: dependencies.getNow(),
+    });
+    return { outcome: "recovered", reason: "reschedule_committed" };
+  } catch {
+    const [currentSource, currentHold] = await Promise.all([
+      persistence.findSource(bookingId),
+      persistence.findPendingHold(bookingId),
+    ]);
+    if (
+      currentSource?.status === "CONFIRMED" &&
+      sameInstant(currentSource.startAt, hold.startAt) &&
+      (!currentHold || currentHold.status !== "HOLD")
+    ) {
+      return {
+        outcome: "already_reconciled",
+        reason: "reschedule_concurrently_committed",
+      };
+    }
+    if (["CANCELLED", "REFUNDED"].includes(currentSource?.status)) {
+      await persistence
+        .releaseTarget({ sourceId: bookingId, holdId: hold.id })
+        .catch(() => {});
+      return {
+        outcome: "already_reconciled",
+        reason: "reschedule_concurrently_cancelled",
+      };
+    }
+    return { outcome: "deferred", reason: "reschedule_commit_pending" };
+  }
+}
+
+export async function reconcilePendingRescheduleWithDefaultDependencies(
+  bookingId,
+  now = new Date(),
+) {
+  const { db } = await import("../db.ts");
+  return reconcilePendingReschedule(bookingId, now, {
+    persistence: createBookingReschedulePersistence(db),
+    rescheduleCalendarEvent: (source, hold, options) =>
+      rescheduleBookingCalendarEvent(source, hold, undefined, options),
+    getNow: () => new Date(),
+  });
+}
+
 export async function rescheduleBookingWithDefaultDependencies(
   bookingId,
   input,

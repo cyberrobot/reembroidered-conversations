@@ -17,6 +17,7 @@
     "db:validate": "prisma validate",
     "db:migrate:dev": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
+    "booking:reconcile:scheduled": "node scripts/invoke-booking-reconciliation.mjs",
     "postinstall": "prisma generate"
   },
   "dependencies": {
