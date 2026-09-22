@@ -658,6 +658,7 @@ test("fresh HOLD validation bypasses a populated browse-time Google busy cache",
           name: "Fresh Calendar Check",
           email: "fresh-calendar@example.test",
           startAt: targetStartAt,
+          acceptedBoundaries: true,
         },
         testNow,
         {

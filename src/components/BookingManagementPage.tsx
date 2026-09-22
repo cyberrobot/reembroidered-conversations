@@ -471,10 +471,10 @@ export function BookingManagementPage({
         {managementState.kind === "active" && booking && current && (
           <>
             {step === "overview" && (
-              <article className="relative space-y-8 overflow-hidden rounded-3xl border border-[#E8DFD5] bg-[#FDFCFB] p-6 shadow-sm sm:p-12">
+              <article className="relative space-y-8 overflow-hidden rounded-3xl bg-[#FDFCFB] p-6 sm:p-12">
                 <div className="absolute left-0 top-0 h-2 w-full bg-gradient-to-r from-[#8C4038] via-[#A35048] to-[#C47065]" />
                 <header className="space-y-3 text-center">
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[#E8DFD5] bg-[#FAF2EB] px-3 py-1 text-xs font-medium text-[#8C4038]">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[#8C4038]">
                     <ShieldCheck className="h-3.5 w-3.5" />
                     Private booking management
                   </span>
@@ -904,7 +904,7 @@ function BookingSummary({
   return (
     <section
       aria-label="Booking details"
-      className={`rounded-2xl border border-[#E8DFD5] bg-[#FAF8F5] ${compact ? "p-4" : "p-5 sm:p-6"}`}
+      className={`border-y border-[#E8DFD5] ${compact ? "py-4" : "py-5 sm:py-6"}`}
     >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#E8DFD5] pb-4 text-xs">
         <div>
@@ -913,7 +913,7 @@ function BookingSummary({
             {booking.name}
           </strong>
         </div>
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-[#D0E7D7] bg-[#EAF5EE] px-3 py-1 font-medium text-[#2E6B48]">
+        <span className="inline-flex items-center gap-1.5 font-medium text-[#2E6B48]">
           <CreditCard className="h-3.5 w-3.5" />
           Paid · {booking.amountPaid}
         </span>

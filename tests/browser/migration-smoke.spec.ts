@@ -359,10 +359,12 @@ test("one booking action creates a hold and automatically redirects to Checkout"
     /bg-\[#282524\]/,
   );
 
-  await page.getByRole("button", { name: /Audio-Only Call/ }).click();
+  await expect(page.getByText("Audio-Only Call")).toHaveCount(0);
   await expect(
-    page.getByRole("button", { name: /Audio-Only Call/ }),
-  ).toHaveClass(/ring-1/);
+    page.getByText("55-minute private video conversation via Google Meet", {
+      exact: true,
+    }),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "View full calendar" }).click();
   const dialog = page.getByRole("dialog");
@@ -431,6 +433,7 @@ test("one booking action creates a hold and automatically redirects to Checkout"
     name: "Browser Smoke",
     email: "browser.smoke@example.com",
     startAt: expect.any(String),
+    acceptedBoundaries: true,
     turnstileToken: "browser-test-token",
   });
   releaseHold?.();

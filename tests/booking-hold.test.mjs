@@ -33,6 +33,8 @@ test("valid request persists canonical server-owned HOLD data using one clock", 
       name: "  Sarah  ",
       email: " sarah@example.com ",
       startAt,
+      acceptedBoundaries: true,
+      boundariesAcceptedAt: "attacker",
       endAt: "attacker",
       status: "CONFIRMED",
       expiresAt: "attacker",
@@ -52,6 +54,7 @@ test("valid request persists canonical server-owned HOLD data using one clock", 
   assert.equal(persisted.endAt.toISOString(), endAt);
   assert.equal(persisted.timezone, "Europe/London");
   assert.equal(persisted.expiresAt.toISOString(), "2026-09-14T12:15:00.000Z");
+  assert.equal(persisted.boundariesAcceptedAt, now);
   assert.equal(persisted.now, now);
   assert.equal("status" in persisted, false);
   assert.equal(result.id, "hold-id");
@@ -59,9 +62,14 @@ test("valid request persists canonical server-owned HOLD data using one clock", 
 
 test("invalid name, email, and timestamp fail before availability or persistence", async () => {
   const invalid = [
-    { name: " ", email: "a@example.com", startAt },
-    { name: "Sarah", email: "invalid", startAt },
-    { name: "Sarah", email: "a@example.com", startAt: "2026-09-16" },
+    { name: " ", email: "a@example.com", startAt, acceptedBoundaries: true },
+    { name: "Sarah", email: "invalid", startAt, acceptedBoundaries: true },
+    {
+      name: "Sarah",
+      email: "a@example.com",
+      startAt: "2026-09-16",
+      acceptedBoundaries: true,
+    },
   ];
   for (const input of invalid) {
     let calls = 0;
@@ -86,12 +94,48 @@ test("invalid name, email, and timestamp fail before availability or persistence
   }
 });
 
+test("missing, false, and non-boolean boundaries consent fail before availability or persistence", async () => {
+  for (const acceptedBoundaries of [undefined, false, "true", 1, {}]) {
+    let availabilityCalls = 0;
+    let persistenceCalls = 0;
+    await assert.rejects(
+      () =>
+        createBookingHold(
+          {
+            name: "Sarah",
+            email: "sarah@example.com",
+            startAt,
+            ...(acceptedBoundaries === undefined ? {} : { acceptedBoundaries }),
+          },
+          now,
+          dependencies({
+            getAvailableSlots: async () => {
+              availabilityCalls += 1;
+              return [];
+            },
+            persist: async () => {
+              persistenceCalls += 1;
+            },
+          }),
+        ),
+      InvalidHoldRequestError,
+    );
+    assert.equal(availabilityCalls, 0);
+    assert.equal(persistenceCalls, 0);
+  }
+});
+
 test("a slot absent from current unified availability is unavailable", async () => {
   let persisted = false;
   await assert.rejects(
     () =>
       createBookingHold(
-        { name: "Sarah", email: "a@example.com", startAt },
+        {
+          name: "Sarah",
+          email: "a@example.com",
+          startAt,
+          acceptedBoundaries: true,
+        },
         now,
         dependencies({
           getAvailableSlots: async () => [],
@@ -116,7 +160,12 @@ test("a provider event added after display is rejected by the fresh hold-time av
   await assert.rejects(
     () =>
       createBookingHold(
-        { name: "Sarah", email: "sarah@example.test", startAt },
+        {
+          name: "Sarah",
+          email: "sarah@example.test",
+          startAt,
+          acceptedBoundaries: true,
+        },
         now,
         dependencies({
           // The provider added a conflicting event after the displayed snapshot.
@@ -136,7 +185,12 @@ test("availability failures are distinguished and prevent persistence", async ()
   await assert.rejects(
     () =>
       createBookingHold(
-        { name: "Sarah", email: "a@example.com", startAt },
+        {
+          name: "Sarah",
+          email: "a@example.com",
+          startAt,
+          acceptedBoundaries: true,
+        },
         now,
         dependencies({
           getAvailableSlots: async () => {
@@ -172,7 +226,12 @@ test("only the active-slot constraint becomes a slot conflict", async () => {
     await assert.rejects(
       () =>
         createBookingHold(
-          { name: "Sarah", email: "a@example.com", startAt },
+          {
+            name: "Sarah",
+            email: "a@example.com",
+            startAt,
+            acceptedBoundaries: true,
+          },
           now,
           dependencies({
             persist: async () => {
@@ -202,7 +261,12 @@ test("only the active-slot constraint becomes a slot conflict", async () => {
     await assert.rejects(
       () =>
         createBookingHold(
-          { name: "Sarah", email: "a@example.com", startAt },
+          {
+            name: "Sarah",
+            email: "a@example.com",
+            startAt,
+            acceptedBoundaries: true,
+          },
           now,
           dependencies({
             persist: async () => {
@@ -239,6 +303,7 @@ test("claim transaction releases only an exact expired HOLD before inserting", a
     endAt: new Date(endAt),
     timezone: "Europe/London",
     expiresAt: new Date("2026-09-14T12:15:00.000Z"),
+    boundariesAcceptedAt: now,
     now,
   };
   assert.equal(await createHoldPersistence(database)(input), created);
@@ -264,5 +329,6 @@ test("claim transaction releases only an exact expired HOLD before inserting", a
     timezone: input.timezone,
     status: "HOLD",
     expiresAt: input.expiresAt,
+    boundariesAcceptedAt: now,
   });
 });

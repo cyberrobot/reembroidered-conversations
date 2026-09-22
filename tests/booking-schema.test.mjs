@@ -78,6 +78,12 @@ test(
       assert.equal(emailColumns.rows[0].confirmationEmailSentAt, null);
       assert.equal(emailColumns.rows[0].confirmationEmailId, null);
 
+      const consentColumns = await client.query(
+        `SELECT "boundariesAcceptedAt" FROM bookings WHERE id = $1`,
+        [first.rows[0].id],
+      );
+      assert.equal(consentColumns.rows[0].boundariesAcceptedAt, null);
+
       const managementColumns = await client.query(
         `SELECT "cancelledAt", "cancellationRefundDue", "calendarCancelledAt", "stripeRefundId",
                 "stripeRefundStatus", "refundRequestedAt", "refundedAt", "rescheduledAt",

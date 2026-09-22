@@ -78,11 +78,11 @@ export const FREQUENT_QUESTIONS = [
   },
   {
     q: "What actually happens during the session?",
-    a: "We connect over a private video link (or audio call if you prefer). After a quiet moment to settle with a warm drink, the floor is entirely yours. You might speak continuously, or stop and start, or ask Shahd Karaeen to reflect back what she hears. Shahd Karaeen listens with total presence, holding a confidential, warm, and non-judgmental space.",
+    a: "We connect over a private Google Meet video link. After a quiet moment to settle with a warm drink, the floor is entirely yours. You might speak continuously, or stop and start, or ask Shahd Karaeen to reflect back what she hears. Shahd Karaeen listens with total presence, holding a confidential, warm, and non-judgmental space.",
   },
   {
-    q: "Can I do an audio-only phone call instead of video?",
-    a: "Yes, completely. Many women find it far more relaxing to turn the camera off, put their headphones in, and speak without feeling watched. You can choose either private video (Google Meet / Zoom) or an audio-only call when booking.",
+    q: "How do we meet?",
+    a: "Your 55-minute private video conversation takes place on Google Meet. Your confirmed booking includes the link you will use to join.",
   },
   {
     q: "Is everything strictly confidential?",

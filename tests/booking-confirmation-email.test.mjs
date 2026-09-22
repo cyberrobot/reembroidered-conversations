@@ -74,6 +74,10 @@ test("renders branded HTML and plain text from authoritative confirmed booking d
   );
   assert.ok(result.text.includes("55-minute session"));
   assert.ok(result.text.includes("Your session is confirmed"));
+  for (const unsupported of ["Audio-Only", "Phone call", "Zoom"]) {
+    assert.equal(result.html.includes(unsupported), false);
+    assert.equal(result.text.includes(unsupported), false);
+  }
   assert.ok(
     result.html.includes(`${configuration.changesUrl}/${booking().id}.`),
   );

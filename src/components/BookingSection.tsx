@@ -1,12 +1,11 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Clock, Video, Phone, ShieldCheck, AlertCircle } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import {
   BookingCheckoutResponse,
   BookingHold,
   BookingHoldResponse,
-  SessionFormat,
 } from "../types";
 import { AvailabilityPicker } from "./availability/AvailabilityPicker";
 import { useAvailability } from "../hooks/useAvailability";
@@ -15,25 +14,17 @@ import { TurnstileVerification } from "./TurnstileVerification";
 export const BookingSection: React.FC = () => {
   const {
     availableDays,
-    timezone,
     status: availabilityStatus,
     refresh: refreshAvailability,
   } = useAvailability();
-  const timeZone = timezone
-    ? `${timezone} (GMT/BST)`
-    : "Europe/London (GMT/BST)";
-
   // Selected date & slot state
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedSlot, setSelectedSlot] = useState<string>("");
   const [requiresFreshSelection, setRequiresFreshSelection] = useState(false);
-  const [sessionFormat, setSessionFormat] = useState<SessionFormat>("video");
 
   // Client details
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [optionalNote, setOptionalNote] = useState("");
   const [acceptedBoundaries, setAcceptedBoundaries] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [hold, setHold] = useState<BookingHold | null>(null);
@@ -114,6 +105,7 @@ export const BookingSection: React.FC = () => {
             name,
             email,
             startAt: selectedSlotData.startAt,
+            acceptedBoundaries: true,
             turnstileToken,
           }),
           signal: controller.signal,
@@ -254,17 +246,9 @@ export const BookingSection: React.FC = () => {
             yourself before we meet.
           </p>
 
-          {/* Pricing & Duration Bar */}
-          <div className="mt-6 inline-flex flex-wrap items-center justify-center gap-3 bg-[#F5EFE9] px-5 py-2.5 rounded-full border border-[#E8DFD5] text-xs sm:text-sm font-sans text-[#4B4643]">
-            <span className="font-medium text-[#282524] flex items-center gap-1.5">
-              <Clock className="w-4 h-4 text-[#A35048]" /> 55-minute private
-              session
-            </span>
-            <span className="text-[#C4B7A9]">•</span>
-            <span className="font-serif text-base font-medium text-[#A35048]">
-              £55
-            </span>
-          </div>
+          <p className="mt-5 font-sans text-sm text-[#4B4643]">
+            55-minute private video conversation via Google Meet · £55
+          </p>
         </div>
 
         {/* Interactive Booking Form */}
@@ -341,66 +325,19 @@ export const BookingSection: React.FC = () => {
             )}
           </div>
 
-          {/* Step 2: Format & Basic Details */}
+          {/* Step 2: Customer Details */}
           <div className="mb-10 pb-8 border-b border-[#E8DFD5]">
             <span className="text-xs font-serif uppercase tracking-widest text-[#A35048] font-medium">
               Step 2 of 3
             </span>
             <h3 className="font-serif text-2xl text-[#282524] font-medium mb-4">
-              Session format & your details
+              Your details
             </h3>
+            <p className="mb-6 text-sm text-[#68635F]">
+              55-minute private video conversation via Google Meet
+            </p>
 
-            {/* Format Choice: Video or Audio */}
-            <div className="grid sm:grid-cols-2 gap-4 mb-6">
-              <button
-                type="button"
-                onClick={() => setSessionFormat("video")}
-                className={`p-4 rounded-xl border text-left cursor-pointer transition-all flex items-start gap-3 ${
-                  sessionFormat === "video"
-                    ? "bg-[#F5EFE9] border-[#A35048] ring-1 ring-[#A35048]"
-                    : "bg-[#FAF8F5] border-[#E8DFD5] hover:border-[#C4B7A9]"
-                }`}
-              >
-                <Video
-                  className={`w-5 h-5 mt-0.5 ${sessionFormat === "video" ? "text-[#A35048]" : "text-[#78716C]"}`}
-                />
-                <div>
-                  <h4 className="font-serif text-base font-medium text-[#282524]">
-                    Video Conversation
-                  </h4>
-                  <p className="text-xs text-[#68635F] mt-1 leading-relaxed">
-                    A quiet face-to-face over Google Meet or Zoom. Warm, direct,
-                    and personal.
-                  </p>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setSessionFormat("audio")}
-                className={`p-4 rounded-xl border text-left cursor-pointer transition-all flex items-start gap-3 ${
-                  sessionFormat === "audio"
-                    ? "bg-[#F5EFE9] border-[#A35048] ring-1 ring-[#A35048]"
-                    : "bg-[#FAF8F5] border-[#E8DFD5] hover:border-[#C4B7A9]"
-                }`}
-              >
-                <Phone
-                  className={`w-5 h-5 mt-0.5 ${sessionFormat === "audio" ? "text-[#A35048]" : "text-[#78716C]"}`}
-                />
-                <div>
-                  <h4 className="font-serif text-base font-medium text-[#282524]">
-                    Audio-Only Call
-                  </h4>
-                  <p className="text-xs text-[#68635F] mt-1 leading-relaxed">
-                    No cameras. Put your headphones on and speak comfortably
-                    without being seen.
-                  </p>
-                </div>
-              </button>
-            </div>
-
-            {/* Name, Email, Phone */}
-            <div className="grid sm:grid-cols-2 gap-4 mb-4">
+            <div className="grid sm:grid-cols-2 gap-4">
               <div>
                 <label
                   htmlFor="client-name"
@@ -440,50 +377,16 @@ export const BookingSection: React.FC = () => {
                 />
               </div>
             </div>
-
-            <div>
-              <label
-                htmlFor="client-phone"
-                className="block text-xs font-sans text-[#4B4643] mb-1.5"
-              >
-                Phone / Mobile number{" "}
-                <span className="text-[#78716C] font-light">(Optional)</span>
-              </label>
-              <input
-                id="client-phone"
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+44 7123 456789"
-                className="w-full bg-[#FAF8F5] border border-[#E8DFD5] rounded-xl px-4 py-2.5 text-sm text-[#282524] placeholder-[#A8A29E] focus:outline-none focus:border-[#A35048]"
-              />
-            </div>
           </div>
 
-          {/* Step 3: Optional context & Boundaries */}
+          {/* Step 3: Consent & Security */}
           <div className="mb-8">
             <span className="text-xs font-serif uppercase tracking-widest text-[#A35048] font-medium">
               Step 3 of 3
             </span>
             <h3 className="font-serif text-2xl text-[#282524] font-medium mb-3">
-              Anything Shahd Karaeen should know beforehand?
+              Consent &amp; security
             </h3>
-
-            <div className="mb-6">
-              <textarea
-                id="client-note"
-                rows={3}
-                value={optionalNote}
-                onChange={(e) => setOptionalNote(e.target.value)}
-                placeholder="Optional: A few words if you'd like to share what's on your mind... or leave completely blank."
-                className="w-full bg-[#FAF8F5] border border-[#E8DFD5] rounded-xl p-3.5 text-sm text-[#282524] placeholder-[#A8A29E] focus:outline-none focus:border-[#A35048] resize-none"
-              />
-              <p className="text-xs text-[#78716C] mt-1.5 font-sans font-light">
-                Reassurance: You do not need to explain your situation. Many
-                women arrive with no words prepared at all and simply begin with
-                how their morning was.
-              </p>
-            </div>
 
             {/* Boundaries Checkbox */}
             <div className="p-4 rounded-xl bg-[#F5EFE9]/80 border border-[#E8DFD5] mb-6">

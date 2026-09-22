@@ -76,6 +76,15 @@ test("customer can later open the known success URL for a webhook-confirmed book
     await expect(page.getByText(text, { exact: false })).toBeVisible();
   await expect(page.getByText("Attacker")).toHaveCount(0);
   await expect(page.getByText("attacker@example.test")).toHaveCount(0);
+  for (const unsupported of [
+    "Audio-Only",
+    "Phone call",
+    "Zoom",
+    "Preset:",
+    "Simulate",
+    "visual-fixture",
+  ])
+    await expect(page.getByText(unsupported, { exact: false })).toHaveCount(0);
   await expect(page.locator("#main-nav")).toBeVisible();
   await expect(page.locator("#main-nav")).not.toContainText(
     "Return to Re-Embroidered",

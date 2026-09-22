@@ -17,6 +17,7 @@ const originalStart = new Date("2042-01-06T10:00:00.000Z");
 const originalEnd = new Date("2042-01-06T10:55:00.000Z");
 const targetStart = new Date("2042-01-07T10:00:00.000Z");
 const targetEnd = new Date("2042-01-07T10:55:00.000Z");
+const acceptedAt = new Date("2042-01-01T11:59:00.000Z");
 
 function confirmedData(overrides = {}) {
   return {
@@ -31,6 +32,7 @@ function confirmedData(overrides = {}) {
     stripePaymentIntentId: "pi_management_db",
     calendarEventId: "event_management_db",
     meetingUrl: "https://meet.google.com/abc-defg-hij",
+    boundariesAcceptedAt: acceptedAt,
     expiresAt: new Date("2042-01-01T12:15:00.000Z"),
     createdAt: new Date("2042-01-01T12:00:00.000Z"),
     ...overrides,
@@ -58,6 +60,13 @@ test(
       assert.equal(cancelled.status, "CANCELLED");
       assert.equal(cancelled.cancellationRefundDue, true);
       assert.ok(cancelled.cancelledAt instanceof Date);
+      const persistedCancelled = await db.booking.findUniqueOrThrow({
+        where: { id: sourceId },
+      });
+      assert.equal(
+        persistedCancelled.boundariesAcceptedAt.toISOString(),
+        acceptedAt.toISOString(),
+      );
       const replacement = await db.booking.create({
         data: {
           id: competingId,
@@ -132,6 +141,13 @@ test(
       assert.equal(result.status, "CONFIRMED");
       assert.equal(result.startAt.toISOString(), targetStart.toISOString());
       assert.equal(result.stripePaymentIntentId, "pi_management_db");
+      const persistedSource = await db.booking.findUniqueOrThrow({
+        where: { id: sourceId },
+      });
+      assert.equal(
+        persistedSource.boundariesAcceptedAt.toISOString(),
+        acceptedAt.toISOString(),
+      );
       const retired = await db.booking.findUniqueOrThrow({
         where: { id: hold.id },
       });

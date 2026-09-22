@@ -113,12 +113,22 @@ test(
       await first.booking.deleteMany({ where: { startAt: new Date(startAt) } });
       const attempts = [
         createBookingHold(
-          { name: "First Listener", email: "first@example.test", startAt },
+          {
+            name: "First Listener",
+            email: "first@example.test",
+            startAt,
+            acceptedBoundaries: true,
+          },
           now,
           { getAvailableSlots, persist: createHoldPersistence(first) },
         ),
         createBookingHold(
-          { name: "Second Listener", email: "second@example.test", startAt },
+          {
+            name: "Second Listener",
+            email: "second@example.test",
+            startAt,
+            acceptedBoundaries: true,
+          },
           now,
           { getAvailableSlots, persist: createHoldPersistence(second) },
         ),
@@ -331,6 +341,7 @@ test(
             name: "Stale Availability Listener",
             email: "stale-availability@example.test",
             startAt: selected.startAt,
+            acceptedBoundaries: true,
           }),
         SlotUnavailableError,
       );
@@ -555,6 +566,7 @@ test(
     const bookingId = "5a449655-7be3-432c-a124-b769e10b5303";
     const startAt = new Date("2044-01-13T10:00:00.000Z");
     const endAt = new Date("2044-01-13T10:55:00.000Z");
+    const acceptedAt = new Date("2044-01-01T09:59:00.000Z");
     const persistence = createBookingCancellationPersistence(db);
     let providersHealthy = false;
     let calendarCalls = 0;
@@ -618,6 +630,7 @@ test(
           stripePaymentIntentId: "pi_test_cancel_reliability",
           calendarEventId: "evt_test_cancel_reliability",
           meetingUrl: "https://meet.google.com/abc-defg-hij",
+          boundariesAcceptedAt: acceptedAt,
         }),
       });
 
@@ -636,6 +649,13 @@ test(
       assert.equal(cancelled.cancellationRefundDue, true);
       assert.equal(cancelled.calendarCancelledAt, null);
       assert.equal(cancelled.stripeRefundId, null);
+      const persistedCancelled = await db.booking.findUniqueOrThrow({
+        where: { id: bookingId },
+      });
+      assert.equal(
+        persistedCancelled.boundariesAcceptedAt.toISOString(),
+        acceptedAt.toISOString(),
+      );
       assert.equal(
         await db.booking.count({
           where: { startAt, status: { in: activeStatuses } },
@@ -698,6 +718,13 @@ test(
       });
       assert.equal(refunded.status, "REFUNDED");
       assert.equal(refunded.stripeRefundId, "re_test_reliability");
+      const persistedRefunded = await db.booking.findUniqueOrThrow({
+        where: { id: bookingId },
+      });
+      assert.equal(
+        persistedRefunded.boundariesAcceptedAt.toISOString(),
+        acceptedAt.toISOString(),
+      );
       assert.equal(
         refunded.stripePaymentIntentId,
         "pi_test_cancel_reliability",
