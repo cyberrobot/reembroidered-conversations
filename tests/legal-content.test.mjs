@@ -59,7 +59,11 @@ test("Terms match the current product and preserve statutory consumer rights", (
     terms,
     /lose the statutory right to cancel once the service has been fully performed/i,
   );
-  assert.match(terms, /no later than 14 days after we are informed/i);
+  assert.match(
+    terms,
+    /without undue delay and no later than 14 days after we are informed/i,
+  );
+  assert.doesNotMatch(terms, /ordinarily no later than/i);
   assert.match(terms, /same payment method used for the original transaction/i);
   assert.match(terms, /Model cancellation form/i);
   assert.match(terms, /I give notice that I cancel my contract/i);
