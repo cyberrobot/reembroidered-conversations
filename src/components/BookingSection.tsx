@@ -10,6 +10,7 @@ import {
 import { AvailabilityPicker } from "./availability/AvailabilityPicker";
 import { useAvailability } from "../hooks/useAvailability";
 import { TurnstileVerification } from "./TurnstileVerification";
+import { LegalLink } from "./LegalLink";
 
 export const BookingSection: React.FC = () => {
   const {
@@ -377,6 +378,11 @@ export const BookingSection: React.FC = () => {
                 />
               </div>
             </div>
+            <div className="mt-5 rounded-xl border border-[#E8DFD5] bg-[#F5EFE9]/60 p-4 text-xs leading-relaxed text-[#68635F]">
+              We use your name and email to reserve and manage your session,
+              process payment, create your Google Calendar/Meet invitation and
+              send booking emails.
+            </div>
           </div>
 
           {/* Step 3: Consent & Security */}
@@ -405,7 +411,21 @@ export const BookingSection: React.FC = () => {
                     not psychological therapy, counselling, psychiatric
                     treatment, or crisis support
                   </strong>
-                  .
+                  . By booking and paying, I enter into a contract subject to{" "}
+                  <LegalLink
+                    document="terms"
+                    className="font-medium text-[#A35048] underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#A35048]"
+                  >
+                    Terms
+                  </LegalLink>
+                  . See our{" "}
+                  <LegalLink
+                    document="privacy"
+                    className="font-medium text-[#A35048] underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#A35048]"
+                  >
+                    Privacy Notice
+                  </LegalLink>{" "}
+                  for how your information is used.
                 </span>
               </label>
             </div>
@@ -441,33 +461,22 @@ export const BookingSection: React.FC = () => {
             )}
 
             {/* Submit CTA */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
-              <div className="text-xs text-[#78716C] text-center sm:text-left">
-                <span>Private listening session · </span>
-                <span className="font-medium text-[#282524]">£55</span>
-                <p className="text-[11px] text-[#A8A29E]">
-                  Secure payment link sent upon confirmation · Reschedule
-                  anytime up to 24h prior
-                </p>
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-                <button
-                  id="confirm-booking-button"
-                  type="submit"
-                  disabled={
-                    availabilityStatus !== "ready" ||
-                    !selectedSlotData ||
-                    checkoutStatus !== "idle"
-                  }
-                  aria-busy={checkoutStatus !== "idle"}
-                  className="w-full sm:w-auto bg-[#A35048] hover:bg-[#8C4038] text-[#FAF8F5] text-sm font-medium px-8 py-3.5 rounded-full transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {checkoutStatus !== "idle"
-                    ? "Securing your time…"
-                    : "Book & pay £55"}
-                </button>
-              </div>
+            <div className="flex justify-end w-full sm:w-auto">
+              <button
+                id="confirm-booking-button"
+                type="submit"
+                disabled={
+                  availabilityStatus !== "ready" ||
+                  !selectedSlotData ||
+                  checkoutStatus !== "idle"
+                }
+                aria-busy={checkoutStatus !== "idle"}
+                className="w-full sm:w-auto bg-[#A35048] hover:bg-[#8C4038] text-[#FAF8F5] text-sm font-medium px-8 py-3.5 rounded-full transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {checkoutStatus !== "idle"
+                  ? "Securing your time…"
+                  : "Continue to secure checkout £55"}
+              </button>
             </div>
           </div>
         </form>

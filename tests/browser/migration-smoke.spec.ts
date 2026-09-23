@@ -328,7 +328,7 @@ test("one booking action creates a hold and automatically redirects to Checkout"
   await openHomeWithMuxFallback(page);
   await page.locator("#book-session").scrollIntoViewIfNeeded();
   await expect(page.locator("#confirm-booking-button")).toHaveText(
-    "Book & pay £55",
+    "Continue to secure checkout £55",
   );
 
   const dateCards = page

@@ -78,15 +78,15 @@ export const FREQUENT_QUESTIONS = [
   },
   {
     q: "What actually happens during the session?",
-    a: "We connect over a private Google Meet video link. After a quiet moment to settle with a warm drink, the floor is entirely yours. You might speak continuously, or stop and start, or ask Shahd Karaeen to reflect back what she hears. Shahd Karaeen listens with total presence, holding a confidential, warm, and non-judgmental space.",
+    a: "We connect over a private Google Meet video link. After a quiet moment to settle with a warm drink, the floor is entirely yours. You might speak continuously, or stop and start, or ask Shahd Karaeen to reflect back what she hears. Shahd Karaeen listens with total presence in a warm, non-judgmental space.",
   },
   {
     q: "How do we meet?",
     a: "Your 55-minute private video conversation takes place on Google Meet. Your confirmed booking includes the link you will use to join.",
   },
   {
-    q: "Is everything strictly confidential?",
-    a: "Yes. What you share in your session remains completely between you and Shahd Karaeen. No recordings, no shared notes, and no public discussion under any circumstances.",
+    q: "How is session privacy handled?",
+    a: "Sessions are private and we do not record them as part of the service. We do not publish or routinely disclose what you say. Limited disclosure may be necessary where required or permitted by law, in response to a serious and immediate safety concern, to protect legal rights, or to obtain confidential professional advice. Booking and technology providers also process the limited information needed to operate the service. See our Privacy Notice and Terms for details.",
   },
   {
     q: "Can I book just one session, or is there a package?",

@@ -1,5 +1,6 @@
 import React from "react";
-import { Heart } from "lucide-react";
+import { LegalLink } from "./LegalLink";
+import { PUBLIC_COMPANY } from "../data/legal";
 
 export const Footer: React.FC = () => {
   return (
@@ -7,7 +8,7 @@ export const Footer: React.FC = () => {
       <div className="max-w-5xl mx-auto">
         <div className="grid md:grid-cols-12 gap-10 pb-12 border-b border-[#3E3A37]">
           {/* Brand & Closing Thought */}
-          <div className="md:col-span-6 space-y-4">
+          <div className="md:col-span-5 space-y-4">
             <span className="font-serif text-2xl tracking-tight text-white block">
               Re-Embroidered Conversations
             </span>
@@ -21,7 +22,7 @@ export const Footer: React.FC = () => {
           </div>
 
           {/* Quick Links */}
-          <div className="md:col-span-3 space-y-3 text-xs text-[#D9CFC4]">
+          <div className="md:col-span-2 space-y-3 text-xs text-[#D9CFC4]">
             <span className="text-white font-medium uppercase tracking-wider block text-[11px]">
               Exploration
             </span>
@@ -62,7 +63,7 @@ export const Footer: React.FC = () => {
           </div>
 
           {/* Boundaries & Booking */}
-          <div className="md:col-span-3 space-y-3 text-xs text-[#D9CFC4]">
+          <div className="md:col-span-2 space-y-3 text-xs text-[#D9CFC4]">
             <span className="text-white font-medium uppercase tracking-wider block text-[11px]">
               Care & Integrity
             </span>
@@ -84,19 +85,66 @@ export const Footer: React.FC = () => {
                 </a>
               </li>
               <li className="text-[#A8A29E] leading-relaxed pt-1">
-                Strict personal confidentiality. All sessions held over secure
-                private video or telephone links.
+                Private one-to-one sessions via Google Meet. See our Privacy
+                Notice and Terms for how information is handled.
               </li>
             </ul>
+          </div>
+
+          <div className="md:col-span-3 space-y-3 text-xs text-[#D9CFC4]">
+            <span className="text-white font-medium uppercase tracking-wider block text-[11px]">
+              Legal
+            </span>
+            <ul className="space-y-2">
+              <li>
+                <LegalLink
+                  document="terms"
+                  className="hover:text-white transition-colors underline-offset-4 hover:underline"
+                >
+                  Terms
+                </LegalLink>
+              </li>
+              <li>
+                <LegalLink
+                  document="privacy"
+                  className="hover:text-white transition-colors underline-offset-4 hover:underline"
+                >
+                  Privacy Notice
+                </LegalLink>
+              </li>
+            </ul>
+            <address className="not-italic space-y-1 pt-3 text-[#A8A29E] leading-relaxed">
+              <strong className="block font-medium text-[#D9CFC4]">
+                {PUBLIC_COMPANY.legalName}
+              </strong>
+              <span className="block">
+                Company number {PUBLIC_COMPANY.companyNumber}
+              </span>
+              <span className="block">
+                Registered in {PUBLIC_COMPANY.jurisdiction}
+              </span>
+              <span className="block">{PUBLIC_COMPANY.companyType}</span>
+              <span className="block pt-1">
+                Registered office:
+                <br />
+                {PUBLIC_COMPANY.registeredOfficeLines.map((line, index) => (
+                  <React.Fragment key={`${line}-${index}`}>
+                    {line}
+                    {index < PUBLIC_COMPANY.registeredOfficeLines.length - 1
+                      ? ","
+                      : ""}
+                    {index <
+                      PUBLIC_COMPANY.registeredOfficeLines.length - 1 && <br />}
+                  </React.Fragment>
+                ))}
+              </span>
+            </address>
           </div>
         </div>
 
         {/* Bottom Colophon */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#A8A29E]">
-          <div>
-            © 2026 PEACE IS THE SONG C.I.C. Company number 16883201. All rights
-            reserved.
-          </div>
+          <div>© 2026 {PUBLIC_COMPANY.legalName}. All rights reserved.</div>
           <div className="flex items-center gap-1.5 text-xs">
             <span>Woven with care & quiet attention</span>
             <span className="w-1.5 h-1.5 rounded-full bg-[#A35048]" />

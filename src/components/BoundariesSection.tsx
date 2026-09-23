@@ -52,7 +52,7 @@ export const BoundariesSection: React.FC = () => {
                 <li className="flex items-start gap-2">
                   <span className="text-[#63705C] mt-0.5">✓</span>
                   <span>
-                    A dedicated private, confidential conversation with Shahd
+                    A dedicated private one-to-one conversation with Shahd
                     Karaeen.
                   </span>
                 </li>

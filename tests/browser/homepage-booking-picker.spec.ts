@@ -218,7 +218,9 @@ test("booking form exposes only the Google Meet product and submits consent with
     name: /I understand that this is a private listening session/,
   });
   const turnstile = form.getByTestId("turnstile-verification");
-  const submit = form.getByRole("button", { name: "Book & pay £55" });
+  const submit = form.getByRole("button", {
+    name: "Continue to secure checkout £55",
+  });
   await expect(turnstile).toBeVisible();
   const order = await form
     .locator(
