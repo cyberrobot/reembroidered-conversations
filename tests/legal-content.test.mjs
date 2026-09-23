@@ -22,9 +22,11 @@ function text(document) {
 
 test("legal documents expose stable versioned metadata and unique section IDs", () => {
   assert.deepEqual(Object.keys(LEGAL_DOCUMENTS), ["terms", "privacy"]);
+  assert.equal(TERMS.version, "1.1");
+  assert.equal(TERMS.effectiveDate, "23 September 2026");
+  assert.equal(PRIVACY_NOTICE.version, "1.0");
+  assert.equal(PRIVACY_NOTICE.effectiveDate, "22 September 2026");
   for (const document of Object.values(LEGAL_DOCUMENTS)) {
-    assert.equal(document.version, "1.0");
-    assert.equal(document.effectiveDate, "22 September 2026");
     const ids = document.sections.map(({ id }) => id);
     assert.equal(new Set(ids).size, ids.length);
     assert.ok(ids.every((id) => /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)));
@@ -41,6 +43,33 @@ test("Terms match the current product and preserve statutory consumer rights", (
   assert.match(terms, /automatic refund policy/i);
   assert.match(terms, /at least 24 hours/i);
   assert.match(terms, /Nothing in these Terms limits any cancellation/i);
+  assert.match(
+    terms,
+    /14 days after the day on which the contract is concluded/i,
+  );
+  assert.match(terms, /without giving any reason/i);
+  assert.match(
+    terms,
+    /contract is concluded when payment has been successfully processed and we confirm your booking/i,
+  );
+  assert.match(terms, /24-hour policy is separate from.*statutory/i);
+  assert.match(terms, /expressly request that we provide the service/i);
+  assert.match(terms, /proportionate amount for the service already supplied/i);
+  assert.match(
+    terms,
+    /lose the statutory right to cancel once the service has been fully performed/i,
+  );
+  assert.match(
+    terms,
+    /without undue delay and no later than 14 days after we are informed/i,
+  );
+  assert.doesNotMatch(terms, /ordinarily no later than/i);
+  assert.match(terms, /same payment method used for the original transaction/i);
+  assert.match(terms, /Model cancellation form/i);
+  assert.match(terms, /I give notice that I cancel my contract/i);
+  assert.match(terms, /82a James Carter Road/);
+  assert.match(terms, /clear statement that you wish to cancel/i);
+  assert.match(terms, /does not restrict or override/i);
   assert.doesNotMatch(terms, /no statutory rights/i);
 });
 

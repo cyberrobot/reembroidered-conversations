@@ -32,7 +32,7 @@ test("footer links open canonical documents and restore focus on close", async (
   await expect(dialog).toBeVisible();
   await expect(page).toHaveURL(/\?legal=terms$/);
   await expect(
-    dialog.getByText("Version 1.0", { exact: false }).first(),
+    dialog.getByText("Version 1.1", { exact: false }).first(),
   ).toBeVisible();
   await expect(page.locator("#site-content")).toHaveAttribute("inert", "");
   await dialog.getByRole("button", { name: "Close legal document" }).click();
@@ -99,6 +99,39 @@ test("direct document and section links support browser history", async ({
   await expect(
     page.getByRole("dialog", { name: "Terms and Conditions" }),
   ).toBeVisible();
+});
+
+test("Terms statutory cancellation sections support deep links and search", async ({
+  page,
+}) => {
+  await page.goto(
+    "/?legal=terms&legalSection=statutory-right-to-cancel#book-session",
+  );
+  const terms = page.getByRole("dialog", { name: "Terms and Conditions" });
+  await expect(terms).toBeVisible();
+  await expect(
+    terms.getByRole("heading", { name: "Statutory right to cancel" }),
+  ).toBeInViewport();
+
+  await page.goto("/?legal=terms&legalSection=model-cancellation-form");
+  await expect(
+    terms.getByRole("heading", { name: "Model cancellation form" }),
+  ).toBeInViewport();
+
+  const search = terms.getByRole("searchbox", {
+    name: "Search this document",
+  });
+  await search.fill("14 days");
+  await expect(terms.locator('[aria-live="polite"]')).toContainText(
+    /matches found/,
+  );
+  await expect(terms.locator("mark")).not.toHaveCount(0);
+
+  await search.fill("model cancellation form");
+  await expect(terms.locator('[aria-live="polite"]')).toContainText(
+    /matches found/,
+  );
+  await expect(terms.locator("mark")).not.toHaveCount(0);
 });
 
 test("close uses the active history entry after Back and Forward navigation", async ({
@@ -236,6 +269,12 @@ test("print action is invoked and Mux privacy properties are effective", async (
       name: /Changes and document version/,
     }),
   ).toBeVisible();
+  await expect(
+    legalDocument.getByRole("heading", { name: "Model cancellation form" }),
+  ).toBeVisible();
+  await expect(
+    legalDocument.getByText(/I give notice that I cancel my contract/),
+  ).toBeVisible();
   const printCompanyDisclosure = legalDocument.locator("footer");
   await expect(
     printCompanyDisclosure.getByText(/Company number 16883201/),
@@ -243,7 +282,7 @@ test("print action is invoked and Mux privacy properties are effective", async (
   await expect(
     printCompanyDisclosure.getByText(/82a James Carter Road/),
   ).toBeVisible();
-  await expect(legalDocument.getByText(/Version 1\.0/).first()).toBeVisible();
+  await expect(legalDocument.getByText(/Version 1\.1/).first()).toBeVisible();
   expect(
     await page.evaluate(() => ({
       html: getComputedStyle(document.documentElement).overflow,
