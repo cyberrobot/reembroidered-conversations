@@ -36,6 +36,19 @@ real bookings or payments.
 
 ## Verification
 
+Audit the complete dependency graph before merging:
+
+```bash
+npm run security:audit
+```
+
+High and critical findings must be resolved before merge. The `deepmerge-ts`
+override raises Prisma's `@prisma/config` transitive dependency to 8.0.2 (the
+minimum safe version is 8.0.0), and the `mysql2` override raises Prisma CLI's
+transitive dependency to 3.24.4 (the minimum safe version is 3.22.0). These are
+temporary security pins and should be removed once a compatible stable Prisma
+release carries the patched dependencies itself.
+
 Run the deterministic date tests and TypeScript check:
 
 ```bash

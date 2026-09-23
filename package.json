@@ -10,6 +10,7 @@
     "clean": "rm -rf .next",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "security:audit": "npm audit --audit-level=high",
     "lint": "tsc --noEmit",
     "test": "node --conditions=react-server --experimental-test-module-mocks --test tests/*.test.mjs",
     "test:browser": "playwright test",
@@ -27,7 +28,7 @@
     "dotenv": "^17.4.2",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
-    "next": "^16.3.4",
+    "next": "^16.3.6",
     "pg": "^8.23.0",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
@@ -45,5 +46,9 @@
     "prisma": "^7.10.0",
     "tailwindcss": "^4.1.14",
     "typescript": "~5.8.2"
+  },
+  "overrides": {
+    "deepmerge-ts": "8.0.2",
+    "mysql2": "3.24.4"
   }
 }
