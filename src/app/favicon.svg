@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <!-- Warm terracotta gradient -->
+    <linearGradient id="terracottaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#BA5D54" />
+      <stop offset="100%" stop-color="#93453E" />
+    </linearGradient>
+  </defs>
+
+  <!-- Clean rounded background tile -->
+  <rect width="64" height="64" rx="14" fill="url(#terracottaGrad)" />
+
+  <!-- Pure geometric Palestinian Tatreez embroidery cross-stitch rosette (No writing, no needle) -->
+  <g fill="#FAF8F5" stroke="#FAF8F5" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Center diamond square -->
+    <rect x="28.5" y="28.5" width="7" height="7" fill="#FAF8F5" rx="1.2" />
+    <rect x="30.5" y="30.5" width="3" height="3" fill="#93453E" rx="0.5" />
+
+    <!-- North arm stitches -->
+    <rect x="29.5" y="21" width="5" height="5" rx="1" fill="#FAF8F5" />
+    <rect x="30" y="14" width="4" height="4" rx="0.8" fill="#F4EBE1" />
+    <rect x="30.75" y="8" width="2.5" height="2.5" rx="0.5" fill="#FAF8F5" opacity="0.9" />
+
+    <!-- South arm stitches -->
+    <rect x="29.5" y="38" width="5" height="5" rx="1" fill="#FAF8F5" />
+    <rect x="30" y="46" width="4" height="4" rx="0.8" fill="#F4EBE1" />
+    <rect x="30.75" y="53.5" width="2.5" height="2.5" rx="0.5" fill="#FAF8F5" opacity="0.9" />
+
+    <!-- West arm stitches -->
+    <rect x="21" y="29.5" width="5" height="5" rx="1" fill="#FAF8F5" />
+    <rect x="14" y="30" width="4" height="4" rx="0.8" fill="#F4EBE1" />
+    <rect x="8" y="30.75" width="2.5" height="2.5" rx="0.5" fill="#FAF8F5" opacity="0.9" />
+
+    <!-- East arm stitches -->
+    <rect x="38" y="29.5" width="5" height="5" rx="1" fill="#FAF8F5" />
+    <rect x="46" y="30" width="4" height="4" rx="0.8" fill="#F4EBE1" />
+    <rect x="53.5" y="30.75" width="2.5" height="2.5" rx="0.5" fill="#FAF8F5" opacity="0.9" />
+
+    <!-- Diagonal cross stitches creating the rosette star -->
+    <!-- North-West -->
+    <rect x="22.5" y="22.5" width="4" height="4" rx="0.8" fill="#FAF8F5" opacity="0.95" />
+    <rect x="16.5" y="16.5" width="3" height="3" rx="0.6" fill="#F4EBE1" opacity="0.8" />
+
+    <!-- North-East -->
+    <rect x="37.5" y="22.5" width="4" height="4" rx="0.8" fill="#FAF8F5" opacity="0.95" />
+    <rect x="44.5" y="16.5" width="3" height="3" rx="0.6" fill="#F4EBE1" opacity="0.8" />
+
+    <!-- South-West -->
+    <rect x="22.5" y="37.5" width="4" height="4" rx="0.8" fill="#FAF8F5" opacity="0.95" />
+    <rect x="16.5" y="44.5" width="3" height="3" rx="0.6" fill="#F4EBE1" opacity="0.8" />
+
+    <!-- South-East -->
+    <rect x="37.5" y="37.5" width="4" height="4" rx="0.8" fill="#FAF8F5" opacity="0.95" />
+    <rect x="44.5" y="44.5" width="3" height="3" rx="0.6" fill="#F4EBE1" opacity="0.8" />
+
+    <!-- Center connecting cross stitches (X stitches) -->
+    <line x1="27" y1="27" x2="29" y2="29" stroke-width="1.8" stroke="#FAF8F5" opacity="0.85" />
+    <line x1="37" y1="27" x2="35" y2="29" stroke-width="1.8" stroke="#FAF8F5" opacity="0.85" />
+    <line x1="27" y1="37" x2="29" y2="35" stroke-width="1.8" stroke="#FAF8F5" opacity="0.85" />
+    <line x1="37" y1="37" x2="35" y2="35" stroke-width="1.8" stroke="#FAF8F5" opacity="0.85" />
+  </g>
+</svg>
