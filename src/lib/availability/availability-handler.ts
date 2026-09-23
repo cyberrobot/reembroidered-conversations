@@ -91,6 +91,13 @@ export function createAvailabilityHandler(
     } catch (error) {
       console.error("Availability calculation failed.", {
         errorName: error instanceof Error ? error.name : "UnknownError",
+        errorCode:
+          error &&
+          typeof error === "object" &&
+          "code" in error &&
+          typeof error.code === "string"
+            ? error.code
+            : undefined,
       });
       return NextResponse.json(
         {
