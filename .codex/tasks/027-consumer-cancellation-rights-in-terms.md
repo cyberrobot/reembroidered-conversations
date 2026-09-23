@@ -103,7 +103,7 @@ Where the existing private booking-management link is mentioned, do not claim th
 
 Where the consumer validly exercises the statutory cancellation right before the service has been supplied, payments due to be reimbursed must be reimbursed without undue delay and within the legally required period.
 
-For this service, state that reimbursement will ordinarily be made no later than 14 days after the company is informed of the statutory cancellation, using the same payment method used for the original transaction unless another method is expressly agreed, and without a reimbursement fee to the consumer.
+For this service, state that reimbursement will be made without undue delay and no later than 14 days after the company is informed of the statutory cancellation, using the same payment method used for the original transaction unless another method is expressly agreed, and without a reimbursement fee to the consumer.
 
 Do not change the application's Stripe refund implementation in this PR.
 
