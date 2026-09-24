@@ -24,9 +24,11 @@ test(
       adapter: new PrismaPg({ connectionString: schemaTestUrl }),
     });
     const databaseModule = await mock.module("../src/lib/db.ts", {
-      exports: { db },
+      namedExports: { db },
     });
     const previousEncryptionKey = process.env.GOOGLE_TOKEN_ENCRYPTION_KEY;
+    let originalConnection;
+    let fixtureWriteAttempted = false;
     process.env.GOOGLE_TOKEN_ENCRYPTION_KEY = Buffer.alloc(32, 11).toString(
       "base64",
     );
@@ -46,6 +48,10 @@ test(
         "https://www.googleapis.com/auth/calendar.freebusy",
       ];
 
+      originalConnection = await db.googleCalendarConnection.findUnique({
+        where: { id: "primary" },
+      });
+      fixtureWriteAttempted = true;
       await saveGoogleCalendarConnection({
         googleSubject: "connection-test-google-subject",
         googleEmail: "connection-test@example.test",
@@ -71,15 +77,32 @@ test(
         false,
       );
     } finally {
-      await db.googleCalendarConnection.deleteMany({
-        where: { id: "primary" },
-      });
-      await db.$disconnect();
-      databaseModule.restore();
-      if (previousEncryptionKey === undefined) {
-        delete process.env.GOOGLE_TOKEN_ENCRYPTION_KEY;
-      } else {
-        process.env.GOOGLE_TOKEN_ENCRYPTION_KEY = previousEncryptionKey;
+      try {
+        if (fixtureWriteAttempted) {
+          if (originalConnection) {
+            const { id, ...originalFields } = originalConnection;
+            await db.googleCalendarConnection.upsert({
+              where: { id },
+              create: originalConnection,
+              update: originalFields,
+            });
+          } else {
+            await db.googleCalendarConnection.deleteMany({
+              where: { id: "primary" },
+            });
+          }
+        }
+      } finally {
+        try {
+          await db.$disconnect();
+        } finally {
+          databaseModule.restore();
+          if (previousEncryptionKey === undefined) {
+            delete process.env.GOOGLE_TOKEN_ENCRYPTION_KEY;
+          } else {
+            process.env.GOOGLE_TOKEN_ENCRYPTION_KEY = previousEncryptionKey;
+          }
+        }
       }
     }
   },
