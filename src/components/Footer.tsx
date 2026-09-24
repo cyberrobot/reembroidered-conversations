@@ -85,8 +85,8 @@ export const Footer: React.FC = () => {
                 </a>
               </li>
               <li className="text-[#A8A29E] leading-relaxed pt-1">
-                Private one-to-one sessions via Google Meet. See our Privacy
-                Notice and Terms for how information is handled.
+                Private one-to-one video conversations. See our Privacy Notice
+                and Terms for how information is handled.
               </li>
             </ul>
           </div>

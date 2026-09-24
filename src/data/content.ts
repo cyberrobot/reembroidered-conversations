@@ -78,11 +78,11 @@ export const FREQUENT_QUESTIONS = [
   },
   {
     q: "What actually happens during the session?",
-    a: "We connect over a private Google Meet video link. After a quiet moment to settle with a warm drink, the floor is entirely yours. You might speak continuously, or stop and start, or ask Shahd Karaeen to reflect back what she hears. Shahd Karaeen listens with total presence in a warm, non-judgmental space.",
+    a: "We connect privately by video. After a quiet moment to settle with a warm drink, the floor is entirely yours. You might speak continuously, or stop and start, or ask Shahd Karaeen to reflect back what she hears. Shahd Karaeen listens with total presence in a warm, non-judgmental space.",
   },
   {
     q: "How do we meet?",
-    a: "Your 55-minute private video conversation takes place on Google Meet. Your confirmed booking includes the link you will use to join.",
+    a: "Your 55-minute private video conversation takes place online. Your confirmed booking includes the joining link.",
   },
   {
     q: "How is session privacy handled?",

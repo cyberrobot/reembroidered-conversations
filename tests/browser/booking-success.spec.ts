@@ -69,11 +69,12 @@ test("customer can later open the known success URL for a webhook-confirmed book
     fixture.id,
     "Thursday, 24 September 2026",
     "14:00–14:55 (BST) · 55 min",
-    "Private video meeting via Google Meet",
+    "Private video conversation",
     "sarah@example.test",
     "£55 paid",
   ])
     await expect(page.getByText(text, { exact: false })).toBeVisible();
+  await expect(page.getByText(/use the joining link below/)).toBeVisible();
   await expect(page.getByText("Attacker")).toHaveCount(0);
   await expect(page.getByText("attacker@example.test")).toHaveCount(0);
   for (const unsupported of [
@@ -143,6 +144,9 @@ test("finalising booking visual is stable", async ({ page }) => {
   );
   await expect(
     page.getByRole("heading", { name: "We’re preparing your booking." }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/calendar invitation and joining link/),
   ).toBeVisible();
   await expect(page).toHaveScreenshot("booking-success-finalising.png", {
     fullPage: true,

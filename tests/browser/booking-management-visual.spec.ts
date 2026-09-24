@@ -42,6 +42,7 @@ test("desktop management states preserve the AI Studio visual flow", async ({
   await expect(
     page.getByRole("heading", { name: "Manage your conversation" }),
   ).toBeVisible();
+  await expect(page.getByText("Private video conversation")).toBeVisible();
   await expect(page).toHaveScreenshot(
     "booking-management-confirmed-desktop.png",
     { fullPage: true, animations: "disabled" },
@@ -58,6 +59,9 @@ test("desktop management states preserve the AI Studio visual flow", async ({
   await page.getByRole("button", { name: /Review new time/ }).click();
   await expect(
     page.getByRole("heading", { name: "Review your new time" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/preserve its joining details where possible/),
   ).toBeVisible();
   await expect(page).toHaveScreenshot(
     "booking-management-reschedule-review.png",

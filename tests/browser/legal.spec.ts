@@ -32,7 +32,10 @@ test("footer links open canonical documents and restore focus on close", async (
   await expect(dialog).toBeVisible();
   await expect(page).toHaveURL(/\?legal=terms$/);
   await expect(
-    dialog.getByText("Version 1.1", { exact: false }).first(),
+    dialog.getByText("Version 1.2", { exact: false }).first(),
+  ).toBeVisible();
+  await expect(
+    dialog.getByText(/one-to-one private video listening conversation/),
   ).toBeVisible();
   await expect(page.locator("#site-content")).toHaveAttribute("inert", "");
   await dialog.getByRole("button", { name: "Close legal document" }).click();
@@ -282,7 +285,7 @@ test("print action is invoked and Mux privacy properties are effective", async (
   await expect(
     printCompanyDisclosure.getByText(/82a James Carter Road/),
   ).toBeVisible();
-  await expect(legalDocument.getByText(/Version 1\.1/).first()).toBeVisible();
+  await expect(legalDocument.getByText(/Version 1\.2/).first()).toBeVisible();
   expect(
     await page.evaluate(() => ({
       html: getComputedStyle(document.documentElement).overflow,

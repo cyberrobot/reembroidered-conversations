@@ -26,8 +26,9 @@ export type LegalSection = {
 export type LegalDocument = {
   id: LegalDocumentId;
   title: string;
-  version: "1.0" | "1.1";
-  effectiveDate: "22 September 2026" | "23 September 2026";
+  version: "1.0" | "1.1" | "1.2";
+  effectiveDate:
+    "22 September 2026" | "23 September 2026" | "24 September 2026";
   introduction: readonly string[];
   sections: readonly LegalSection[];
 };
@@ -37,8 +38,8 @@ const companyDescription = `${PUBLIC_COMPANY.legalName}, company number ${PUBLIC
 export const TERMS: LegalDocument = {
   id: "terms",
   title: "Terms and Conditions",
-  version: "1.1",
-  effectiveDate: "23 September 2026",
+  version: "1.2",
+  effectiveDate: "24 September 2026",
   introduction: [
     `These Terms are between you and ${PUBLIC_COMPANY.legalName}, trading as ${PUBLIC_COMPANY.tradingName}. Please read them before booking.`,
     "Nothing in these Terms limits any cancellation, refund or other rights you have under applicable consumer law.",
@@ -56,7 +57,7 @@ export const TERMS: LegalDocument = {
       id: "service",
       title: "The service",
       paragraphs: [
-        "The service is one 55-minute, one-to-one listening conversation with Shahd Karaeen by Google Meet for £55 GBP. No subscription or package is required.",
+        "The service is one 55-minute, one-to-one private video listening conversation with Shahd Karaeen for £55 GBP. No subscription or package is required.",
         "It is not therapy, counselling, healthcare, psychiatric treatment or crisis support, and it is not a substitute for professional medical, psychological, psychiatric or emergency support.",
       ],
     },
@@ -65,7 +66,7 @@ export const TERMS: LegalDocument = {
       title: "Booking and payment",
       paragraphs: [
         "You choose an available session, provide your name and email, acknowledge the service boundaries and complete payment through Stripe. Stripe handles your card details; we do not receive or store full payment-card details.",
-        "Reaching Stripe or returning from Stripe does not by itself mean that a booking is finally confirmed. Confirmation follows our authoritative payment and booking process. Once confirmed, you receive the session information and Google Meet details.",
+        "Reaching Stripe or returning from Stripe does not by itself mean that a booking is finally confirmed. Confirmation follows our authoritative payment and booking process. Once confirmed, you receive the session information and joining details.",
         `The contract between you and ${PUBLIC_COMPANY.tradingName} is concluded when payment has been successfully processed and we confirm your booking. Merely opening Stripe Checkout or returning from Stripe does not conclude the contract.`,
       ],
     },
@@ -97,7 +98,7 @@ export const TERMS: LegalDocument = {
       paragraphs: [
         "Where the statutory right applies, you may cancel this distance service contract without giving any reason. The cancellation period ends 14 days after the day on which the contract is concluded. As explained under Booking and payment, the contract is concluded when payment has been successfully processed and we confirm your booking.",
         `To exercise this right, give us a clear statement that you wish to cancel before the cancellation period expires. You can write to ${PUBLIC_COMPANY.legalName}, ${PUBLIC_REGISTERED_OFFICE}. No particular form is compulsory; the model cancellation form below may be used but is optional.`,
-        "Exercising the statutory right is not restricted by the contractual 24-hour cutoff. In particular, the right does not disappear merely because your booking has been confirmed, payment has been captured, a Google Calendar event or Google Meet link has been created, or the appointment is less than 24 hours away.",
+        "Exercising the statutory right is not restricted by the contractual 24-hour cutoff. In particular, the right does not disappear merely because your booking has been confirmed, payment has been captured, a Google Calendar event or joining link has been created, or the appointment is less than 24 hours away.",
         "If you validly exercise the statutory cancellation right before the service has been supplied, payments due to be reimbursed will be reimbursed without undue delay and no later than 14 days after we are informed of your statutory cancellation. Reimbursement will use the same payment method used for the original transaction unless you expressly agree another method, and you will not incur a reimbursement fee.",
       ],
     },
@@ -108,7 +109,7 @@ export const TERMS: LegalDocument = {
         "If you select a session that is due to take place before the end of your statutory 14-day cancellation period and complete the booking subject to these Terms, you expressly request that we provide the service on the selected date even though the cancellation period has not yet expired.",
         "Until the service has been fully performed, the statutory right may continue subject to the applicable rules. If you cancel after performance has begun following your express request, you may be required to pay a proportionate amount for the service already supplied where the law permits this. You will not be charged for service supplied during the cancellation period where the legal prerequisites for such a charge have not been satisfied.",
         "You acknowledge that, where the session is fully performed during the statutory cancellation period following your request for early performance, you will lose the statutory right to cancel once the service has been fully performed.",
-        "The service is the 55-minute listening session itself. Reserving the appointment, processing payment, confirming the booking, creating a Google Calendar event or generating a Google Meet link does not mean that the service has started or been fully performed.",
+        "The service is the 55-minute listening session itself. Reserving the appointment, processing payment, confirming the booking, creating a Google Calendar event or generating a joining link does not mean that the service has started or been fully performed.",
       ],
     },
     {
@@ -147,7 +148,7 @@ export const TERMS: LegalDocument = {
       id: "customer-responsibilities",
       title: "Your responsibilities",
       paragraphs: [
-        "Please provide accurate booking and email information, ensure you can access Google Meet, attend from an environment you consider appropriately private, use the service respectfully and lawfully, and do not record or distribute the session without permission.",
+        "Please provide accurate booking and email information, ensure you can access the supplied joining link with suitable equipment and connectivity, attend from an environment you consider appropriately private, use the service respectfully and lawfully, and do not record or distribute the session without permission.",
       ],
     },
     {
@@ -190,7 +191,7 @@ export const TERMS: LegalDocument = {
       id: "changes-version",
       title: "Changes and document version",
       paragraphs: [
-        "We may replace these Terms when the service, law or our practices change. The version applicable to a transaction is the version made available for that transaction; Version 1.1 does not apply retrospectively to a booking entered into under Version 1.0. This is Version 1.1, effective 23 September 2026.",
+        "We may replace these Terms when the service, law or our practices change. The version applicable to a transaction is the version made available for that transaction; Version 1.2 does not apply retrospectively to a booking entered into under an earlier version. This is Version 1.2, effective 24 September 2026.",
       ],
     },
   ],

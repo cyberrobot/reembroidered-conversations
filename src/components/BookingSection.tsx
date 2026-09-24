@@ -248,7 +248,7 @@ export const BookingSection: React.FC = () => {
           </p>
 
           <p className="mt-5 font-sans text-sm text-[#4B4643]">
-            55-minute private video conversation via Google Meet · £55
+            55-minute private video conversation · £55
           </p>
         </div>
 
@@ -335,7 +335,7 @@ export const BookingSection: React.FC = () => {
               Your details
             </h3>
             <p className="mb-6 text-sm text-[#68635F]">
-              55-minute private video conversation via Google Meet
+              55-minute private video conversation
             </p>
 
             <div className="grid sm:grid-cols-2 gap-4">

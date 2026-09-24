@@ -22,8 +22,8 @@ function text(document) {
 
 test("legal documents expose stable versioned metadata and unique section IDs", () => {
   assert.deepEqual(Object.keys(LEGAL_DOCUMENTS), ["terms", "privacy"]);
-  assert.equal(TERMS.version, "1.1");
-  assert.equal(TERMS.effectiveDate, "23 September 2026");
+  assert.equal(TERMS.version, "1.2");
+  assert.equal(TERMS.effectiveDate, "24 September 2026");
   assert.equal(PRIVACY_NOTICE.version, "1.0");
   assert.equal(PRIVACY_NOTICE.effectiveDate, "22 September 2026");
   for (const document of Object.values(LEGAL_DOCUMENTS)) {
@@ -39,7 +39,28 @@ test("Terms match the current product and preserve statutory consumer rights", (
   const terms = text(TERMS);
   assert.match(terms, /55-minute/);
   assert.match(terms, /£55 GBP/);
-  assert.match(terms, /Google Meet/);
+  assert.match(
+    TERMS.sections.find(({ id }) => id === "service").paragraphs.join(" "),
+    /one-to-one private video listening conversation/,
+  );
+  assert.doesNotMatch(
+    TERMS.sections.find(({ id }) => id === "service").paragraphs.join(" "),
+    /Google Meet/,
+  );
+  assert.match(
+    TERMS.sections
+      .find(({ id }) => id === "third-party-services")
+      .paragraphs.join(" "),
+    /Google Meet/,
+  );
+  assert.doesNotMatch(
+    TERMS.sections
+      .find(({ id }) => id === "customer-responsibilities")
+      .paragraphs.join(" "),
+    /Google Meet/,
+  );
+  assert.match(terms, /joining details/);
+  assert.match(terms, /joining link/);
   assert.match(terms, /automatic refund policy/i);
   assert.match(terms, /at least 24 hours/i);
   assert.match(terms, /Nothing in these Terms limits any cancellation/i);
@@ -80,6 +101,8 @@ test("Privacy Notice describes actual data flows without inventing consent or de
     "Stripe Checkout Session",
     "PaymentIntent",
     "Google Calendar",
+    "Google Meet URL",
+    "Google for Calendar and Google Meet",
     "Resend",
     "Cloudflare Turnstile",
     "keyed/HMAC pseudonymous client identifier",

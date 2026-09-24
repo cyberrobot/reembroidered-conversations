@@ -603,8 +603,8 @@ export function BookingManagementPage({
                 </div>
                 <InfoBox>
                   Your existing payment and booking identity stay the same. We
-                  update the existing Calendar invitation and preserve its
-                  Google Meet wherever Google does.
+                  update the existing calendar invitation and preserve its
+                  joining details where possible.
                 </InfoBox>
                 <button
                   type="button"
@@ -932,7 +932,7 @@ function BookingSummary({
         <Detail
           icon={<Video className="h-4 w-4" />}
           label="Format"
-          value="Private video meeting via Google Meet"
+          value="Private video conversation"
         />
         <Detail
           icon={<ShieldCheck className="h-4 w-4" />}
