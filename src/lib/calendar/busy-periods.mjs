@@ -99,6 +99,7 @@ export async function getBusyPeriods(
       stage: "token_refresh",
       category: error instanceof GoogleApiError ? error.category : undefined,
     });
+    if (error instanceof CalendarAvailabilityError) throw error;
     if (error instanceof GoogleApiError && error.category === "authorization") {
       throw new CalendarAvailabilityError("reauthorization_required");
     }
@@ -117,6 +118,7 @@ export async function getBusyPeriods(
       stage: "freebusy",
       category: error instanceof GoogleApiError ? error.category : undefined,
     });
+    if (error instanceof CalendarAvailabilityError) throw error;
     if (error instanceof GoogleApiError) {
       if (error.category === "authorization") {
         throw new CalendarAvailabilityError("reauthorization_required");

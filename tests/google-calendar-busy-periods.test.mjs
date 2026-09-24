@@ -191,6 +191,16 @@ test("service logs safe stage diagnostics while preserving failure classificatio
       { stage: "token_refresh", category: "unavailable" },
     ],
     [
+      "classified token refresh failure",
+      {
+        refreshAccessToken: async () => {
+          throw new CalendarAvailabilityError("reauthorization_required");
+        },
+      },
+      "reauthorization_required",
+      { stage: "token_refresh", category: undefined },
+    ],
+    [
       "unexpected token failure",
       {
         refreshAccessToken: async () => {
@@ -229,6 +239,16 @@ test("service logs safe stage diagnostics while preserving failure classificatio
       },
       "invalid_provider_response",
       { stage: "freebusy", category: "invalid_response" },
+    ],
+    [
+      "classified FreeBusy failure",
+      {
+        queryFreeBusy: async () => {
+          throw new CalendarAvailabilityError("invalid_provider_response");
+        },
+      },
+      "invalid_provider_response",
+      { stage: "freebusy", category: undefined },
     ],
   ];
 
