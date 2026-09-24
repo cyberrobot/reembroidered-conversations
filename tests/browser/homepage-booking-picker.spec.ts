@@ -87,6 +87,27 @@ async function openBookingPicker(page: Page) {
   return form;
 }
 
+test("homepage FAQ describes the online session and joining link", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.getByText("Online video", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText(/Private one-to-one video conversations/),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "How do we meet?" }).click();
+  await expect(
+    page.getByText(/55-minute private video conversation takes place online/),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/confirmed booking includes the joining link/),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "What actually happens during the session?" })
+    .click();
+  await expect(page.getByText(/We connect privately by video/)).toBeVisible();
+});
+
 for (const viewport of [
   { name: "desktop", width: 1280, height: 900 },
   { name: "tablet", width: 768, height: 1024 },
@@ -192,7 +213,7 @@ test("full-calendar later-date selection scrolls its date card into the visible 
     .toBe(true);
 });
 
-test("booking form exposes only the Google Meet product and submits consent without discarded fields", async ({
+test("booking form describes the private video conversation and submits consent without discarded fields", async ({
   page,
 }) => {
   const form = await openBookingPicker(page);
@@ -200,8 +221,9 @@ test("booking form exposes only the Google Meet product and submits consent with
   await expect(form.getByText("Step 2 of 3")).toBeVisible();
   await expect(form.getByText("Step 3 of 3")).toBeVisible();
   await expect(
-    form.getByText("55-minute private video conversation via Google Meet"),
+    form.getByText("55-minute private video conversation"),
   ).toBeVisible();
+  await expect(form).not.toContainText("via Google Meet");
   for (const unsupported of [
     "Audio-Only Call",
     "Google Meet or Zoom",

@@ -61,7 +61,7 @@ test("renders branded HTML and plain text from authoritative confirmed booking d
     "Re-Embroidered Conversations: One-to-One",
     "55 Minutes",
     'Hosted by <strong style="color:#1c2a39">Shahd Karaeen',
-    "Join via Google Meet",
+    "Join your session",
     "Warmly",
   ])
     assert.ok(result.html.includes(marker), `HTML should include ${marker}`);
@@ -72,6 +72,15 @@ test("renders branded HTML and plain text from authoritative confirmed booking d
   assert.ok(
     result.html.includes("Your Google Calendar invitation is sent separately"),
   );
+  assert.ok(
+    result.html.includes(
+      "Your joining link, session details, and booking information.",
+    ),
+  );
+  assert.ok(result.html.includes("Join on Google Meet"));
+  assert.ok(!result.html.includes("Join via Google Meet"));
+  assert.ok(!result.html.includes("Your Google Meet link"));
+  assert.ok(result.text.includes("Join on Google Meet:"));
   assert.ok(result.text.includes("55-minute session"));
   assert.ok(result.text.includes("Your session is confirmed"));
   for (const unsupported of ["Audio-Only", "Phone call", "Zoom"]) {

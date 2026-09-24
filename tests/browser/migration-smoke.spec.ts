@@ -361,7 +361,7 @@ test("one booking action creates a hold and automatically redirects to Checkout"
 
   await expect(page.getByText("Audio-Only Call")).toHaveCount(0);
   await expect(
-    page.getByText("55-minute private video conversation via Google Meet", {
+    page.getByText("55-minute private video conversation", {
       exact: true,
     }),
   ).toBeVisible();

@@ -122,7 +122,7 @@ test("confirmed booking renders authoritative details, secure headers, keyboard 
     "10:00–10:55",
     "55 min",
     "£55.00",
-    "Private video meeting via Google Meet",
+    "Private video conversation",
   ])
     await expect(page.getByText(text, { exact: false })).toBeVisible();
   for (const unsupported of [
@@ -204,6 +204,9 @@ test("reschedule selection, review, processing, success, and conflict use real A
   ).toBeVisible();
   await expect(page.getByText("Current time")).toBeVisible();
   await expect(page.getByText("New time", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText(/preserve its joining details where possible/),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Secure this new time" }).click();
   await expect(
     page.getByRole("heading", { name: "Securing your new time…" }),

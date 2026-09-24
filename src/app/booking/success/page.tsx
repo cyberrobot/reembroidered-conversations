@@ -49,7 +49,7 @@ export default async function BookingSuccessPage({
     "finalising-booking": {
       eyebrow: "Payment received",
       title: "We’re preparing your booking.",
-      body: "Your payment is secure. We’re finalising your calendar invitation and Google Meet link.",
+      body: "Your payment is secure. We’re finalising your calendar invitation and joining link.",
       icon: <Clock3 className="h-9 w-9" aria-hidden="true" />,
     },
     invalid: {

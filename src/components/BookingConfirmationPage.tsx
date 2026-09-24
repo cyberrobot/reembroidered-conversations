@@ -99,7 +99,7 @@ export function BookingConfirmationPage({
               <Detail
                 icon={<Video className="h-4 w-4" />}
                 label="Conversation Format"
-                value="Private video meeting via Google Meet"
+                value="Private video conversation"
               />
               <Detail
                 icon={<Mail className="h-4 w-4" />}
@@ -117,8 +117,8 @@ export function BookingConfirmationPage({
               </div>
               <p className="font-serif text-base italic leading-relaxed text-[#3E3A37] sm:text-lg">
                 When the time comes, find a quiet place where you won’t be
-                interrupted and use the Google Meet link below. I am looking
-                forward to meeting you.
+                interrupted and use the joining link below. I am looking forward
+                to meeting you.
               </p>
               <span className="mt-3 block text-right text-xs font-medium text-[#78716C]">
                 — Shahd Karaeen
