@@ -4,7 +4,7 @@ import { GOOGLE_CONNECTION_ID } from "./constants.mjs";
 import {
   decryptRefreshToken,
   encryptedRefreshTokenContainsOAuthState,
-} from "./token-encryption";
+} from "./token-encryption.ts";
 
 export type GoogleCalendarConnectionInput = {
   googleSubject: string;
@@ -19,7 +19,7 @@ export type GoogleCalendarConnectionInput = {
 export async function saveGoogleCalendarConnection(
   input: GoogleCalendarConnectionInput,
 ) {
-  const { db } = await import("@/lib/db");
+  const { db } = await import("../db.ts");
   return db.googleCalendarConnection.upsert({
     where: { id: GOOGLE_CONNECTION_ID },
     create: { id: GOOGLE_CONNECTION_ID, ...input },
@@ -30,7 +30,7 @@ export async function saveGoogleCalendarConnection(
 export async function isGoogleOAuthStateConsumed(
   state: string,
 ): Promise<boolean> {
-  const { db } = await import("@/lib/db");
+  const { db } = await import("../db.ts");
   const connection = await db.googleCalendarConnection.findUnique({
     where: { id: GOOGLE_CONNECTION_ID },
     select: { refreshTokenEncrypted: true },
@@ -44,7 +44,7 @@ export async function isGoogleOAuthStateConsumed(
 }
 
 export async function getGoogleCalendarConnection() {
-  const { db } = await import("@/lib/db");
+  const { db } = await import("../db.ts");
   return db.googleCalendarConnection.findUnique({
     where: { id: GOOGLE_CONNECTION_ID },
     select: {
@@ -61,7 +61,7 @@ export async function getGoogleCalendarConnection() {
 }
 
 export async function getGoogleCalendarCredentials() {
-  const { db } = await import("@/lib/db");
+  const { db } = await import("../db.ts");
   const connection = await db.googleCalendarConnection.findUnique({
     where: { id: GOOGLE_CONNECTION_ID },
   });
