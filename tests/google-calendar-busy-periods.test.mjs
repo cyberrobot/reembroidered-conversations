@@ -148,7 +148,7 @@ test("missing connection and missing scope fail explicitly before Google calls",
   assert.equal(googleCalls, 0);
 });
 
-test("service normalizes credential, authentication, provider, and malformed response failures", async () => {
+test("service logs safe stage diagnostics while preserving failure classifications", async () => {
   const scenarios = [
     [
       "credential load",
@@ -158,6 +158,17 @@ test("service normalizes credential, authentication, provider, and malformed res
         },
       },
       "provider_unavailable",
+      { stage: "credentials" },
+    ],
+    [
+      "OAuth configuration",
+      {
+        getOAuthConfig: async () => {
+          throw new Error("client-secret-value");
+        },
+      },
+      "provider_unavailable",
+      { stage: "config" },
     ],
     [
       "revoked token",
@@ -167,6 +178,7 @@ test("service normalizes credential, authentication, provider, and malformed res
         },
       },
       "reauthorization_required",
+      { stage: "token_refresh", category: "authorization" },
     ],
     [
       "token outage",
@@ -176,6 +188,27 @@ test("service normalizes credential, authentication, provider, and malformed res
         },
       },
       "provider_unavailable",
+      { stage: "token_refresh", category: "unavailable" },
+    ],
+    [
+      "classified token refresh failure",
+      {
+        refreshAccessToken: async () => {
+          throw new CalendarAvailabilityError("reauthorization_required");
+        },
+      },
+      "reauthorization_required",
+      { stage: "token_refresh", category: undefined },
+    ],
+    [
+      "unexpected token failure",
+      {
+        refreshAccessToken: async () => {
+          throw new Error("stored-refresh-token");
+        },
+      },
+      "provider_unavailable",
+      { stage: "token_refresh", category: undefined },
     ],
     [
       "FreeBusy auth",
@@ -185,6 +218,7 @@ test("service normalizes credential, authentication, provider, and malformed res
         },
       },
       "reauthorization_required",
+      { stage: "freebusy", category: "authorization" },
     ],
     [
       "FreeBusy outage",
@@ -194,6 +228,7 @@ test("service normalizes credential, authentication, provider, and malformed res
         },
       },
       "provider_unavailable",
+      { stage: "freebusy", category: "unavailable" },
     ],
     [
       "malformed response",
@@ -203,15 +238,51 @@ test("service normalizes credential, authentication, provider, and malformed res
         },
       },
       "invalid_provider_response",
+      { stage: "freebusy", category: "invalid_response" },
+    ],
+    [
+      "classified FreeBusy failure",
+      {
+        queryFreeBusy: async () => {
+          throw new CalendarAvailabilityError("invalid_provider_response");
+        },
+      },
+      "invalid_provider_response",
+      { stage: "freebusy", category: undefined },
     ],
   ];
-  for (const [name, overrides, code] of scenarios) {
-    await assert.rejects(
-      () => getBusyPeriods(from, to, serviceDependencies(overrides)),
-      (error) =>
-        rejectsWithCode(code)(error) && !error.message.includes("detail"),
-      name,
-    );
+
+  const originalError = console.error;
+  try {
+    for (const [name, overrides, code, expectedMetadata] of scenarios) {
+      const logs = [];
+      console.error = (...values) => logs.push(values);
+      await assert.rejects(
+        () => getBusyPeriods(from, to, serviceDependencies(overrides)),
+        (error) =>
+          rejectsWithCode(code)(error) && !error.message.includes("detail"),
+        name,
+      );
+      assert.deepEqual(
+        logs,
+        [["Google availability failed.", expectedMetadata]],
+        name,
+      );
+    }
+  } finally {
+    console.error = originalError;
+  }
+});
+
+test("successful availability lookup emits no failure diagnostic", async () => {
+  const logs = [];
+  const originalError = console.error;
+  console.error = (...values) => logs.push(values);
+  try {
+    assert.deepEqual(await getBusyPeriods(from, to, serviceDependencies()), []);
+    assert.deepEqual(logs, []);
+  } finally {
+    console.error = originalError;
   }
 });
 

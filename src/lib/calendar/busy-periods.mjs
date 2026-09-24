@@ -67,6 +67,9 @@ export async function getBusyPeriods(
   try {
     credentials = await dependencies.getCredentials();
   } catch {
+    console.error("Google availability failed.", {
+      stage: "credentials",
+    });
     throw new CalendarAvailabilityError("provider_unavailable");
   }
   if (!credentials) throw new CalendarAvailabilityError("not_connected");
@@ -74,13 +77,36 @@ export async function getBusyPeriods(
     throw new CalendarAvailabilityError("reauthorization_required");
   }
 
+  let config;
   try {
-    const config = await dependencies.getOAuthConfig();
-    const { accessToken } = await dependencies.refreshAccessToken({
+    config = await dependencies.getOAuthConfig();
+  } catch {
+    console.error("Google availability failed.", {
+      stage: "config",
+    });
+    throw new CalendarAvailabilityError("provider_unavailable");
+  }
+
+  let accessToken;
+  try {
+    ({ accessToken } = await dependencies.refreshAccessToken({
       refreshToken: credentials.refreshToken,
       clientId: config.clientId,
       clientSecret: config.clientSecret,
+    }));
+  } catch (error) {
+    console.error("Google availability failed.", {
+      stage: "token_refresh",
+      category: error instanceof GoogleApiError ? error.category : undefined,
     });
+    if (error instanceof CalendarAvailabilityError) throw error;
+    if (error instanceof GoogleApiError && error.category === "authorization") {
+      throw new CalendarAvailabilityError("reauthorization_required");
+    }
+    throw new CalendarAvailabilityError("provider_unavailable");
+  }
+
+  try {
     return await dependencies.queryFreeBusy({
       accessToken,
       calendarId: credentials.calendarId,
@@ -88,6 +114,10 @@ export async function getBusyPeriods(
       to,
     });
   } catch (error) {
+    console.error("Google availability failed.", {
+      stage: "freebusy",
+      category: error instanceof GoogleApiError ? error.category : undefined,
+    });
     if (error instanceof CalendarAvailabilityError) throw error;
     if (error instanceof GoogleApiError) {
       if (error.category === "authorization") {
