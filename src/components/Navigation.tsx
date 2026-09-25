@@ -78,6 +78,12 @@ export const Navigation: React.FC = () => {
             About Shahd
           </button>
           <button
+            onClick={() => scrollTo("international-recognition")}
+            className="hover:text-[#A35048] transition-colors cursor-pointer py-1"
+          >
+            Literary Voice
+          </button>
+          <button
             onClick={() => scrollTo("the-book")}
             className="hover:text-[#A35048] transition-colors cursor-pointer py-1"
           >

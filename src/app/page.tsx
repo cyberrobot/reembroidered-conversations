@@ -8,6 +8,7 @@ import { HeroVideo } from "@/components/HeroVideo";
 import { Navigation } from "@/components/Navigation";
 import { ThemeQuestionInterstitial } from "@/components/ThemeQuestionInterstitial";
 import { LegalModal } from "@/components/LegalModal";
+import { InternationalRecognition } from "@/components/InternationalRecognition";
 
 export default function Home() {
   return (
@@ -23,6 +24,7 @@ export default function Home() {
           <Experience />
           <ThemeQuestionInterstitial />
           <AboutShahd />
+          <InternationalRecognition />
           <BookShowcase />
           <BookingSection />
           <BoundariesSection />
