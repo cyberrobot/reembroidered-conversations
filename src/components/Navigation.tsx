@@ -155,6 +155,12 @@ export const Navigation: React.FC = () => {
             About Shahd
           </button>
           <button
+            onClick={() => scrollTo("international-recognition")}
+            className="text-left text-[#4B4643] hover:text-[#A35048] py-1.5"
+          >
+            Literary Voice
+          </button>
+          <button
             onClick={() => scrollTo("the-book")}
             className="text-left text-[#4B4643] hover:text-[#A35048] py-1.5"
           >

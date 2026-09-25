@@ -91,17 +91,9 @@ export const InternationalRecognition = () => {
                 to honor the exact weight of what a person finally finds the
                 courage to speak.”
               </p>
-              {
-                <div className="pt-1">
-                  <ScrollToBookingButton title="Experience an unhurried 55-minute session →" />
-                  {/* <button
-                    onClick={handleScrollToBooking}
-                    className="text-xs font-sans font-medium text-[#A35048] hover:text-[#8C4038] underline underline-offset-4 cursor-pointer"
-                  >
-                    Experience an unhurried 55-minute session →
-                  </button> */}
-                </div>
-              }
+              <div className="pt-1">
+                <ScrollToBookingButton title="Experience an unhurried 55-minute session →" />
+              </div>
             </div>
           </div>
 

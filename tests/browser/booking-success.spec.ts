@@ -25,8 +25,8 @@ async function seedBooking(
   const sessionId = `cs_test_confirmation_${index}`;
   await pool!.query('DELETE FROM "bookings" WHERE "id" = $1', [id]);
   await pool!.query(
-    `INSERT INTO "bookings" ("id", "name", "email", "startAt", "endAt", "timezone", "status", "stripeCheckoutSessionId", "stripePaymentIntentId", "calendarEventId", "meetingUrl", "expiresAt")
-     VALUES ($1, 'Sarah Jenkins', $6, '2026-09-24T13:00:00.000Z', '2026-09-24T13:55:00.000Z', 'Europe/London', $2::"BookingStatus", $3, 'pi_test_confirmation', $4, $5, '2026-09-24T14:30:00.000Z')`,
+    `INSERT INTO "bookings" ("id", "name", "email", "startAt", "endAt", "timezone", "status", "stripeCheckoutSessionId", "stripePaymentIntentId", "calendarEventId", "meetingUrl", "expiresAt", "createdAt")
+     VALUES ($1, 'Sarah Jenkins', $6, '2026-09-24T13:00:00.000Z', '2026-09-24T13:55:00.000Z', 'Europe/London', $2::"BookingStatus", $3, 'pi_test_confirmation', $4, $5, '2026-09-24T14:30:00.000Z', '2026-09-24T12:00:00.000Z')`,
     [
       id,
       status,
