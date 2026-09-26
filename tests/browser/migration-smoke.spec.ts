@@ -207,6 +207,7 @@ test("homepage, navigation, Mux fallback, and transcript work without browser er
     "the-experience",
     "A question from Hope: Re-Embroidered",
     "about-shahd",
+    "international-recognition",
     "the-book",
     "book-session",
     "boundaries",
@@ -247,6 +248,46 @@ test("homepage, navigation, Mux fallback, and transcript work without browser er
   expect(failures).toEqual([]);
 });
 
+test("International Recognition links and booking action work", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await mockAvailability(page);
+  await page.goto("/");
+
+  const section = page.locator("#international-recognition");
+  await expect(section).toBeAttached();
+  await expect(
+    section.getByRole("heading", {
+      name: "An International Voice on Silence, Memory & Justice",
+    }),
+  ).toBeVisible();
+
+  const profile = section.getByRole("link", {
+    name: "View Nexus Instituut Profile",
+  });
+  await expect(profile).toHaveAttribute(
+    "href",
+    "https://nexus-instituut.nl/person/shahd-karaeen",
+  );
+  await expect(profile).toHaveAttribute("target", "_blank");
+  await expect(profile).toHaveAttribute("rel", "noopener noreferrer");
+
+  const desktopLink = page
+    .locator("#main-nav nav")
+    .getByRole("button", { name: "Literary Voice" });
+  await expect(desktopLink).toBeVisible();
+  await desktopLink.click();
+  await expect(section).toBeInViewport();
+
+  await section
+    .getByRole("button", {
+      name: "Experience an unhurried 55-minute session →",
+    })
+    .click();
+  await expect(page.locator("#book-session")).toBeInViewport();
+});
+
 test("mobile navigation opens, closes, and navigates", async ({ page }) => {
   const failures = collectBrowserFailures(page);
   await page.setViewportSize({ width: 390, height: 844 });
@@ -263,6 +304,13 @@ test("mobile navigation opens, closes, and navigates", async ({ page }) => {
   await expect(
     page.getByRole("button", { name: "Meet Shahd & Video" }),
   ).toBeHidden();
+
+  await toggle.click();
+  const literaryVoice = page.getByRole("button", { name: "Literary Voice" });
+  await expect(literaryVoice).toBeVisible();
+  await literaryVoice.click();
+  await expect(literaryVoice).toBeHidden();
+  await expect(page.locator("#international-recognition")).toBeInViewport();
 
   await toggle.click();
   await page
@@ -1100,6 +1148,7 @@ test("responsive visual tokens and layouts remain intact", async ({
 }, testInfo) => {
   const viewports = [
     { name: "desktop", width: 1280, height: 720 },
+    { name: "desktop-lg", width: 1024, height: 768 },
     { name: "tablet", width: 768, height: 1024 },
     { name: "mobile", width: 390, height: 844 },
   ];
@@ -1153,7 +1202,7 @@ test("responsive visual tokens and layouts remain intact", async ({
     expect(visualTokens.muxRatio).toBeCloseTo(16 / 9, 1);
     expect(visualTokens.overflow).toBeLessThanOrEqual(0);
 
-    if (viewport.name === "desktop") {
+    if (viewport.name === "desktop" || viewport.name === "desktop-lg") {
       await expect(page.locator("#main-nav nav")).toBeVisible();
       await expect(page.locator("#mobile-nav-toggle")).toBeHidden();
     } else {
