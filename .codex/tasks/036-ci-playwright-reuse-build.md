@@ -51,16 +51,15 @@ playwright.config.ts
 package.json
 ```
 
-Relevant current behaviour:
+Relevant final behaviour:
 
 - CI runs `npm run build` before browser tests.
 - `npm run build` executes `next build --webpack`.
 - `npm run test:browser` executes `playwright test`.
-- Playwright currently starts its local web server with:
-  ```text
-  npm run build && next start ...
-  ```
-- therefore CI performs the production build twice.
+- CI supplies the deterministic Mux fixture to the explicit production build.
+- Playwright starts the existing build with `next start` when `CI=true`.
+- Local Playwright execution still runs `npm run build && next start`.
+- The complete CI job invokes `next build --webpack` exactly once.
 
 ### Relevant symbols
 
@@ -86,21 +85,17 @@ env:
 
 ### Expected change surface
 
-Expected primary change:
+Expected implementation files:
 
 ```text
 playwright.config.ts
+.github/workflows/ci.yml
 ```
 
-`.github/workflows/ci.yml` should not need functional changes because it already:
-
-1. builds the production application;
-2. installs Playwright Chromium;
-3. runs the browser suite.
-
-A minimal explanatory comment may be added where useful.
-
-If additional files must change, explain why in the completion report.
+The workflow retains its explicit production build and supplies
+`NEXT_PUBLIC_MUX_PLAYBACK_ID=invalid-playback-id-for-browser-smoke` to that step.
+Next.js compiles `NEXT_PUBLIC_*` values into the client bundle at build time;
+setting the fixture only when `next start` runs cannot change the existing bundle.
 
 ### Excluded areas
 
@@ -133,9 +128,9 @@ Before editing, confirm from the current branch that:
 
 - `.github/workflows/ci.yml` still runs `npm run build` before `npm run test:browser`;
 - the CI job still sets `CI: true`;
-- `playwright.config.ts` still performs `npm run build && next start` when it owns the web server;
+- `playwright.config.ts` builds before startup locally and starts the existing build in CI;
 - `PLAYWRIGHT_BASE_URL` still disables Playwright's local `webServer`;
-- no existing helper or configuration already differentiates local and CI web-server startup.
+- the explicit CI build receives the same Mux fixture used by Playwright locally.
 
 Do not assume these remain unchanged if `main` has moved.
 
@@ -150,6 +145,7 @@ After this PR:
 ```text
 CI
  ↓
+NEXT_PUBLIC_MUX_PLAYBACK_ID=invalid-playback-id-for-browser-smoke
 npm run build
  ↓
 Playwright
@@ -195,7 +191,7 @@ Completion means:
 
 ---
 
-## Current architecture
+## Final architecture
 
 The GitHub Actions CI job currently runs the relevant stages sequentially:
 
@@ -233,13 +229,13 @@ which maps to:
 next build --webpack
 ```
 
-However, `playwright.config.ts` currently owns the application web server for normal browser-test execution and uses a command equivalent to:
+Outside CI, `playwright.config.ts` owns the application web server and uses:
 
 ```bash
 npm run build && next start --hostname 0.0.0.0 --port <port>
 ```
 
-As a result, CI builds the same commit twice.
+In CI, Playwright runs `next start` directly against the `.next` artifact from the explicit build step. That build receives the Mux fixture at compilation time.
 
 ### Observed failure
 
@@ -267,6 +263,19 @@ PR #35's own CI run had already passed the same browser suite.
 The font configuration in `src/app/layout.tsx` was also unchanged by PR #35.
 
 PR #36 should therefore eliminate the redundant second build rather than modify unrelated application code.
+
+### Mux fixture regression during implementation
+
+The first version of PR #36 correctly removed the second build, but CI run #109
+failed because the earlier CI build did not receive
+`NEXT_PUBLIC_MUX_PLAYBACK_ID=invalid-playback-id-for-browser-smoke`.
+The existing browser tests require this value at build time. Failures occurred in
+`tests/browser/migration-smoke.spec.ts`, including tests using
+`openHomeWithMuxFallback()`.
+
+The fix supplies the Mux test fixture to the authoritative CI build environment.
+It preserves the single build and the existing fallback tests without weakening
+or removing assertions.
 
 ---
 
@@ -337,6 +346,16 @@ unless inspection establishes a better existing convention.
 
 `PLAYWRIGHT_BASE_URL` behaviour must remain unchanged.
 
+The existing Mux fixture must be supplied to the explicit CI production-build step:
+
+```text
+NEXT_PUBLIC_MUX_PLAYBACK_ID=invalid-playback-id-for-browser-smoke
+```
+
+This deterministic fixture is deliberately applied only to the CI test build,
+which is not deployed to production. Local Playwright builds continue to receive
+it through `webServer.env`. No production deployment configuration changes are required.
+
 ### Database or schema
 
 None.
@@ -353,7 +372,7 @@ None.
 
 Production deployment configuration is unchanged.
 
-This task changes only browser-test web-server startup behaviour.
+This task changes browser-test startup and the CI test build environment.
 
 The existing explicit CI production-build step remains authoritative.
 
@@ -438,6 +457,8 @@ Keep the existing explicit production-build step:
 
 ```yaml
 - name: Build production application
+  env:
+    NEXT_PUBLIC_MUX_PLAYBACK_ID: invalid-playback-id-for-browser-smoke
   run: npm run build
 ```
 
@@ -515,7 +536,12 @@ Any unexpected visual difference should be investigated rather than accepted aut
 
 ### Behaviour
 
-- [ ] CI still contains one explicit `npm run build` production-build step.
+- [ ] CI contains one explicit `npm run build` production-build step.
+- [ ] That build receives `NEXT_PUBLIC_MUX_PLAYBACK_ID=invalid-playback-id-for-browser-smoke`.
+- [ ] The existing Mux fallback behaviour remains covered.
+- [ ] No browser tests are weakened or removed.
+- [ ] No font configuration changes are made.
+- [ ] No production environment changes are required.
 - [ ] CI performs only **one** `next build --webpack` invocation during the complete test job.
 - [ ] The Playwright browser-test stage does not invoke `npm run build` when `CI=true`.
 - [ ] In CI, Playwright starts the `.next` artifact produced by the preceding production-build step.
@@ -585,7 +611,7 @@ Run the existing browser suite in CI mode against an already-created production 
 The important infrastructure assertion is:
 
 ```text
-npm run build
+NEXT_PUBLIC_MUX_PLAYBACK_ID=invalid-playback-id-for-browser-smoke npm run build
 ↓
 CI=true npm run test:browser
 ```
@@ -627,8 +653,8 @@ npm run lint
 # Unit/integration tests
 npm test
 
-# Production build
-npm run build
+# Production build with the browser fixture compiled into the client bundle
+NEXT_PUBLIC_MUX_PLAYBACK_ID=invalid-playback-id-for-browser-smoke npm run build
 
 # CI-mode browser verification.
 # This must reuse the build created immediately above.
@@ -666,6 +692,36 @@ If a verification command cannot run in the available environment, document:
 2. why it could not run;
 3. what was verified instead.
 
+## Successful CI verification evidence
+
+CI run #111 passed:
+
+```text
+Build production application → success
+Run browser tests            → success
+```
+
+The production-build log records:
+
+```text
+NEXT_PUBLIC_MUX_PLAYBACK_ID: invalid-playback-id-for-browser-smoke
+
+> next build --webpack
+```
+
+Later, the browser-test log records:
+
+```text
+> playwright test
+Running 50 tests using 1 worker
+...
+50 passed (1.7m)
+```
+
+The job contains exactly one `next build --webpack` invocation. Playwright reuses
+that build. No implementation changes or expensive test reruns are required for
+the final Markdown and PR metadata cleanup; run `npm run format:check`.
+
 ---
 
 ## Completion report
@@ -677,7 +733,7 @@ When implementation is complete, provide a concise summary containing:
 State:
 
 - how `playwright.config.ts` now distinguishes CI from local execution;
-- that CI reuses its existing `.next` build;
+- that CI reuses its existing `.next` build containing the build-time Mux fixture;
 - that local browser-test behaviour remains build-and-start.
 
 ### Tests
