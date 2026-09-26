@@ -69,6 +69,8 @@ jobs:
         run: npm run lint
 
       - name: Build production application
+        env:
+          NEXT_PUBLIC_MUX_PLAYBACK_ID: invalid-playback-id-for-browser-smoke
         run: npm run build
 
       - name: Install Playwright Chromium

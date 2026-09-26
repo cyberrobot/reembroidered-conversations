@@ -330,7 +330,7 @@ as CI merely because a non-empty string is truthy.
 Prefer an explicit comparison appropriate to the repository's current value, for example:
 
 ```ts
-process.env.CI === "true"
+process.env.CI === "true";
 ```
 
 unless inspection establishes a better existing convention.
@@ -482,8 +482,7 @@ A likely implementation shape is:
 ```ts
 const isCi = process.env.CI === "true";
 
-const startCommand =
-  `./node_modules/.bin/next start --hostname 0.0.0.0 --port ${testPort}`;
+const startCommand = `./node_modules/.bin/next start --hostname 0.0.0.0 --port ${testPort}`;
 
 const webServerCommand = isCi
   ? startCommand
