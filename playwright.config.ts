@@ -4,6 +4,11 @@ const invalidPlaybackId = "invalid-playback-id-for-browser-smoke";
 const managementTestSecret = "playwright-management-secret-at-least-32-bytes";
 const testPort = process.env.PLAYWRIGHT_PORT ?? "3000";
 const externalBaseUrl = process.env.PLAYWRIGHT_BASE_URL;
+const isCi = process.env.CI === "true";
+const startCommand = `./node_modules/.bin/next start --hostname 0.0.0.0 --port ${testPort}`;
+const webServerCommand = isCi
+  ? startCommand
+  : `npm run build && ${startCommand}`;
 
 export default defineConfig({
   testDir: "./tests/browser",
@@ -32,7 +37,7 @@ export default defineConfig({
   webServer: externalBaseUrl
     ? undefined
     : {
-        command: `npm run build && ./node_modules/.bin/next start --hostname 0.0.0.0 --port ${testPort}`,
+        command: webServerCommand,
         url: `http://127.0.0.1:${testPort}`,
         reuseExistingServer: false,
         timeout: 120_000,
