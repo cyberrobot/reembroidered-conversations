@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import Stripe from "stripe";
 import { createStripeWebhookHandler } from "../src/lib/booking/stripe-webhook-handler.ts";
 import {
   processStripeWebhookEvent,
@@ -675,5 +676,222 @@ test("webhook handler logs only the safe reconciliation category for email failu
     });
   } finally {
     console.error = originalError;
+  }
+});
+
+const terminalStatuses = ["CANCELLED", "REFUNDED"];
+const noTerminalProcessing = async () =>
+  assert.fail("Terminal replay must not invoke downstream processing");
+
+for (const status of terminalStatuses) {
+  test(`${status} payment replay preserves all values and skips downstream callbacks twice`, async () => {
+    for (const calendar of [
+      { calendarEventId: null, meetingUrl: null },
+      { calendarEventId, meetingUrl },
+    ]) {
+      const p = persistence({
+        status,
+        stripeCheckoutSessionId: "cs_test_one",
+        stripePaymentIntentId: "pi_test_one",
+        cancellationRefundDue: true,
+        calendarCancelledAt: null,
+        stripeRefundId: null,
+        stripeRefundStatus: "pending",
+        refundedAt: null,
+        ...calendar,
+      });
+      const before = structuredClone(p.get());
+      p.confirm = noTerminalProcessing;
+      p.recordConfirmationEmail = noTerminalProcessing;
+      for (let delivery = 0; delivery < 2; delivery += 1) {
+        await processStripeWebhookEvent(
+          event("checkout.session.completed"),
+          p,
+          noTerminalProcessing,
+          noTerminalProcessing,
+          noTerminalProcessing,
+        );
+        assert.deepEqual(p.get(), before);
+      }
+    }
+  });
+
+  test(`${status} rejects inconsistent persisted payment correlation`, async () => {
+    for (const override of [
+      { stripeCheckoutSessionId: "cs_other" },
+      { stripeCheckoutSessionId: null },
+      { stripePaymentIntentId: "pi_other" },
+      { stripePaymentIntentId: null },
+    ]) {
+      const p = persistence({
+        status,
+        stripeCheckoutSessionId: "cs_test_one",
+        stripePaymentIntentId: "pi_test_one",
+        ...override,
+      });
+      const before = structuredClone(p.get());
+      await assert.rejects(
+        () =>
+          processStripeWebhookEvent(
+            event("checkout.session.completed"),
+            p,
+            noTerminalProcessing,
+            noTerminalProcessing,
+            noTerminalProcessing,
+          ),
+        StripeWebhookReconciliationError,
+      );
+      assert.deepEqual(p.get(), before);
+    }
+  });
+
+  test(`${status} preserves completed Session validation`, async () => {
+    for (const override of [
+      { amount_total: 1 },
+      { currency: "usd" },
+      { payment_status: "unpaid" },
+      { mode: "subscription" },
+      { metadata: { bookingId: "other" } },
+      { client_reference_id: "other" },
+      { payment_intent: null },
+      { payment_intent: "" },
+      { id: "" },
+      { id: null },
+      { object: "payment_intent" },
+      { status: "expired" },
+    ]) {
+      const p = persistence({
+        status,
+        stripeCheckoutSessionId: "cs_test_one",
+        stripePaymentIntentId: "pi_test_one",
+      });
+      const before = structuredClone(p.get());
+      await assert.rejects(
+        () =>
+          processStripeWebhookEvent(
+            event("checkout.session.completed", override),
+            p,
+            noTerminalProcessing,
+            noTerminalProcessing,
+            noTerminalProcessing,
+          ),
+        StripeWebhookReconciliationError,
+      );
+      assert.deepEqual(p.get(), before);
+    }
+  });
+}
+
+test("expired unpaid booking rejects a later contradictory completed payment", async () => {
+  const p = persistence();
+  await processStripeWebhookEvent(
+    event("checkout.session.expired", {
+      payment_status: "unpaid",
+      payment_intent: null,
+    }),
+    p,
+  );
+  const before = structuredClone(p.get());
+  await assert.rejects(
+    () =>
+      processStripeWebhookEvent(
+        event("checkout.session.completed"),
+        p,
+        noTerminalProcessing,
+        noTerminalProcessing,
+        noTerminalProcessing,
+      ),
+    StripeWebhookReconciliationError,
+  );
+  assert.deepEqual(p.get(), before);
+});
+
+test("missing bookings and unknown states still fail reconciliation", async () => {
+  for (const booking of [
+    null,
+    {
+      status: "UNKNOWN",
+      stripeCheckoutSessionId: "cs_test_one",
+      stripePaymentIntentId: "pi_test_one",
+    },
+  ]) {
+    const p = persistence();
+    p.markPaid = async () => ({ count: 0 });
+    p.findBooking = async () => booking;
+    await assert.rejects(
+      () =>
+        processStripeWebhookEvent(
+          event("checkout.session.completed"),
+          p,
+          noTerminalProcessing,
+          noTerminalProcessing,
+          noTerminalProcessing,
+        ),
+      StripeWebhookReconciliationError,
+    );
+  }
+});
+
+test("terminal HTTP replays verify Stripe signatures and preserve success and failure contracts", async () => {
+  const stripe = new Stripe("sk_test_fixture");
+  const secret = "whsec_terminal_replay_fixture";
+  for (const status of terminalStatuses) {
+    for (const payment of ["pi_test_one", "pi_other"]) {
+      const p = persistence({
+        status,
+        stripeCheckoutSessionId: "cs_test_one",
+        stripePaymentIntentId: "pi_test_one",
+      });
+      const before = structuredClone(p.get());
+      const payload = JSON.stringify(
+        event("checkout.session.completed", { payment_intent: payment }),
+      );
+      const signature = stripe.webhooks.generateTestHeaderString({
+        payload,
+        secret,
+      });
+      let processed = 0;
+      const handler = createStripeWebhookHandler({
+        constructEvent: (body, header) =>
+          stripe.webhooks.constructEvent(body, header, secret),
+        processEvent: async (verified) => {
+          processed += 1;
+          await processStripeWebhookEvent(
+            verified,
+            p,
+            noTerminalProcessing,
+            noTerminalProcessing,
+            noTerminalProcessing,
+          );
+        },
+      });
+      for (const header of [undefined, "invalid", signature, signature]) {
+        const response = await handler(
+          new Request("http://localhost/api/stripe/webhook", {
+            method: "POST",
+            body: payload,
+            headers: header ? { "stripe-signature": header } : {},
+          }),
+        );
+        const expected =
+          header !== signature ? 400 : payment === "pi_test_one" ? 200 : 500;
+        assert.equal(response.status, expected);
+        assert.deepEqual(
+          await response.json(),
+          expected === 200
+            ? { received: true }
+            : {
+                error: {
+                  code:
+                    expected === 400
+                      ? "invalid_signature"
+                      : "webhook_processing_failed",
+                },
+              },
+        );
+        assert.deepEqual(p.get(), before);
+      }
+      assert.equal(processed, 2);
+    }
   }
 });

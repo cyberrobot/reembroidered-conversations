@@ -167,12 +167,24 @@ export async function reconcilePaidBooking(
   const booking = await persistence.findBooking(bookingId);
   if (
     !booking ||
-    !["PAID", "CONFIRMED"].includes(booking.status) ||
     booking.stripeCheckoutSessionId !== sessionId ||
     booking.stripePaymentIntentId !== paymentIntentId
   ) {
     throw new StripeWebhookReconciliationError();
   }
+  if (["CANCELLED", "REFUNDED"].includes(booking.status)) {
+    if (
+      typeof booking.stripeCheckoutSessionId !== "string" ||
+      !booking.stripeCheckoutSessionId.trim() ||
+      typeof booking.stripePaymentIntentId !== "string" ||
+      !booking.stripePaymentIntentId.trim()
+    ) {
+      throw new StripeWebhookReconciliationError();
+    }
+    return;
+  }
+  if (!["PAID", "CONFIRMED"].includes(booking.status))
+    throw new StripeWebhookReconciliationError();
   await onValidated?.(booking);
   if (booking.status === "CONFIRMED") {
     let expectedEventId;
