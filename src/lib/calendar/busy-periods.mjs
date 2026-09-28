@@ -27,6 +27,11 @@ const defaultDependencies = {
       await import("../google-calendar/config.ts");
     return getGoogleOAuthConfig();
   },
+  getAvailabilityCalendarId: async () => {
+    const { getGoogleAvailabilityCalendarId } =
+      await import("../google-calendar/config.ts");
+    return getGoogleAvailabilityCalendarId();
+  },
   refreshAccessToken: async (input) => {
     const { refreshGoogleAccessToken } =
       await import("../google-calendar/google-api.mjs");
@@ -40,7 +45,7 @@ const defaultDependencies = {
 };
 
 /**
- * Return busy periods for the connected practitioner's primary calendar.
+ * Return busy periods for the configured practitioner availability calendar.
  * The interval is [from, to), expressed as absolute instants.
  *
  * @param {Date} from
@@ -78,8 +83,10 @@ export async function getBusyPeriods(
   }
 
   let config;
+  let availabilityCalendarId;
   try {
     config = await dependencies.getOAuthConfig();
+    availabilityCalendarId = await dependencies.getAvailabilityCalendarId();
   } catch {
     console.error("Google availability failed.", {
       stage: "config",
@@ -109,7 +116,7 @@ export async function getBusyPeriods(
   try {
     return await dependencies.queryFreeBusy({
       accessToken,
-      calendarId: credentials.calendarId,
+      calendarId: availabilityCalendarId,
       from,
       to,
     });

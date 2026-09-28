@@ -28,6 +28,10 @@ export function getGoogleOAuthConfig() {
   };
 }
 
+export function getGoogleAvailabilityCalendarId() {
+  return required("GOOGLE_AVAILABILITY_CALENDAR_ID");
+}
+
 export function getAdminSessionSecret() {
   const secret = required("ADMIN_SESSION_SECRET");
   if (Buffer.byteLength(secret) < 32) {
