@@ -15,13 +15,14 @@ import {
   GOOGLE_FREEBUSY_ENDPOINT,
   GOOGLE_TOKEN_ENDPOINT,
 } from "../src/lib/google-calendar/constants.mjs";
+import { getGoogleAvailabilityCalendarId } from "../src/lib/google-calendar/config.ts";
 
 const from = new Date("2030-01-01T09:00:00Z");
 const to = new Date("2030-01-01T18:00:00Z");
 
 function credentials(overrides = {}) {
   return {
-    calendarId: "primary@example.com",
+    calendarId: "booking-calendar@example.com",
     grantedScopes: [GOOGLE_FREEBUSY_SCOPE],
     refreshToken: "stored-refresh-token",
     ...overrides,
@@ -35,6 +36,7 @@ function serviceDependencies(overrides = {}) {
       clientId: "client-id",
       clientSecret: "client-secret",
     }),
+    getAvailabilityCalendarId: async () => "availability-calendar@example.com",
     refreshAccessToken: async () => ({ accessToken: "temporary-access-token" }),
     queryFreeBusy: async () => [],
     ...overrides,
@@ -74,7 +76,7 @@ test("invalid ranges fail before loading credentials or calling Google", async (
   }
 });
 
-test("service uses persisted credentials and maps the complete flow without exposing them", async () => {
+test("service uses persisted credentials to query the separate availability calendar", async () => {
   const calls = [];
   const expected = [
     { startAt: "2030-01-01T10:00:00.000Z", endAt: "2030-01-01T11:00:00.000Z" },
@@ -106,12 +108,74 @@ test("service uses persisted credentials and maps the complete flow without expo
     "freebusy",
     {
       accessToken: "temporary-access-token",
-      calendarId: "primary@example.com",
+      calendarId: "availability-calendar@example.com",
       from,
       to,
     },
   ]);
   assert.deepEqual(Object.keys(result[0]), ["startAt", "endAt"]);
+});
+
+test("availability calendar ID is required and trimmed from server configuration", () => {
+  const previous = process.env.GOOGLE_AVAILABILITY_CALENDAR_ID;
+  try {
+    delete process.env.GOOGLE_AVAILABILITY_CALENDAR_ID;
+    assert.throws(
+      () => getGoogleAvailabilityCalendarId(),
+      /GOOGLE_AVAILABILITY_CALENDAR_ID is required/,
+    );
+    process.env.GOOGLE_AVAILABILITY_CALENDAR_ID = "  ";
+    assert.throws(
+      () => getGoogleAvailabilityCalendarId(),
+      /GOOGLE_AVAILABILITY_CALENDAR_ID is required/,
+    );
+    process.env.GOOGLE_AVAILABILITY_CALENDAR_ID =
+      " availability-calendar@example.com ";
+    assert.equal(
+      getGoogleAvailabilityCalendarId(),
+      "availability-calendar@example.com",
+    );
+  } finally {
+    if (previous === undefined)
+      delete process.env.GOOGLE_AVAILABILITY_CALENDAR_ID;
+    else process.env.GOOGLE_AVAILABILITY_CALENDAR_ID = previous;
+  }
+});
+
+test("missing availability configuration fails closed before token refresh or FreeBusy", async () => {
+  let externalCalls = 0;
+  const logs = [];
+  const originalError = console.error;
+  console.error = (...values) => logs.push(values);
+  try {
+    await assert.rejects(
+      () =>
+        getBusyPeriods(
+          from,
+          to,
+          serviceDependencies({
+            getAvailabilityCalendarId: async () => {
+              throw new Error("GOOGLE_AVAILABILITY_CALENDAR_ID is required.");
+            },
+            refreshAccessToken: async () => {
+              externalCalls += 1;
+              return { accessToken: "token" };
+            },
+            queryFreeBusy: async () => {
+              externalCalls += 1;
+              return [];
+            },
+          }),
+        ),
+      rejectsWithCode("provider_unavailable"),
+    );
+    assert.equal(externalCalls, 0);
+    assert.deepEqual(logs, [
+      ["Google availability failed.", { stage: "config" }],
+    ]);
+  } finally {
+    console.error = originalError;
+  }
 });
 
 test("missing connection and missing scope fail explicitly before Google calls", async () => {
@@ -165,6 +229,16 @@ test("service logs safe stage diagnostics while preserving failure classificatio
       {
         getOAuthConfig: async () => {
           throw new Error("client-secret-value");
+        },
+      },
+      "provider_unavailable",
+      { stage: "config" },
+    ],
+    [
+      "availability calendar configuration",
+      {
+        getAvailabilityCalendarId: async () => {
+          throw new Error("personal-calendar@example.com");
         },
       },
       "provider_unavailable",

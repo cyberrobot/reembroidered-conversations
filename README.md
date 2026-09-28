@@ -34,28 +34,29 @@ Configure the production web service in Railway with the following environment v
 
 Configure these on the Railway **web service**.
 
-| Variable                         | Production value                                                       |
-| -------------------------------- | ---------------------------------------------------------------------- |
-| `DATABASE_URL`                   | Railway production PostgreSQL connection string                        |
-| `APP_URL`                        | `https://example.com`                                                  |
-| `STRIPE_SECRET_KEY`              | Stripe live secret/restricted API key                                  |
-| `STRIPE_WEBHOOK_SECRET`          | Production Stripe webhook signing secret (`whsec_...`)                 |
-| `GOOGLE_OAUTH_CLIENT_ID`         | Production Google OAuth client ID                                      |
-| `GOOGLE_OAUTH_CLIENT_SECRET`     | Production Google OAuth client secret                                  |
-| `GOOGLE_ADMIN_EMAIL`             | Practitioner Google account permitted to connect                       |
-| `GOOGLE_TOKEN_ENCRYPTION_KEY`    | Base64 encoding of exactly 32 random bytes                             |
-| `ADMIN_SESSION_SECRET`           | High-entropy secret, minimum 32 bytes                                  |
-| `RESEND_API_KEY`                 | Production Resend API key                                              |
-| `BOOKING_EMAIL_FROM`             | Verified production sender                                             |
-| `BOOKING_CHANGES_URL`            | `https://example.com/booking/manage`                                   |
-| `BOOKING_MANAGEMENT_SECRET`      | High-entropy booking-management signing secret                         |
-| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Production Cloudflare Turnstile site key                               |
-| `TURNSTILE_SECRET_KEY`           | Production Turnstile secret                                            |
-| `TURNSTILE_EXPECTED_HOSTNAME`    | Production hostname only, e.g. `example.com`                           |
-| `TRUSTED_CLIENT_IP_HEADER`       | `cf-connecting-ip` when traffic is securely proxied through Cloudflare |
-| `ABUSE_PROTECTION_HMAC_SECRET`   | High-entropy secret, minimum 32 bytes                                  |
-| `BOOKING_RECONCILIATION_SECRET`  | High-entropy shared reconciliation secret                              |
-| `NEXT_PUBLIC_MUX_PLAYBACK_ID`    | Optional Mux playback ID override                                      |
+| Variable                          | Production value                                                       |
+| --------------------------------- | ---------------------------------------------------------------------- |
+| `DATABASE_URL`                    | Railway production PostgreSQL connection string                        |
+| `APP_URL`                         | `https://example.com`                                                  |
+| `STRIPE_SECRET_KEY`               | Stripe live secret/restricted API key                                  |
+| `STRIPE_WEBHOOK_SECRET`           | Production Stripe webhook signing secret (`whsec_...`)                 |
+| `GOOGLE_OAUTH_CLIENT_ID`          | Production Google OAuth client ID                                      |
+| `GOOGLE_OAUTH_CLIENT_SECRET`      | Production Google OAuth client secret                                  |
+| `GOOGLE_ADMIN_EMAIL`              | Dedicated booking Google account permitted to connect                  |
+| `GOOGLE_AVAILABILITY_CALENDAR_ID` | Personal practitioner calendar ID queried for FreeBusy only            |
+| `GOOGLE_TOKEN_ENCRYPTION_KEY`     | Base64 encoding of exactly 32 random bytes                             |
+| `ADMIN_SESSION_SECRET`            | High-entropy secret, minimum 32 bytes                                  |
+| `RESEND_API_KEY`                  | Production Resend API key                                              |
+| `BOOKING_EMAIL_FROM`              | Verified production sender                                             |
+| `BOOKING_CHANGES_URL`             | `https://example.com/booking/manage`                                   |
+| `BOOKING_MANAGEMENT_SECRET`       | High-entropy booking-management signing secret                         |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY`  | Production Cloudflare Turnstile site key                               |
+| `TURNSTILE_SECRET_KEY`            | Production Turnstile secret                                            |
+| `TURNSTILE_EXPECTED_HOSTNAME`     | Production hostname only, e.g. `example.com`                           |
+| `TRUSTED_CLIENT_IP_HEADER`        | `cf-connecting-ip` when traffic is securely proxied through Cloudflare |
+| `ABUSE_PROTECTION_HMAC_SECRET`    | High-entropy secret, minimum 32 bytes                                  |
+| `BOOKING_RECONCILIATION_SECRET`   | High-entropy shared reconciliation secret                              |
+| `NEXT_PUBLIC_MUX_PLAYBACK_ID`     | Optional Mux playback ID override                                      |
 
 Never expose server secrets using a `NEXT_PUBLIC_` variable.
 
@@ -151,6 +152,15 @@ The browser run writes its inspectable HTML report and screenshot attachments to
 
 ## Google Calendar OAuth setup
 
+Use a dedicated Google account for Re-Embroidered Conversations bookings. Set
+its Google display name to the intended stage/business identity and use an
+email address suitable for customer Calendar invitations. Share the
+practitioner's personal calendar with this account using free/busy-only
+visibility, then obtain the personal calendar's Calendar ID. The personal
+calendar supplies availability conflicts; the dedicated account's primary
+calendar owns customer events and Google Meet conferences. Manually block time
+on the personal availability calendar, not the booking calendar.
+
 1. In Google Cloud, enable the **Google Calendar API**.
 
 2. Open **Google Auth Platform** and configure:
@@ -185,12 +195,26 @@ The browser run writes its inspectable HTML report and screenshot attachments to
    APP_URL=https://example.com
    GOOGLE_OAUTH_CLIENT_ID=...
    GOOGLE_OAUTH_CLIENT_SECRET=...
-   GOOGLE_ADMIN_EMAIL=provider@example.com
+   GOOGLE_ADMIN_EMAIL=booking@example.com
+   GOOGLE_AVAILABILITY_CALENDAR_ID=personal-calendar@example.com
    GOOGLE_TOKEN_ENCRYPTION_KEY=...
    ADMIN_SESSION_SECRET=...
    ```
 
-7. Deploy the application, then open the Google Calendar connect endpoint and authorize the Google account matching `GOOGLE_ADMIN_EMAIL`.
+7. Deploy the application, then open the existing Google Calendar connect endpoint
+   and authorize the dedicated booking account matching `GOOGLE_ADMIN_EMAIL`.
+   For an existing deployment, reconnect the integration using that account.
+   The OAuth client ID, client secret and token-encryption configuration remain
+   unchanged. Its primary calendar is persisted as the booking calendar;
+   `GOOGLE_AVAILABILITY_CALENDAR_ID` is never used to create customer events.
+
+8. Verify that a temporary busy period on the personal calendar removes the
+   corresponding website slots, and that removing it restores them subject to
+   existing booking conflicts. Complete a controlled booking and verify the
+   event and Meet link are on the dedicated account's primary calendar and the
+   customer invitation shows its intended stage/business identity. Check that
+   cancellation and rescheduling update that event without changing the personal
+   calendar.
 
 Do not reuse development OAuth credentials or databases in production.
 
@@ -358,12 +382,12 @@ After deployment verify:
 ```text
 Homepage loads over HTTPS
 Turnstile completes successfully
-Availability loads from the connected Google Calendar
+Availability reflects the shared personal Google calendar
 A booking hold can be created
 Stripe Checkout opens in live mode
 Successful payment reaches the Stripe webhook
 Booking reaches CONFIRMED
-Google Calendar event is created
+Google Calendar event is created on the dedicated booking account
 Google Meet URL is created
 Customer receives the Calendar invitation
 Customer receives the branded confirmation email
