@@ -11,7 +11,7 @@
 **Worktree:**  
 N/A
 
-**Dependencies:**  
+**Dependencies:**
 
 - Existing Google Calendar OAuth integration
 - Existing Google FreeBusy availability integration
