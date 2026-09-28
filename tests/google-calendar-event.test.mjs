@@ -237,6 +237,7 @@ test("deterministic insert conflict retrieves and validates the existing event",
       },
       getEvent: async (input) => {
         gets += 1;
+        assert.equal(input.calendarId, "persisted-calendar@example.com");
         assert.equal(input.eventId, googleEventIdForBooking(booking.id));
         return createdEvent();
       },
@@ -347,12 +348,16 @@ test("reschedule updates the stored event in place, preserves Meet, and requests
     endAt: new Date("2030-01-02T11:55:00.000Z"),
     timezone: "Europe/London",
   };
+  let lookup;
   let patch;
   const result = await rescheduleBookingCalendarEvent(
     managedBooking,
     target,
     dependencies({
-      getEvent: async () => createdEvent(),
+      getEvent: async (input) => {
+        lookup = input;
+        return createdEvent();
+      },
       updateEvent: async (input) => {
         patch = input;
         return createdEvent({
@@ -362,6 +367,9 @@ test("reschedule updates the stored event in place, preserves Meet, and requests
       },
     }),
   );
+  assert.equal(lookup.calendarId, "persisted-calendar@example.com");
+  assert.equal(lookup.eventId, managedBooking.calendarEventId);
+  assert.equal(patch.calendarId, "persisted-calendar@example.com");
   assert.equal(patch.eventId, managedBooking.calendarEventId);
   assert.deepEqual(patch.event, {
     start: {
@@ -588,6 +596,7 @@ test("Calendar cancellation uses the persisted event and treats already removed 
     ),
     { cancelled: true },
   );
+  assert.equal(deleted.calendarId, "persisted-calendar@example.com");
   assert.equal(deleted.eventId, "persisted-event-id");
 
   assert.deepEqual(
