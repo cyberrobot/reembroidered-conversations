@@ -221,8 +221,13 @@ test("booking form describes the private video conversation and submits consent 
   await expect(form.getByText("Step 2 of 3")).toBeVisible();
   await expect(form.getByText("Step 3 of 3")).toBeVisible();
   await expect(
-    form.getByText("55-minute private video conversation"),
+    page.getByText("55-minute private video conversation · £55", {
+      exact: true,
+    }),
   ).toBeVisible();
+  await expect(
+    form.getByText("55-minute private video conversation", { exact: true }),
+  ).toHaveCount(0);
   await expect(form).not.toContainText("via Google Meet");
   for (const unsupported of [
     "Audio-Only Call",

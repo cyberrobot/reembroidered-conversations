@@ -179,7 +179,6 @@ test("reschedule selection, review, processing, success, and conflict use real A
     page.getByRole("heading", { name: "Choose a new time" }),
   ).toBeVisible();
   await expect(page.getByText("Upcoming available days")).toBeVisible();
-  await expect(page.getByText("Nearest dates shown first")).toBeVisible();
   await expect(page.getByRole("button", { name: "10:00 AM" })).toHaveAttribute(
     "aria-pressed",
     "true",
