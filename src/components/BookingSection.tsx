@@ -259,7 +259,7 @@ export const BookingSection: React.FC = () => {
         >
           {/* Step 1: Choose Date & Time */}
           <div className="mb-10 pb-8 border-b border-[#E8DFD5]">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
               <div>
                 <span className="text-xs font-serif uppercase tracking-widest text-[#A35048] font-medium">
                   Step 1 of 3
@@ -334,9 +334,6 @@ export const BookingSection: React.FC = () => {
             <h3 className="font-serif text-2xl text-[#282524] font-medium mb-4">
               Your details
             </h3>
-            <p className="mb-6 text-sm text-[#68635F]">
-              55-minute private video conversation
-            </p>
 
             <div className="grid sm:grid-cols-2 gap-4">
               <div>
@@ -378,7 +375,7 @@ export const BookingSection: React.FC = () => {
                 />
               </div>
             </div>
-            <div className="mt-5 rounded-xl border border-[#E8DFD5] bg-[#F5EFE9]/60 p-4 text-xs leading-relaxed text-[#68635F]">
+            <div className="mt-4 text-xs leading-relaxed text-[#68635F]">
               We use your name and email to reserve and manage your session,
               process payment, create your Google Calendar/Meet invitation and
               send booking emails.
@@ -396,7 +393,7 @@ export const BookingSection: React.FC = () => {
 
             {/* Boundaries Checkbox */}
             <div className="p-4 rounded-xl bg-[#F5EFE9]/80 border border-[#E8DFD5] mb-6">
-              <label className="flex items-start gap-3 cursor-pointer text-xs sm:text-sm text-[#4B4643]">
+              <label className="flex items-start gap-3 cursor-pointer text-sm text-[#4B4643]">
                 <input
                   type="checkbox"
                   id="boundaries-checkbox"

@@ -15,7 +15,7 @@ export function ScrollToBookingButton({ title }: ScrollToBookingButtonProps) {
   return (
     <button
       onClick={handleScrollToBooking}
-      className="text-xs font-sans font-medium text-[#A35048] hover:text-[#8C4038] underline underline-offset-4 cursor-pointer"
+      className="text-sm font-sans font-medium text-[#A35048] hover:text-[#8C4038] underline underline-offset-4 cursor-pointer"
     >
       {title || "Book a session"}
     </button>

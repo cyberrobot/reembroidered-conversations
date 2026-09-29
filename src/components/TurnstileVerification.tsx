@@ -117,7 +117,6 @@ export function TurnstileVerification({
           <ShieldCheck className="h-5 w-5 text-[#A35048]" aria-hidden="true" />
           <span>Security Verification</span>
         </div>
-        <span className="text-[11px] text-[#A8A29E]">Cloudflare Turnstile</span>
       </div>
       {loadFailed ? (
         <div
@@ -152,9 +151,6 @@ export function TurnstileVerification({
           Verification successful. You can proceed with booking.
         </p>
       )}
-      <p className="mt-2 text-[11px] text-[#78716C]">
-        Privacy-preserving bot protection. No puzzles or cookies required.
-      </p>
     </div>
   );
 }
