@@ -261,7 +261,7 @@ export const HeroVideo: React.FC = () => {
                 <h4 className="font-serif text-xl text-[#282524] font-medium mb-1">
                   Private & One-to-One
                 </h4>
-                <p className="text-[#68635F] leading-relaxed">
+                <p className="text-base sm:text-sm text-[#68635F] leading-relaxed">
                   A private one-to-one video conversation with Shahd Karaeen. We
                   do not record sessions.
                 </p>
@@ -274,7 +274,7 @@ export const HeroVideo: React.FC = () => {
                 <h4 className="font-serif text-[#282524] text-xl font-medium mb-1">
                   No Homework or Plans
                 </h4>
-                <p className="text-[#68635F] leading-relaxed">
+                <p className="text-base sm:text-sm text-[#68635F] leading-relaxed">
                   No questionnaires to fill in beforehand. No follow-up
                   checklists. You arrive as you are.
                 </p>
@@ -287,7 +287,7 @@ export const HeroVideo: React.FC = () => {
                 <h4 className="font-serif text-[#282524] text-xl font-medium mb-1">
                   Gentle & Low-Pressure
                 </h4>
-                <p className="text-[#68635F] leading-relaxed">
+                <p className="text-base sm:text-sm text-[#68635F] leading-relaxed">
                   Book a date and time that suits your life. Cancel or
                   reschedule easily if plans change.
                 </p>

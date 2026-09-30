@@ -49,7 +49,7 @@ export const Experience: React.FC = () => {
                 {pillar.title}
               </h3>
 
-              <p className="font-sans text-base text-[#68635F] leading-relaxed font-light">
+              <p className="font-sans text-base sm:text-sm text-[#68635F] leading-relaxed font-light">
                 {pillar.description}
               </p>
             </div>
@@ -72,7 +72,7 @@ export const Experience: React.FC = () => {
                 <span className="text-[#A35048] font-serif text-lg leading-none mt-0.5">
                   •
                 </span>
-                <p className="font-light">
+                <p className="text-base sm:text-sm font-light">
                   <strong className="font-medium text-[#282524]">
                     A quiet crossroad:
                   </strong>{" "}
@@ -85,7 +85,7 @@ export const Experience: React.FC = () => {
                 <span className="text-[#A35048] font-serif text-lg leading-none mt-0.5">
                   •
                 </span>
-                <p className="font-light">
+                <p className="text-base sm:text-sm font-light">
                   <strong className="font-medium text-[#282524]">
                     Unfiltered unloading:
                   </strong>{" "}
@@ -98,7 +98,7 @@ export const Experience: React.FC = () => {
                 <span className="text-[#A35048] font-serif text-lg leading-none mt-0.5">
                   •
                 </span>
-                <p className="font-light">
+                <p className="text-base sm:text-sm font-light">
                   <strong className="font-medium text-[#282524]">
                     Invisible labor:
                   </strong>{" "}
@@ -111,7 +111,7 @@ export const Experience: React.FC = () => {
                 <span className="text-[#A35048] font-serif text-lg leading-none mt-0.5">
                   •
                 </span>
-                <p className="font-light">
+                <p className="text-base sm:text-sm font-light">
                   <strong className="font-medium text-[#282524]">
                     Quiet grief or change:
                   </strong>{" "}

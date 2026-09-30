@@ -51,28 +51,28 @@ export const BoundariesSection: React.FC = () => {
               <ul className="space-y-2.5 text-[#59534F] font-light">
                 <li className="flex items-start gap-2">
                   <span className="text-[#63705C] mt-0.5">✓</span>
-                  <span>
+                  <span className="text-base sm:text-sm">
                     A dedicated private one-to-one conversation with Shahd
                     Karaeen.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-[#63705C] mt-0.5">✓</span>
-                  <span>
+                  <span className="text-base sm:text-sm">
                     A safe sounding board to untangle feelings, decisions, or
                     unsaid thoughts.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-[#63705C] mt-0.5">✓</span>
-                  <span>
+                  <span className="text-base sm:text-sm">
                     A quiet, non-judgmental space free of unsolicited advice or
                     performance.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-[#63705C] mt-0.5">✓</span>
-                  <span>
+                  <span className="text-base sm:text-sm">
                     Thoughtful reflections and active listening rooted in
                     narrative respect.
                   </span>
@@ -91,7 +91,7 @@ export const BoundariesSection: React.FC = () => {
               <ul className="space-y-2.5 text-[#59534F] font-light">
                 <li className="flex items-start gap-2">
                   <span className="text-[#A35048] mt-0.5">✕</span>
-                  <span>
+                  <span className="text-base sm:text-sm">
                     <strong>
                       Not psychological therapy or clinical counselling:
                     </strong>{" "}
@@ -101,14 +101,14 @@ export const BoundariesSection: React.FC = () => {
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-[#A35048] mt-0.5">✕</span>
-                  <span>
+                  <span className="text-base sm:text-sm">
                     <strong>Not diagnostic or medical treatment:</strong> We do
                     not diagnose, treat, or manage mental health disorders.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-[#A35048] mt-0.5">✕</span>
-                  <span>
+                  <span className="text-base sm:text-sm">
                     <strong>Not crisis or emergency support:</strong> These
                     scheduled sessions are not equipped to respond to acute
                     psychiatric crises or self-harm.
@@ -186,7 +186,7 @@ export const BoundariesSection: React.FC = () => {
                   />
                 </button>
                 {openFaq === i && (
-                  <div className="px-5 pb-5 pt-1 text-base font-sans text-[#68635F] font-light leading-relaxed border-t border-[#E8DFD5]/40">
+                  <div className="px-5 pb-5 pt-1 text-base sm:text-sm font-sans text-[#68635F] font-light leading-relaxed border-t border-[#E8DFD5]/40">
                     {faq.a}
                   </div>
                 )}
