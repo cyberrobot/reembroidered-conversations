@@ -1181,6 +1181,23 @@ test("responsive visual tokens and layouts remain intact", async ({
       const muxPlayer = document.querySelector("mux-player")!;
       const muxRect = muxPlayer.getBoundingClientRect();
       const imageRect = aboutImage.getBoundingClientRect();
+      const responsiveCopyFontSizes = {
+        hero: Array.from(
+          document.querySelectorAll<HTMLElement>(
+            '#meet-shahd [class~="text-base"][class~="sm:text-sm"]',
+          ),
+        ).map((element) => getComputedStyle(element).fontSize),
+        experience: Array.from(
+          document.querySelectorAll<HTMLElement>(
+            '#the-experience [class~="text-base"][class~="sm:text-sm"]',
+          ),
+        ).map((element) => getComputedStyle(element).fontSize),
+        boundaries: Array.from(
+          document.querySelectorAll<HTMLElement>(
+            '#boundaries [class~="text-base"][class~="sm:text-sm"]',
+          ),
+        ).map((element) => getComputedStyle(element).fontSize),
+      };
 
       return {
         bodyFont: pageRootStyle.fontFamily,
@@ -1190,6 +1207,7 @@ test("responsive visual tokens and layouts remain intact", async ({
         imageRatio: imageRect.width / imageRect.height,
         muxRatio: muxRect.width / muxRect.height,
         overflow: document.documentElement.scrollWidth - window.innerWidth,
+        responsiveCopyFontSizes,
       };
     });
 
@@ -1200,6 +1218,13 @@ test("responsive visual tokens and layouts remain intact", async ({
     expect(visualTokens.imageRatio).toBeCloseTo(0.75, 1);
     expect(visualTokens.muxRatio).toBeCloseTo(16 / 9, 1);
     expect(visualTokens.overflow).toBeLessThanOrEqual(0);
+    const expectedCopyFontSize = viewport.width < 640 ? "16px" : "14px";
+    for (const fontSizes of Object.values(
+      visualTokens.responsiveCopyFontSizes,
+    )) {
+      expect(fontSizes.length).toBeGreaterThan(0);
+      expect(new Set(fontSizes)).toEqual(new Set([expectedCopyFontSize]));
+    }
 
     if (viewport.name === "desktop" || viewport.name === "desktop-lg") {
       await expect(page.locator("#main-nav nav")).toBeVisible();
