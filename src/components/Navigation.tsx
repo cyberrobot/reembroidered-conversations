@@ -48,12 +48,8 @@ export const Navigation: React.FC = () => {
             }
           }}
         >
-          <span className="font-serif text-xl sm:text-2xl tracking-tight text-[#282524] font-medium group-hover:text-[#A35048] transition-colors whitespace-nowrap">
+          <span className="font-serif text-2xl tracking-tight text-[#282524] font-medium group-hover:text-[#A35048] transition-colors whitespace-nowrap">
             Re-Embroidered Conversations
-          </span>
-          <span className="text-xs text-[#78716C] tracking-wide font-sans flex items-center gap-1.5 whitespace-nowrap">
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#A35048]" />
-            Private Listening with Shahd Karaeen
           </span>
         </a>
 

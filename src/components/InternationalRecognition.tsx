@@ -21,7 +21,7 @@ export const InternationalRecognition = () => {
           <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl text-[#282524] font-normal tracking-tight max-w-3xl mx-auto">
             An International Voice on Silence, Memory & Justice
           </h2>
-          <p className="font-sans text-sm sm:text-base text-[#78716C] mt-3 font-light max-w-2xl mx-auto">
+          <p className="font-sans text-base text-[#78716C] mt-3 font-light max-w-2xl mx-auto">
             Examining human endurance and unexpressed truth alongside global
             philosophers and authors at the Netherlands’ foremost cultural
             think-tank.
@@ -85,7 +85,7 @@ export const InternationalRecognition = () => {
                   The Discipline of The Poet's Ear
                 </h4>
               </div>
-              <p className="font-serif italic text-sm sm:text-base text-[#282524] leading-relaxed">
+              <p className="font-serif italic text-base sm:text-xl text-[#282524] leading-relaxed">
                 “To listen as a poet is not to categorize or diagnose. It is to
                 attend to cadence, to respect the pauses where words fail, and
                 to honor the exact weight of what a person finally finds the
@@ -118,7 +118,7 @@ export const InternationalRecognition = () => {
                   <h4 className="font-serif text-2xl text-[#282524] font-normal tracking-tight">
                     Tijdschrift Nexus · Nexus 100
                   </h4>
-                  <p className="text-xs font-sans text-[#78716C]">
+                  <p className="text-sm font-sans text-[#78716C]">
                     The European journal for cultural philosophy, literature,
                     and intellectual debate
                   </p>
@@ -133,7 +133,7 @@ export const InternationalRecognition = () => {
                     <p className="font-serif text-lg text-[#282524] font-medium">
                       Shahd Karaeen
                     </p>
-                    <p className="text-xs font-sans text-[#68635F]">
+                    <p className="text-sm font-sans text-[#68635F]">
                       Palestinian poet, author, and speaker on justice,
                       resilience, and memory
                     </p>
@@ -145,7 +145,7 @@ export const InternationalRecognition = () => {
                       <Bookmark className="w-3.5 h-3.5" />
                       <span>Thematic Inquiry: The Anatomy of Silence</span>
                     </div>
-                    <blockquote className="font-serif italic text-sm sm:text-base text-[#282524] leading-relaxed">
+                    <blockquote className="font-serif italic text-xl text-[#282524] leading-relaxed">
                       “Silence is not the peaceful absence of noise; it is an
                       invisible architecture built to protect equilibrium at the
                       expense of reality. Reclamation begins the moment we cease
@@ -159,9 +159,9 @@ export const InternationalRecognition = () => {
                   </div>
 
                   {/* Registry Details Table */}
-                  <div className="grid grid-cols-2 gap-4 pt-2 text-xs font-sans border-t border-[#E8DDD2]/60">
+                  <div className="grid grid-cols-2 gap-4 pt-2 text-sm font-sans border-t border-[#E8DDD2]/60">
                     <div>
-                      <span className="block text-[10px] uppercase tracking-wider text-[#78716C]">
+                      <span className="text-xs block uppercase tracking-wider text-[#78716C]">
                         Institution
                       </span>
                       <span className="font-medium text-[#282524]">
@@ -172,7 +172,7 @@ export const InternationalRecognition = () => {
                       </span>
                     </div>
                     <div>
-                      <span className="block text-[10px] uppercase tracking-wider text-[#78716C]">
+                      <span className="text-xs block uppercase tracking-wider text-[#78716C]">
                         Core Themes
                       </span>
                       <span className="font-medium text-[#282524]">
@@ -186,7 +186,7 @@ export const InternationalRecognition = () => {
                 </div>
 
                 {/* Footer with External Link */}
-                <div className="pt-5 border-t border-[#E8DDD2] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="pt-5 border-t border-[#E8DDD2] flex w-full flex-col items-start justify-between gap-3">
                   <a
                     href="https://nexus-instituut.nl/person/shahd-karaeen"
                     target="_blank"
@@ -198,9 +198,6 @@ export const InternationalRecognition = () => {
                     <span>View Nexus Instituut Profile</span>
                     <ExternalLink className="w-3.5 h-3.5 text-[#78716C] group-hover:text-[#A35048] transition-colors" />
                   </a>
-                  <span className="text-[11px] font-sans text-[#78716C]">
-                    nexus-instituut.nl/person/shahd-karaeen
-                  </span>
                 </div>
               </div>
             </div>

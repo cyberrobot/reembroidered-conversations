@@ -106,16 +106,10 @@ export function AvailabilityPicker({
   return (
     <>
       <div className="mb-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-          <div className="flex flex-col md:flex-row items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-center sm:justify-between gap-2 mb-3">
+          <div className="flex flex-col md:flex-row items-start sm:items-center gap-2">
             <p className="text-xs text-[#282524] font-medium font-sans">
               Upcoming available days
-            </p>
-            <p>
-              <span className="text-[#C4B7A9]">•</span>
-              <span className="text-[11px] text-[#78716C] font-light">
-                Nearest dates shown first
-              </span>
             </p>
           </div>
           <div className="flex items-center justify-between sm:justify-end gap-3">
@@ -213,7 +207,7 @@ export function AvailabilityPicker({
                       </span>
                     )}
                   </div>
-                  <span className="block font-serif text-base font-medium leading-snug">
+                  <span className="block font-serif text-xl sm:text-base font-medium leading-snug">
                     {day.formattedDate.split(", ")[1]}
                   </span>
                   <span
@@ -243,7 +237,7 @@ export function AvailabilityPicker({
         </div>
       </div>
       <div>
-        <div className="flex flex-col md:flex-row gap-2 md:gap-0 items-center justify-between mb-3 text-xs text-[#68635F]">
+        <div className="flex flex-col md:flex-row gap-2 md:gap-0 items-start sm:items-center justify-between mb-3 text-xs text-[#68635F]">
           <span>Available times on {activeDay.formattedDate}:</span>
           <div className="flex gap-1">
             {(["all", "morning", "afternoon", "evening"] as const).map(

@@ -31,7 +31,7 @@ export const BoundariesSection: React.FC = () => {
           <h2 className="font-serif text-3xl sm:text-4xl text-[#282524] font-normal tracking-tight mb-4">
             Understanding our boundaries
           </h2>
-          <p className="font-sans text-sm sm:text-base text-[#68635F] leading-relaxed font-light">
+          <p className="font-sans text-base text-[#68635F] leading-relaxed font-light">
             Clear boundaries protect both of us and ensure you receive the right
             kind of care.
           </p>
@@ -39,7 +39,7 @@ export const BoundariesSection: React.FC = () => {
 
         {/* Clear Boundary Comparison Card */}
         <div className="bg-[#FAF8F5] border border-[#E8DFD5] rounded-2xl p-6 sm:p-10 shadow-xs mb-14">
-          <div className="grid md:grid-cols-2 gap-8 text-sm font-sans">
+          <div className="grid md:grid-cols-2 gap-8 text-base font-sans">
             {/* What this service is */}
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-[#63705C] font-medium">
@@ -51,28 +51,28 @@ export const BoundariesSection: React.FC = () => {
               <ul className="space-y-2.5 text-[#59534F] font-light">
                 <li className="flex items-start gap-2">
                   <span className="text-[#63705C] mt-0.5">✓</span>
-                  <span>
+                  <span className="text-base sm:text-sm">
                     A dedicated private one-to-one conversation with Shahd
                     Karaeen.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-[#63705C] mt-0.5">✓</span>
-                  <span>
+                  <span className="text-base sm:text-sm">
                     A safe sounding board to untangle feelings, decisions, or
                     unsaid thoughts.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-[#63705C] mt-0.5">✓</span>
-                  <span>
+                  <span className="text-base sm:text-sm">
                     A quiet, non-judgmental space free of unsolicited advice or
                     performance.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-[#63705C] mt-0.5">✓</span>
-                  <span>
+                  <span className="text-base sm:text-sm">
                     Thoughtful reflections and active listening rooted in
                     narrative respect.
                   </span>
@@ -91,7 +91,7 @@ export const BoundariesSection: React.FC = () => {
               <ul className="space-y-2.5 text-[#59534F] font-light">
                 <li className="flex items-start gap-2">
                   <span className="text-[#A35048] mt-0.5">✕</span>
-                  <span>
+                  <span className="text-base sm:text-sm">
                     <strong>
                       Not psychological therapy or clinical counselling:
                     </strong>{" "}
@@ -101,14 +101,14 @@ export const BoundariesSection: React.FC = () => {
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-[#A35048] mt-0.5">✕</span>
-                  <span>
+                  <span className="text-base sm:text-sm">
                     <strong>Not diagnostic or medical treatment:</strong> We do
                     not diagnose, treat, or manage mental health disorders.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-[#A35048] mt-0.5">✕</span>
-                  <span>
+                  <span className="text-base sm:text-sm">
                     <strong>Not crisis or emergency support:</strong> These
                     scheduled sessions are not equipped to respond to acute
                     psychiatric crises or self-harm.
@@ -120,14 +120,14 @@ export const BoundariesSection: React.FC = () => {
 
           {/* Compassionate Emergency Support Box */}
           <div className="mt-8 pt-6 border-t border-[#E8DFD5] bg-[#F5EFE9]/60 -mx-6 -mb-6 sm:-mx-10 sm:-mb-10 p-6 sm:px-10 rounded-b-2xl">
-            <p className="text-xs text-[#68635F] leading-relaxed mb-3">
+            <p className="text-sm text-[#68635F] leading-relaxed mb-3">
               <strong className="text-[#282524] font-medium">
                 If you are in distress or need urgent crisis support:
               </strong>{" "}
               Please connect with professional, round-the-clock resources where
               compassionate specialists are waiting to help you right now:
             </p>
-            <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs font-sans text-[#78716C]">
+            <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm font-sans text-[#78716C]">
               <span>
                 UK & Ireland:{" "}
                 <strong className="text-[#282524]">Samaritans (116 123)</strong>{" "}
@@ -176,7 +176,7 @@ export const BoundariesSection: React.FC = () => {
                   onClick={() => setOpenFaq(openFaq === i ? null : i)}
                   className="w-full text-left px-5 py-4 flex items-center justify-between gap-4 cursor-pointer"
                 >
-                  <span className="font-serif text-base text-[#282524] font-medium">
+                  <span className="font-serif text-xl text-[#282524] font-medium">
                     {faq.q}
                   </span>
                   <ChevronDown
@@ -186,7 +186,7 @@ export const BoundariesSection: React.FC = () => {
                   />
                 </button>
                 {openFaq === i && (
-                  <div className="px-5 pb-5 pt-1 text-sm font-sans text-[#68635F] font-light leading-relaxed border-t border-[#E8DFD5]/40">
+                  <div className="px-5 pb-5 pt-1 text-base sm:text-sm font-sans text-[#68635F] font-light leading-relaxed border-t border-[#E8DFD5]/40">
                     {faq.a}
                   </div>
                 )}

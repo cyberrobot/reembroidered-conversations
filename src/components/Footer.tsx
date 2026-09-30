@@ -12,7 +12,7 @@ export const Footer: React.FC = () => {
             <span className="font-serif text-2xl tracking-tight text-white block">
               Re-Embroidered Conversations
             </span>
-            <p className="font-serif italic text-[#D9CFC4] text-base leading-relaxed max-w-md">
+            <p className="font-serif italic text-[#D9CFC4] text-xl leading-relaxed max-w-md">
               “Sometimes, you don’t need an answer. You simply need someone to
               sit in the room while you listen to the sound of your own truth.”
             </p>
@@ -146,8 +146,13 @@ export const Footer: React.FC = () => {
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#A8A29E]">
           <div>© 2026 {PUBLIC_COMPANY.legalName}. All rights reserved.</div>
           <div className="flex items-center gap-1.5 text-xs">
-            <span>Woven with care & quiet attention</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-[#A35048]" />
+            Woven with care & quiet attention by{" "}
+            <a
+              href="https://redmoorconsulting.co.uk"
+              className="text-[#E5988F] hover:text-white font-medium transition-colors"
+            >
+              Redmoor Consulting
+            </a>
           </div>
         </div>
       </div>

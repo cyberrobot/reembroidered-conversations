@@ -22,7 +22,9 @@ export const AboutShahd: React.FC = () => {
           </h2>
           <p className="font-sans text-sm sm:text-base text-[#78716C] mt-2 font-light">
             Author, listener, and founder of{" "}
-            <em className="italic font-serif">Re-Embroidered Conversations</em>
+            <em className="text-base italic font-serif">
+              Re-Embroidered Conversations
+            </em>
           </p>
         </div>
 
@@ -44,7 +46,7 @@ export const AboutShahd: React.FC = () => {
                 />
 
                 {/* Subtle caption pill */}
-                <div className="p-4 bg-gradient-to-r from-[#FAF7F2] to-[#F7EFE7] border-t border-[#E8DDD2] text-xs font-serif text-[#68635F] italic flex items-center justify-between">
+                <div className="p-4 bg-gradient-to-r from-[#FAF7F2] to-[#F7EFE7] border-t border-[#E8DDD2] text-base font-serif text-[#68635F] italic flex items-center justify-between">
                   <span>"Listening is an act of quiet hospitality."</span>
                   <span className="text-[#A35048] not-italic font-sans text-[10px] uppercase tracking-wider font-semibold">
                     SHAHD KARAEEN
@@ -63,13 +65,13 @@ export const AboutShahd: React.FC = () => {
                 <span className="h-px flex-1 bg-[#E8DFD5]/70" />
               </div>
 
-              <blockquote className="font-serif italic text-sm sm:text-base text-[#282524] leading-relaxed pl-4 border-l-2 border-l-[#A35048]">
+              <blockquote className="font-serif italic text-xl text-[#282524] leading-relaxed pl-4 border-l-2 border-l-[#A35048]">
                 “When you sit with me, you don't have to edit your truth or
                 protect anyone’s comfort. Survival is not a weakness—it is proof
                 of your resilience. You are safe to put the burden down.”
               </blockquote>
 
-              <div className="pt-1 flex flex-col gap-2 font-sans text-xs">
+              <div className="pt-1 flex flex-col gap-2 font-sans text-sm">
                 <span className="text-[#78716C]">
                   — Shahd Karaeen, Writer & Listener
                 </span>
@@ -141,14 +143,14 @@ export const AboutShahd: React.FC = () => {
                 </h4>
               </div>
 
-              <div className="grid sm:grid-cols-2 gap-x-8 gap-y-3.5 text-xs sm:text-sm text-[#4B4643]">
+              <div className="grid sm:grid-cols-2 gap-x-8 gap-y-3.5 text-sm text-[#4B4643]">
                 <div className="flex items-start gap-2.5">
                   <span className="text-[#A35048] font-serif text-sm leading-none mt-1 select-none">
                     •
                   </span>
                   <div>
                     <span className="font-medium text-[#282524]">Author</span>,{" "}
-                    <em className="font-serif italic text-[#A35048]">
+                    <em className="text-base font-serif italic text-[#A35048]">
                       Hope: Re-Embroidered
                     </em>
                   </div>
@@ -175,7 +177,7 @@ export const AboutShahd: React.FC = () => {
                       Host & Creator
                     </span>
                     ,{" "}
-                    <em className="font-serif italic text-[#A35048]">
+                    <em className="text-base font-serif italic text-[#A35048]">
                       Re-Embroidered Conversations
                     </em>
                   </div>

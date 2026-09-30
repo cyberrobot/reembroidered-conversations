@@ -46,14 +46,14 @@ export const BookShowcase: React.FC = () => {
               <div className="absolute inset-0 translate-x-1 translate-y-1 bg-[#F1E7DD] rounded-r-xl rounded-l-xs border border-[#E3D5C5] -z-10" />
 
               <div className="p-6 sm:p-7 bg-gradient-to-br from-[#FDFBF8] via-[#FAF6F1] to-[#F5EEE6] border border-[#EAE0D5] border-l-3 border-l-[#A35048] rounded-r-xl rounded-l-xs shadow-[0_4px_16px_-2px_rgba(163,80,72,0.06),0_1px_2px_rgba(40,37,36,0.04)] space-y-3 font-serif">
-                <p className="text-base sm:text-lg italic text-[#282524] leading-relaxed">
+                <p className="text-lg italic text-[#282524] leading-relaxed">
                   “What changed was not a person. It was the space I allowed
                   myself to occupy.”
                 </p>
-                <div className="text-xs font-sans text-[#78716C] not-italic flex items-center pt-1 border-t border-[#EAE0D5]/70">
+                <div className="text-sm font-sans text-[#78716C] not-italic flex items-center pt-1 border-t border-[#EAE0D5]/70">
                   <span>
                     — Excerpt from{" "}
-                    <span className="font-serif italic text-[#282524]">
+                    <span className="text-base font-serif italic text-[#282524]">
                       Hope: Re-Embroidered
                     </span>{" "}
                     by Shahd Karaeen
@@ -83,9 +83,9 @@ export const BookShowcase: React.FC = () => {
                   referrerPolicy="no-referrer"
                   className="w-full aspect-[4/3] object-cover object-center"
                 />
-                <div className="p-4 bg-gradient-to-r from-[#FAF7F2] to-[#F7EFE7] border-t border-[#E8DDD2] flex items-center justify-between text-xs text-[#78716C] font-sans">
+                <div className="p-4 bg-gradient-to-r from-[#FAF7F2] to-[#F7EFE7] border-t border-[#E8DDD2] flex items-center justify-between text-sm sm:text-xs text-[#78716C] font-sans">
                   <span>Hope: Re-Embroidered · A Psychological Novel</span>
-                  <span className="font-serif text-[#A35048] italic font-medium">
+                  <span className="text-base font-serif text-[#A35048] italic font-medium">
                     Hardcover edition
                   </span>
                 </div>

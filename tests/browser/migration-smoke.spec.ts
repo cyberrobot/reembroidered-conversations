@@ -184,7 +184,7 @@ test("production routes ignore legacy payment-authority query parameters", async
   }
 });
 
-test("homepage, navigation, Mux fallback, and transcript work without browser errors", async ({
+test("homepage, navigation, and Mux fallback work without browser errors", async ({
   page,
 }) => {
   const failures = collectBrowserFailures(page);
@@ -225,13 +225,7 @@ test("homepage, navigation, Mux fallback, and transcript work without browser er
   await expect(playControl).toBeHidden();
   await expect(player).toHaveAttribute("playback-id", defaultPlaybackId);
 
-  const transcript = page.getByTitle("Read spoken transcript");
-  await transcript.focus();
-  await transcript.press("Enter");
-  await expect(
-    page.getByRole("heading", { name: "What to expect from a session" }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "✕ Close" }).click();
+  await expect(page.getByTitle("Read spoken transcript")).toHaveCount(0);
 
   await expect(page.locator("#main-nav nav")).toBeVisible();
   await page.locator("#nav-book-button").click();
@@ -409,10 +403,15 @@ test("one booking action creates a hold and automatically redirects to Checkout"
 
   await expect(page.getByText("Audio-Only Call")).toHaveCount(0);
   await expect(
-    page.getByText("55-minute private video conversation", {
+    page.getByText("55-minute private video conversation · £55", {
       exact: true,
     }),
   ).toBeVisible();
+  await expect(
+    page
+      .locator("#book-session form")
+      .getByText("55-minute private video conversation", { exact: true }),
+  ).toHaveCount(0);
 
   await page.getByRole("button", { name: "View full calendar" }).click();
   const dialog = page.getByRole("dialog");
@@ -1182,6 +1181,23 @@ test("responsive visual tokens and layouts remain intact", async ({
       const muxPlayer = document.querySelector("mux-player")!;
       const muxRect = muxPlayer.getBoundingClientRect();
       const imageRect = aboutImage.getBoundingClientRect();
+      const responsiveCopyFontSizes = {
+        hero: Array.from(
+          document.querySelectorAll<HTMLElement>(
+            '#meet-shahd [class~="text-base"][class~="sm:text-sm"]',
+          ),
+        ).map((element) => getComputedStyle(element).fontSize),
+        experience: Array.from(
+          document.querySelectorAll<HTMLElement>(
+            '#the-experience [class~="text-base"][class~="sm:text-sm"]',
+          ),
+        ).map((element) => getComputedStyle(element).fontSize),
+        boundaries: Array.from(
+          document.querySelectorAll<HTMLElement>(
+            '#boundaries [class~="text-base"][class~="sm:text-sm"]',
+          ),
+        ).map((element) => getComputedStyle(element).fontSize),
+      };
 
       return {
         bodyFont: pageRootStyle.fontFamily,
@@ -1191,6 +1207,7 @@ test("responsive visual tokens and layouts remain intact", async ({
         imageRatio: imageRect.width / imageRect.height,
         muxRatio: muxRect.width / muxRect.height,
         overflow: document.documentElement.scrollWidth - window.innerWidth,
+        responsiveCopyFontSizes,
       };
     });
 
@@ -1201,6 +1218,13 @@ test("responsive visual tokens and layouts remain intact", async ({
     expect(visualTokens.imageRatio).toBeCloseTo(0.75, 1);
     expect(visualTokens.muxRatio).toBeCloseTo(16 / 9, 1);
     expect(visualTokens.overflow).toBeLessThanOrEqual(0);
+    const expectedCopyFontSize = viewport.width < 640 ? "16px" : "14px";
+    for (const fontSizes of Object.values(
+      visualTokens.responsiveCopyFontSizes,
+    )) {
+      expect(fontSizes.length).toBeGreaterThan(0);
+      expect(new Set(fontSizes)).toEqual(new Set([expectedCopyFontSize]));
+    }
 
     if (viewport.name === "desktop" || viewport.name === "desktop-lg") {
       await expect(page.locator("#main-nav nav")).toBeVisible();
