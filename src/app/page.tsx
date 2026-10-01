@@ -12,19 +12,8 @@ import { InternationalRecognition } from "@/components/InternationalRecognition"
 import { AnalyticsConsent } from "@/components/AnalyticsConsent";
 import { isValidAnalyticsMeasurementId } from "@/lib/analytics";
 
-type HomeProps = {
-  searchParams?: Promise<{ analyticsConfig?: string }>;
-};
-
-export default async function Home({ searchParams }: HomeProps = {}) {
-  const params = await searchParams;
-  const testMalformedAnalytics =
-    process.env.BOOKING_MANAGEMENT_VISUAL_FIXTURES === "enabled" &&
-    params.analyticsConfig === "malformed";
-  const configuredMeasurementId = process.env.NEXT_PUBLIC_GOOGLE_ANALYTICS_ID;
-  const measurementId = testMalformedAnalytics
-    ? "G-invalid"
-    : configuredMeasurementId;
+export default function Home() {
+  const measurementId = process.env.NEXT_PUBLIC_GOOGLE_ANALYTICS_ID;
   const analyticsEnabled = isValidAnalyticsMeasurementId(measurementId);
   return (
     <>
@@ -45,11 +34,7 @@ export default async function Home({ searchParams }: HomeProps = {}) {
           <BoundariesSection />
         </main>
 
-        <Footer
-          analyticsMeasurementId={
-            testMalformedAnalytics ? measurementId : undefined
-          }
-        />
+        <Footer />
         {analyticsEnabled && <AnalyticsConsent measurementId={measurementId} />}
       </div>
       <LegalModal />

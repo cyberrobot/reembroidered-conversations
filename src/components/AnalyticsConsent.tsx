@@ -117,6 +117,7 @@ export function AnalyticsConsent({ measurementId }: AnalyticsConsentProps) {
     });
     window.gtag("config", validMeasurementId, {
       send_page_view: false,
+      cookie_domain: "none",
       page_location: `${window.location.origin}/`,
       page_title: "Re-Embroidered Conversations",
     });

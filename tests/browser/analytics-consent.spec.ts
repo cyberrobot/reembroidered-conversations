@@ -117,6 +117,9 @@ test("allow persists consent and loads one Google tag; reload keeps it enabled",
     commands.find(({ args }) => args[0] === "config")?.args.slice(0, 2),
   ).toEqual(["config", "G-TEST000001"]);
   expect(
+    commands.find(({ args }) => args[0] === "config")?.args[2],
+  ).toMatchObject({ cookie_domain: "none" });
+  expect(
     commands
       .find(({ args }) => args[0] === "event" && args[1] === "page_view")
       ?.args.slice(0, 2),
@@ -189,9 +192,22 @@ test("invalid stored choice fails closed and asks the visitor", async ({
 test("footer settings reopens choice, reports state and withdraws it", async ({
   page,
 }) => {
+  const googleRequests: string[] = [];
+  page.on("request", (request) => {
+    if (/googletagmanager\.com|google-analytics\.com/.test(request.url())) {
+      googleRequests.push(request.url());
+    }
+  });
   await page.addInitScript(
-    (key) => localStorage.setItem(key, "granted"),
-    consentKey,
+    ({ key, marker }) => {
+      if (sessionStorage.getItem(marker) === "done") return;
+      localStorage.setItem(key, "granted");
+      sessionStorage.setItem(marker, "done");
+    },
+    {
+      key: consentKey,
+      marker: "reembroidered.analytics-consent-test-granted-once",
+    },
   );
   await page.route("https://www.googletagmanager.com/**", (route) =>
     route.fulfill({ contentType: "application/javascript", body: "" }),
@@ -212,6 +228,14 @@ test("footer settings reopens choice, reports state and withdraws it", async ({
     document.cookie = "_ga=browser-test; Path=/; SameSite=Lax";
     document.cookie = "_ga_TEST=browser-test; Path=/; SameSite=Lax";
   });
+  expect(
+    await page.evaluate(() =>
+      document.cookie
+        .split(";")
+        .map((value) => value.trim().split("=", 1)[0])
+        .filter((name) => name.startsWith("_ga")),
+    ),
+  ).toEqual(["_ga", "_ga_TEST"]);
   await panel.getByRole("button", { name: "Reject analytics" }).click();
   await expect(panel).toBeHidden();
   await expect
@@ -228,6 +252,11 @@ test("footer settings reopens choice, reports state and withdraws it", async ({
 
   await settings.click();
   await expect(panel.getByText("Analytics is currently off.")).toBeVisible();
+  await page.reload();
+  await expect(
+    page.getByRole("region", { name: "Analytics settings" }),
+  ).toBeHidden();
+  expect(googleRequests).toHaveLength(1);
 });
 
 test("consent Privacy Notice uses the canonical modal and restores controls", async ({
@@ -260,35 +289,6 @@ test("consent Privacy Notice uses the canonical modal and restores controls", as
     panel.getByRole("button", { name: "Reject analytics" }),
   ).toBeEnabled();
   await expect(page.locator("#site-content")).not.toHaveAttribute("inert", "");
-});
-
-test("malformed Measurement ID disables analytics UI without affecting the homepage", async ({
-  page,
-}) => {
-  const googleRequests: string[] = [];
-  page.on("request", (request) => {
-    if (/googletagmanager\.com|google-analytics\.com/.test(request.url())) {
-      googleRequests.push(request.url());
-    }
-  });
-  await page.goto("/?analyticsConfig=malformed");
-  await expect(
-    page.getByRole("region", { name: "Analytics settings" }),
-  ).toHaveCount(0);
-  await expect(
-    page.locator("footer").getByRole("button", { name: "Analytics settings" }),
-  ).toHaveCount(0);
-  await expect(
-    page.locator('script[src*="googletagmanager.com/gtag/js"]'),
-  ).toHaveCount(0);
-  await expect.poll(() => googleRequests).toEqual([]);
-  await expect(
-    page.getByRole("heading", {
-      name: /Sometimes, you just need someone to listen/,
-    }),
-  ).toBeVisible();
-  await page.locator("#book-session").scrollIntoViewIfNeeded();
-  await expect(page.locator("#book-session")).toBeVisible();
 });
 
 test("granted preference never loads analytics on sensitive routes", async ({

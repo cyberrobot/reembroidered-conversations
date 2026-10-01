@@ -1,16 +1,8 @@
 "use client";
 
-import {
-  ANALYTICS_SETTINGS_EVENT,
-  isValidAnalyticsMeasurementId,
-} from "@/lib/analytics";
+import { ANALYTICS_SETTINGS_EVENT } from "@/lib/analytics";
 
-type AnalyticsSettingsButtonProps = { measurementId?: string };
-
-export function AnalyticsSettingsButton({
-  measurementId,
-}: AnalyticsSettingsButtonProps) {
-  if (!isValidAnalyticsMeasurementId(measurementId)) return null;
+export function AnalyticsSettingsButton() {
   return (
     <button
       type="button"
