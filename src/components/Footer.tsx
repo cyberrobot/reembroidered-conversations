@@ -1,6 +1,12 @@
 import React from "react";
 import { LegalLink } from "./LegalLink";
 import { PUBLIC_COMPANY } from "../data/legal";
+import { AnalyticsSettingsButton } from "./AnalyticsSettingsButton";
+import { isValidAnalyticsMeasurementId } from "@/lib/analytics";
+
+const hasAnalytics = isValidAnalyticsMeasurementId(
+  process.env.NEXT_PUBLIC_GOOGLE_ANALYTICS_ID,
+);
 
 export const Footer: React.FC = () => {
   return (
@@ -112,6 +118,11 @@ export const Footer: React.FC = () => {
                   Privacy Notice
                 </LegalLink>
               </li>
+              {hasAnalytics && (
+                <li>
+                  <AnalyticsSettingsButton />
+                </li>
+              )}
             </ul>
             <address className="not-italic space-y-1 pt-3 text-[#A8A29E] leading-relaxed">
               <strong className="block font-medium text-[#D9CFC4]">

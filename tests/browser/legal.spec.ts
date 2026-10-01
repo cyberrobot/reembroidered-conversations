@@ -1,5 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("reembroidered.analytics-consent.v1", "denied");
+  });
+});
+
 const availability = {
   timezone: "Europe/London",
   days: [

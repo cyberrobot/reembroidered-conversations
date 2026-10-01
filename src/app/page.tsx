@@ -9,6 +9,7 @@ import { Navigation } from "@/components/Navigation";
 import { ThemeQuestionInterstitial } from "@/components/ThemeQuestionInterstitial";
 import { LegalModal } from "@/components/LegalModal";
 import { InternationalRecognition } from "@/components/InternationalRecognition";
+import { AnalyticsConsent } from "@/components/AnalyticsConsent";
 
 export default function Home() {
   return (
@@ -33,6 +34,9 @@ export default function Home() {
         <Footer />
       </div>
       <LegalModal />
+      <AnalyticsConsent
+        measurementId={process.env.NEXT_PUBLIC_GOOGLE_ANALYTICS_ID}
+      />
     </>
   );
 }

@@ -24,8 +24,8 @@ test("legal documents expose stable versioned metadata and unique section IDs", 
   assert.deepEqual(Object.keys(LEGAL_DOCUMENTS), ["terms", "privacy"]);
   assert.equal(TERMS.version, "1.2");
   assert.equal(TERMS.effectiveDate, "24 September 2026");
-  assert.equal(PRIVACY_NOTICE.version, "1.0");
-  assert.equal(PRIVACY_NOTICE.effectiveDate, "22 September 2026");
+  assert.equal(PRIVACY_NOTICE.version, "1.1");
+  assert.equal(PRIVACY_NOTICE.effectiveDate, "1 October 2026");
   for (const document of Object.values(LEGAL_DOCUMENTS)) {
     const ids = document.sections.map(({ id }) => id);
     assert.equal(new Set(ids).size, ids.length);
@@ -107,6 +107,7 @@ test("Privacy Notice describes actual data flows without inventing consent or de
     "Cloudflare Turnstile",
     "keyed/HMAC pseudonymous client identifier",
     "Mux",
+    "Google Analytics",
     "Railway",
     "PostgreSQL database hosting",
   ]) {
@@ -135,6 +136,27 @@ test("Privacy Notice describes actual data flows without inventing consent or de
   assert.match(
     privacy,
     /legitimate interests in operating, understanding and maintaining/i,
+  );
+  assert.match(
+    privacy,
+    /optional Google Analytics is activated only after you choose Allow analytics/i,
+  );
+  assert.match(
+    privacy,
+    /small first-party browser preference stores granted or denied/i,
+  );
+  assert.match(
+    privacy,
+    /Google Analytics storage is not created.*before you allow analytics/i,
+  );
+  assert.match(privacy, /_ga and related _ga_\* cookies/i);
+  assert.match(
+    privacy,
+    /change or withdraw your choice using Analytics settings/i,
+  );
+  assert.match(
+    privacy,
+    /booking form contents and booking identifiers are not intentionally sent/i,
   );
   assert.equal(PUBLIC_COMPANY.companyNumber, "16883201");
 });
