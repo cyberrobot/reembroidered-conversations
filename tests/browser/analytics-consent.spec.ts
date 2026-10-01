@@ -94,6 +94,33 @@ test("allow persists consent and loads one Google tag; reload keeps it enabled",
     page.getByRole("region", { name: "Analytics settings" }),
   ).toBeHidden();
   await expect.poll(() => googleRequests.length).toBe(1);
+  const commands = await page.evaluate(() =>
+    (window.dataLayer ?? []).map((entry) => ({
+      isArray: Array.isArray(entry),
+      length: entry.length,
+      args: Array.from(entry),
+    })),
+  );
+  expect(commands.length).toBeGreaterThanOrEqual(4);
+  expect(commands.every((command) => command.isArray === false)).toBe(true);
+  expect(commands.find(({ args }) => args[0] === "js")?.args).toHaveLength(2);
+  expect(
+    commands.find(({ args }) => args[0] === "consent" && args[1] === "update")
+      ?.args[2],
+  ).toMatchObject({
+    analytics_storage: "granted",
+    ad_storage: "denied",
+    ad_user_data: "denied",
+    ad_personalization: "denied",
+  });
+  expect(
+    commands.find(({ args }) => args[0] === "config")?.args.slice(0, 2),
+  ).toEqual(["config", "G-TEST000001"]);
+  expect(
+    commands
+      .find(({ args }) => args[0] === "event" && args[1] === "page_view")
+      ?.args.slice(0, 2),
+  ).toEqual(["event", "page_view"]);
   await expect
     .poll(() => page.evaluate((key) => localStorage.getItem(key), consentKey))
     .toBe("granted");
@@ -212,6 +239,18 @@ test("consent Privacy Notice uses the canonical modal and restores controls", as
   await panel.getByRole("link", { name: "Privacy Notice" }).click();
   const dialog = page.getByRole("dialog", { name: "Privacy Notice" });
   await expect(dialog).toBeVisible();
+  await expect(page.locator("#site-content")).toHaveAttribute("inert", "");
+  expect(
+    await panel.evaluate((element) =>
+      element.closest("#site-content")?.hasAttribute("inert"),
+    ),
+  ).toBe(true);
+  await expect(
+    panel.getByRole("button", { name: "Reject analytics" }),
+  ).toBeEnabled();
+  await expect(dialog.locator(":focus")).toHaveCount(1);
+  await page.keyboard.press("Tab");
+  await expect(dialog.locator(":focus")).toHaveCount(1);
   await expect(
     dialog.getByText("Version 1.1", { exact: false }).first(),
   ).toBeVisible();
@@ -220,6 +259,36 @@ test("consent Privacy Notice uses the canonical modal and restores controls", as
   await expect(
     panel.getByRole("button", { name: "Reject analytics" }),
   ).toBeEnabled();
+  await expect(page.locator("#site-content")).not.toHaveAttribute("inert", "");
+});
+
+test("malformed Measurement ID disables analytics UI without affecting the homepage", async ({
+  page,
+}) => {
+  const googleRequests: string[] = [];
+  page.on("request", (request) => {
+    if (/googletagmanager\.com|google-analytics\.com/.test(request.url())) {
+      googleRequests.push(request.url());
+    }
+  });
+  await page.goto("/?analyticsConfig=malformed");
+  await expect(
+    page.getByRole("region", { name: "Analytics settings" }),
+  ).toHaveCount(0);
+  await expect(
+    page.locator("footer").getByRole("button", { name: "Analytics settings" }),
+  ).toHaveCount(0);
+  await expect(
+    page.locator('script[src*="googletagmanager.com/gtag/js"]'),
+  ).toHaveCount(0);
+  await expect.poll(() => googleRequests).toEqual([]);
+  await expect(
+    page.getByRole("heading", {
+      name: /Sometimes, you just need someone to listen/,
+    }),
+  ).toBeVisible();
+  await page.locator("#book-session").scrollIntoViewIfNeeded();
+  await expect(page.locator("#book-session")).toBeVisible();
 });
 
 test("granted preference never loads analytics on sensitive routes", async ({

@@ -4,11 +4,11 @@ import { PUBLIC_COMPANY } from "../data/legal";
 import { AnalyticsSettingsButton } from "./AnalyticsSettingsButton";
 import { isValidAnalyticsMeasurementId } from "@/lib/analytics";
 
-const hasAnalytics = isValidAnalyticsMeasurementId(
-  process.env.NEXT_PUBLIC_GOOGLE_ANALYTICS_ID,
-);
+type FooterProps = {
+  analyticsMeasurementId?: string;
+};
 
-export const Footer: React.FC = () => {
+export const Footer: React.FC<FooterProps> = ({ analyticsMeasurementId }) => {
   return (
     <footer className="bg-[#282524] text-[#FAF8F5] py-16 px-6 font-sans border-t border-[#3E3A37]">
       <div className="max-w-5xl mx-auto">
@@ -118,11 +118,14 @@ export const Footer: React.FC = () => {
                   Privacy Notice
                 </LegalLink>
               </li>
-              {hasAnalytics && (
-                <li>
-                  <AnalyticsSettingsButton />
-                </li>
-              )}
+              <li>
+                <AnalyticsSettingsButton
+                  measurementId={
+                    analyticsMeasurementId ??
+                    process.env.NEXT_PUBLIC_GOOGLE_ANALYTICS_ID
+                  }
+                />
+              </li>
             </ul>
             <address className="not-italic space-y-1 pt-3 text-[#A8A29E] leading-relaxed">
               <strong className="block font-medium text-[#D9CFC4]">

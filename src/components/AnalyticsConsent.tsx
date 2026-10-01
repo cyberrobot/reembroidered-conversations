@@ -12,7 +12,7 @@ import {
 
 declare global {
   interface Window {
-    dataLayer?: unknown[][];
+    dataLayer?: IArguments[];
     gtag?: (...args: unknown[]) => void;
     [key: `ga-disable-${string}`]: boolean | undefined;
     __recGaLoadedIds?: string[];
@@ -93,8 +93,8 @@ export function AnalyticsConsent({ measurementId }: AnalyticsConsentProps) {
 
     window[`ga-disable-${validMeasurementId}`] = false;
     window.dataLayer = window.dataLayer ?? [];
-    window.gtag = (...args: unknown[]) => {
-      window.dataLayer?.push(args);
+    window.gtag = function gtag(..._args: unknown[]) {
+      window.dataLayer?.push(arguments);
     };
 
     const loadedIds = (window.__recGaLoadedIds ??= []);

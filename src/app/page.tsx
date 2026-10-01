@@ -10,8 +10,22 @@ import { ThemeQuestionInterstitial } from "@/components/ThemeQuestionInterstitia
 import { LegalModal } from "@/components/LegalModal";
 import { InternationalRecognition } from "@/components/InternationalRecognition";
 import { AnalyticsConsent } from "@/components/AnalyticsConsent";
+import { isValidAnalyticsMeasurementId } from "@/lib/analytics";
 
-export default function Home() {
+type HomeProps = {
+  searchParams?: Promise<{ analyticsConfig?: string }>;
+};
+
+export default async function Home({ searchParams }: HomeProps = {}) {
+  const params = await searchParams;
+  const testMalformedAnalytics =
+    process.env.BOOKING_MANAGEMENT_VISUAL_FIXTURES === "enabled" &&
+    params.analyticsConfig === "malformed";
+  const configuredMeasurementId = process.env.NEXT_PUBLIC_GOOGLE_ANALYTICS_ID;
+  const measurementId = testMalformedAnalytics
+    ? "G-invalid"
+    : configuredMeasurementId;
+  const analyticsEnabled = isValidAnalyticsMeasurementId(measurementId);
   return (
     <>
       <div
@@ -31,12 +45,14 @@ export default function Home() {
           <BoundariesSection />
         </main>
 
-        <Footer />
+        <Footer
+          analyticsMeasurementId={
+            testMalformedAnalytics ? measurementId : undefined
+          }
+        />
+        {analyticsEnabled && <AnalyticsConsent measurementId={measurementId} />}
       </div>
       <LegalModal />
-      <AnalyticsConsent
-        measurementId={process.env.NEXT_PUBLIC_GOOGLE_ANALYTICS_ID}
-      />
     </>
   );
 }
