@@ -30,15 +30,13 @@ test("unresolved consent blocks Google and shows responsive consent choices", as
 
   const panel = page.getByRole("region", { name: "Analytics settings" });
   await expect(panel).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Accept" })).toBeVisible();
   await expect(
-    panel.getByRole("button", { name: "Allow analytics" }),
+    panel.getByRole("button", {
+      name: "Essential only and close cookie settings",
+    }),
   ).toBeVisible();
-  await expect(
-    panel.getByRole("button", { name: "Reject analytics" }),
-  ).toBeVisible();
-  await expect(
-    panel.getByRole("link", { name: "Privacy Notice" }),
-  ).toBeVisible();
+  await expect(panel.getByRole("link", { name: "Learn more" })).toBeVisible();
   await expect.poll(() => googleRequests).toEqual([]);
   expect(
     (await page.context().cookies()).filter(({ name }) =>
@@ -55,16 +53,29 @@ test("unresolved consent blocks Google and shows responsive consent choices", as
     animations: "disabled",
   });
 
-  const privacyLink = panel.getByRole("link", { name: "Privacy Notice" });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await panel.getByRole("button", { name: "Customize" }).click();
+  await expect(
+    panel.getByRole("switch", { name: "Minimal Analytics" }),
+  ).toHaveAttribute("aria-checked", "false");
+  await expect(panel).toHaveScreenshot(
+    "analytics-consent-expanded-desktop.png",
+    {
+      animations: "disabled",
+    },
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(panel).toHaveScreenshot(
+    "analytics-consent-expanded-mobile.png",
+    {
+      animations: "disabled",
+    },
+  );
+
+  const privacyLink = panel.getByRole("link", { name: "Learn more" });
   await privacyLink.focus();
   await page.keyboard.press("Tab");
-  await expect(
-    panel.getByRole("button", { name: "Allow analytics" }),
-  ).toBeFocused();
-  await page.keyboard.press("Tab");
-  await expect(
-    panel.getByRole("button", { name: "Reject analytics" }),
-  ).toBeFocused();
+  await expect(panel.getByRole("button", { name: "Hide" })).toBeFocused();
 });
 
 test("allow persists consent and loads one Google tag; reload keeps it enabled", async ({
@@ -89,7 +100,7 @@ test("allow persists consent and loads one Google tag; reload keeps it enabled",
   ).toBeVisible();
   await expect.poll(() => googleRequests).toEqual([]);
 
-  await page.getByRole("button", { name: "Allow analytics" }).click();
+  await page.getByRole("button", { name: "Accept" }).click();
   await expect(
     page.getByRole("region", { name: "Analytics settings" }),
   ).toBeHidden();
@@ -152,7 +163,7 @@ test("reject persists and keeps analytics blocked across reload", async ({
   });
   await startWithNoChoice(page);
   await page.goto("/");
-  await page.getByRole("button", { name: "Reject analytics" }).click();
+  await page.getByRole("button", { name: "Essential Only" }).click();
   await expect(
     page.getByRole("region", { name: "Analytics settings" }),
   ).toBeHidden();
@@ -223,7 +234,9 @@ test("footer settings reopens choice, reports state and withdraws it", async ({
   await page.keyboard.press("Enter");
 
   const panel = page.getByRole("region", { name: "Analytics settings" });
-  await expect(panel.getByText("Analytics is currently on.")).toBeVisible();
+  await expect(
+    panel.getByRole("switch", { name: "Minimal Analytics" }),
+  ).toHaveAttribute("aria-checked", "true");
   await page.evaluate(() => {
     document.cookie = "_ga=browser-test; Path=/; SameSite=Lax";
     document.cookie = "_ga_TEST=browser-test; Path=/; SameSite=Lax";
@@ -236,7 +249,9 @@ test("footer settings reopens choice, reports state and withdraws it", async ({
         .filter((name) => name.startsWith("_ga")),
     ),
   ).toEqual(["_ga", "_ga_TEST"]);
-  await panel.getByRole("button", { name: "Reject analytics" }).click();
+  await panel
+    .getByRole("button", { name: "Essential Only", exact: true })
+    .click();
   await expect(panel).toBeHidden();
   await expect
     .poll(() => page.evaluate((key) => localStorage.getItem(key), consentKey))
@@ -251,7 +266,9 @@ test("footer settings reopens choice, reports state and withdraws it", async ({
   ).toEqual([]);
 
   await settings.click();
-  await expect(panel.getByText("Analytics is currently off.")).toBeVisible();
+  await expect(
+    panel.getByRole("switch", { name: "Minimal Analytics" }),
+  ).toHaveAttribute("aria-checked", "false");
   await page.reload();
   await expect(
     page.getByRole("region", { name: "Analytics settings" }),
@@ -265,7 +282,7 @@ test("consent Privacy Notice uses the canonical modal and restores controls", as
   await startWithNoChoice(page);
   await page.goto("/");
   const panel = page.getByRole("region", { name: "Analytics settings" });
-  await panel.getByRole("link", { name: "Privacy Notice" }).click();
+  await panel.getByRole("link", { name: "Learn more" }).click();
   const dialog = page.getByRole("dialog", { name: "Privacy Notice" });
   await expect(dialog).toBeVisible();
   await expect(page.locator("#site-content")).toHaveAttribute("inert", "");
@@ -275,7 +292,7 @@ test("consent Privacy Notice uses the canonical modal and restores controls", as
     ),
   ).toBe(true);
   await expect(
-    panel.getByRole("button", { name: "Reject analytics" }),
+    panel.getByRole("button", { name: "Essential Only" }),
   ).toBeEnabled();
   await expect(dialog.locator(":focus")).toHaveCount(1);
   await page.keyboard.press("Tab");
@@ -286,7 +303,7 @@ test("consent Privacy Notice uses the canonical modal and restores controls", as
   await dialog.getByRole("button", { name: "Close legal document" }).click();
   await expect(dialog).toBeHidden();
   await expect(
-    panel.getByRole("button", { name: "Reject analytics" }),
+    panel.getByRole("button", { name: "Essential Only" }),
   ).toBeEnabled();
   await expect(page.locator("#site-content")).not.toHaveAttribute("inert", "");
 });
@@ -325,7 +342,7 @@ test("a failed Google tag does not interrupt homepage or booking interaction", a
     route.abort(),
   );
   await page.goto("/");
-  await page.getByRole("button", { name: "Allow analytics" }).click();
+  await page.getByRole("button", { name: "Accept" }).click();
   await expect(
     page.getByRole("heading", {
       name: /Sometimes, you just need someone to listen/,

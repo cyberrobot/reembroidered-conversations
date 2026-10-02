@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { ShieldCheck, SlidersHorizontal } from "lucide-react";
 import { LegalLink } from "@/components/LegalLink";
 import {
   ANALYTICS_CONSENT_KEY,
@@ -47,6 +48,8 @@ export function AnalyticsConsent({ measurementId }: AnalyticsConsentProps) {
   const [choice, setChoice] = useState<AnalyticsConsentChoice | null>(null);
   const [preferenceRead, setPreferenceRead] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [analyticsSelected, setAnalyticsSelected] = useState(false);
 
   useEffect(() => {
     if (!validMeasurementId) return;
@@ -56,13 +59,18 @@ export function AnalyticsConsent({ measurementId }: AnalyticsConsentProps) {
     } catch {
       // Analytics stays off when browser storage is unavailable.
     }
-    setChoice(parseAnalyticsConsent(storedChoice));
+    const savedChoice = parseAnalyticsConsent(storedChoice);
+    setChoice(savedChoice);
+    setAnalyticsSelected(savedChoice === "granted");
     setPreferenceRead(true);
   }, [validMeasurementId]);
 
   useEffect(() => {
     if (!validMeasurementId) return;
-    const openSettings = () => setSettingsOpen(true);
+    const openSettings = () => {
+      setSettingsOpen(true);
+      setExpanded(true);
+    };
     window.addEventListener(ANALYTICS_SETTINGS_EVENT, openSettings);
     return () =>
       window.removeEventListener(ANALYTICS_SETTINGS_EVENT, openSettings);
@@ -77,6 +85,7 @@ export function AnalyticsConsent({ measurementId }: AnalyticsConsentProps) {
         // Keep the choice for this page without blocking site use.
       }
       setChoice(nextChoice);
+      setAnalyticsSelected(nextChoice === "granted");
       setSettingsOpen(false);
       if (nextChoice === "denied") disableAnalytics(validMeasurementId);
     },
@@ -146,53 +155,150 @@ export function AnalyticsConsent({ measurementId }: AnalyticsConsentProps) {
     return null;
   }
 
+  const focusClass =
+    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#B94F43]";
+  const actionClass = `cursor-pointer inline-flex min-h-7 items-center justify-center px-4 gap-2 rounded-full text-sm sm:text-xs font-medium transition-colors ${focusClass}`;
+
   return (
     <aside
       role="region"
-      aria-labelledby="analytics-consent-title"
+      aria-label="Analytics settings"
       aria-live="polite"
-      className="fixed inset-x-4 bottom-4 z-[60] mx-auto max-w-2xl rounded-xl border border-[#D9CFC4] bg-[#FAF8F5] p-5 text-[#282524] shadow-[0_12px_40px_rgba(40,37,36,0.22)] sm:inset-x-6 sm:bottom-6 sm:p-6"
+      className="fixed inset-x-3 bottom-3 z-[60] mx-auto max-w-[110rem] border border-[#E8DFD5] bg-[#FAF8F5] text-[#282524] shadow-[0_10px_34px_rgba(40,37,36,0.18)] sm:inset-x-2 sm:bottom-2 rounded-[14px] px-3 py-2"
     >
-      <h2
-        id="analytics-consent-title"
-        className="font-serif text-xl font-medium"
-      >
-        Analytics settings
-      </h2>
-      {settingsOpen && choice !== null ? (
-        <p className="mt-2 text-sm leading-relaxed text-[#57514D]">
-          Analytics is currently {choice === "granted" ? "on" : "off"}.
-        </p>
-      ) : (
-        <p className="mt-2 text-sm leading-relaxed text-[#57514D]">
-          We use optional Google Analytics to understand how this site is used.
-          Analytics stays off unless you allow it.
-        </p>
+      {!expanded && (
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center justify-between">
+          <div className="min-w-0 flex flex-col">
+            <h2
+              id="analytics-consent-title"
+              className="font-serif text-xl font-bold leading-snug sm:text-base"
+            >
+              Quiet Privacy &amp; Cookies:
+            </h2>{" "}
+            <p className="text-sm leading-relaxed text-[#625D59] sm:text-xs">
+              Essential cookies support security and booking features. Optional
+              page analytics stays off unless you allow it. We do not use
+              advertising cookies.{" "}
+            </p>
+          </div>
+
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            <LegalLink
+              document="privacy"
+              section="cookies-browser-storage"
+              className="text-sm font-medium text-[#B94F43] underline-offset-4 hover:underline sm:text-xs"
+            >
+              Learn more
+            </LegalLink>
+            <button
+              type="button"
+              aria-expanded={expanded}
+              aria-controls="analytics-preferences"
+              onClick={() => setExpanded((value) => !value)}
+              className={`${actionClass} text-[#6D6763] hover:text-[#282524]`}
+            >
+              <SlidersHorizontal
+                aria-hidden="true"
+                className="size-4 text-[#B94F43]"
+              />
+              <span>{expanded ? "Hide" : "Customize"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => saveChoice("granted")}
+              className={`${actionClass} bg-[#282524] text-white shadow-sm hover:bg-[#403B38]`}
+            >
+              Accept all
+            </button>
+          </div>
+        </div>
       )}
-      <p className="mt-2 text-sm">
-        <LegalLink
-          document="privacy"
-          className="underline decoration-[#9A6B63] underline-offset-4 hover:text-[#754D46] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9A6B63]"
-        >
-          Privacy Notice
-        </LegalLink>
-      </p>
-      <div className="mt-4 flex flex-wrap gap-3">
-        <button
-          type="button"
-          onClick={() => saveChoice("granted")}
-          className="min-h-11 rounded-md bg-[#282524] px-4 py-2 text-sm font-medium text-white hover:bg-[#403B38] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9A6B63]"
-        >
-          Allow analytics
-        </button>
-        <button
-          type="button"
-          onClick={() => saveChoice("denied")}
-          className="min-h-11 rounded-md border border-[#8D837B] bg-transparent px-4 py-2 text-sm font-medium text-[#282524] hover:bg-[#EEE8E1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9A6B63]"
-        >
-          Reject analytics
-        </button>
-      </div>
+
+      {expanded && (
+        <div id="analytics-preferences" className="pt-1">
+          <div className="grid gap-3 md:grid-cols-2">
+            <section className="rounded-[14px] border border-[#E8DFD5] bg-[#F6F1EB] p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-1">
+                  <ShieldCheck
+                    aria-hidden="true"
+                    className="size-4 shrink-0 text-[#B94F43]"
+                  />
+                  <h3 className="text-sm font-medium sm:text-xs">
+                    Strictly Necessary
+                  </h3>
+                </div>
+                <span className="shrink-0 rounded-lg bg-[#EEE7DF] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#817A74] sm:text-[8px]">
+                  Always active
+                </span>
+              </div>
+              <p className="mt-1 text-sm leading-relaxed text-[#716B66] sm:text-xs">
+                Supports security, payment and booking flows, including
+                Turnstile verification.
+              </p>
+            </section>
+
+            <section className="rounded-[14px] border border-[#E8DFD5] bg-[#FAF8F5] p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-medium sm:text-xs">
+                    Minimal Analytics
+                  </h3>
+                  <p className="mt-1 max-w-3xl text-sm leading-relaxed text-[#716B66] sm:text-xs">
+                    Optional insights into page visits. Booking form contents
+                    and booking identifiers are not intentionally sent.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={analyticsSelected}
+                  aria-label="Minimal Analytics"
+                  onClick={() => setAnalyticsSelected((value) => !value)}
+                  className={`mt-0.5 inline-flex h-5 w-8 shrink-0 items-center rounded-full p-1 transition-colors ${focusClass} ${analyticsSelected ? "bg-[#B94F43]" : "bg-[#D8D1CB]"}`}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`size-3 rounded-full bg-white shadow-sm transition-transform ${analyticsSelected ? "translate-x-3" : "translate-x-0"}`}
+                  />
+                </button>
+              </div>
+            </section>
+          </div>
+
+          <div className="mt-3 flex flex-col gap-4 text-sm text-[#817A74] sm:flex-row sm:items-center sm:justify-between sm:text-xs">
+            <p>
+              Read details in our{" "}
+              <LegalLink
+                document="privacy"
+                section="cookies-browser-storage"
+                className="font-medium text-[#B94F43] hover:underline"
+              >
+                Privacy Notice (Cookies &amp; browser storage)
+              </LegalLink>
+              .
+            </p>
+            <div className="flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => saveChoice("granted")}
+                className={`${actionClass} border border-[#D8D1CB] bg-transparent text-[#625D59] hover:bg-[#F1ECE6]`}
+              >
+                Accept all
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  saveChoice(analyticsSelected ? "granted" : "denied")
+                }
+                className={`${actionClass} bg-[#282524] text-white hover:bg-[#403B38]`}
+              >
+                Save Preferences
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </aside>
   );
 }
