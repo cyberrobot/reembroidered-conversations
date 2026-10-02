@@ -7,7 +7,7 @@ const defaultPlaybackId = "4qvdrc02lmk21KDbxfyWcWyiV7YG9Fljckr5xj5wBzXg";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
-    localStorage.setItem("reembroidered.analytics-consent.v1", "denied");
+    localStorage.setItem("reembroidered.analytics-preference.v2", "disabled");
     let latestOptions: Record<string, unknown> | undefined;
     window.turnstile = {
       render(container: HTMLElement, options: Record<string, unknown>) {

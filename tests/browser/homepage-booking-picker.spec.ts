@@ -37,7 +37,7 @@ const availability = {
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
-    localStorage.setItem("reembroidered.analytics-consent.v1", "denied");
+    localStorage.setItem("reembroidered.analytics-preference.v2", "disabled");
     window.turnstile = {
       render(container: HTMLElement, options: Record<string, unknown>) {
         Object.assign(window, {

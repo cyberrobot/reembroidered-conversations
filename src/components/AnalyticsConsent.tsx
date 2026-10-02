@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ShieldCheck, SlidersHorizontal, X } from "lucide-react";
+import { ShieldCheck, SlidersHorizontal } from "lucide-react";
 import { LegalLink } from "@/components/LegalLink";
 import {
   ANALYTICS_CONSENT_KEY,
+  ANALYTICS_PREFERENCE_KEY,
   ANALYTICS_SETTINGS_EVENT,
   isValidAnalyticsMeasurementId,
-  parseAnalyticsConsent,
+  resolveAnalyticsPreference,
   type AnalyticsConsentChoice,
 } from "@/lib/analytics";
 
@@ -47,19 +48,32 @@ export function AnalyticsConsent({ measurementId }: AnalyticsConsentProps) {
     : undefined;
   const [choice, setChoice] = useState<AnalyticsConsentChoice | null>(null);
   const [preferenceRead, setPreferenceRead] = useState(false);
+  const [noticeOpen, setNoticeOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [analyticsSelected, setAnalyticsSelected] = useState(false);
 
   useEffect(() => {
     if (!validMeasurementId) return;
-    let storedChoice: string | null = null;
+    let savedChoice: AnalyticsConsentChoice = "granted";
     try {
-      storedChoice = localStorage.getItem(ANALYTICS_CONSENT_KEY);
+      const legacyConsent = localStorage.getItem(ANALYTICS_CONSENT_KEY);
+      const resolution = resolveAnalyticsPreference(
+        localStorage.getItem(ANALYTICS_PREFERENCE_KEY),
+        legacyConsent,
+      );
+      savedChoice = resolution.preference === "enabled" ? "granted" : "denied";
+      if (resolution.migrated) {
+        localStorage.setItem(ANALYTICS_PREFERENCE_KEY, resolution.preference);
+        localStorage.removeItem(ANALYTICS_CONSENT_KEY);
+      } else if (localStorage.getItem(ANALYTICS_PREFERENCE_KEY) !== null) {
+        localStorage.removeItem(ANALYTICS_CONSENT_KEY);
+      }
+      setNoticeOpen(resolution.showNotice);
     } catch {
-      // Analytics stays off when browser storage is unavailable.
+      // Default-on statistics remain usable, with the opt-out still visible.
+      setNoticeOpen(true);
     }
-    const savedChoice = parseAnalyticsConsent(storedChoice);
     setChoice(savedChoice);
     setAnalyticsSelected(savedChoice === "granted");
     setPreferenceRead(true);
@@ -80,13 +94,18 @@ export function AnalyticsConsent({ measurementId }: AnalyticsConsentProps) {
     (nextChoice: AnalyticsConsentChoice) => {
       if (!validMeasurementId) return;
       try {
-        localStorage.setItem(ANALYTICS_CONSENT_KEY, nextChoice);
+        localStorage.setItem(
+          ANALYTICS_PREFERENCE_KEY,
+          nextChoice === "granted" ? "enabled" : "disabled",
+        );
+        localStorage.removeItem(ANALYTICS_CONSENT_KEY);
       } catch {
         // Keep the choice for this page without blocking site use.
       }
       setChoice(nextChoice);
       setAnalyticsSelected(nextChoice === "granted");
       setSettingsOpen(false);
+      setNoticeOpen(false);
       if (nextChoice === "denied") disableAnalytics(validMeasurementId);
     },
     [validMeasurementId],
@@ -150,7 +169,7 @@ export function AnalyticsConsent({ measurementId }: AnalyticsConsentProps) {
   if (
     !validMeasurementId ||
     !preferenceRead ||
-    (choice !== null && !settingsOpen)
+    (!noticeOpen && !settingsOpen)
   ) {
     return null;
   }
@@ -175,9 +194,9 @@ export function AnalyticsConsent({ measurementId }: AnalyticsConsentProps) {
             Quiet Privacy &amp; Cookies:
           </h2>{" "}
           <p className="text-sm leading-relaxed text-[#625D59] sm:text-xs">
-            Essential cookies support security and booking features. Optional
-            page analytics stays off unless you allow it. We do not use
-            advertising cookies.{" "}
+            We use limited Google Analytics statistics to understand how this
+            public website is used and improve it. You can disable analytics at
+            any time.{" "}
           </p>
         </div>
 
@@ -200,22 +219,22 @@ export function AnalyticsConsent({ measurementId }: AnalyticsConsentProps) {
               aria-hidden="true"
               className="size-4 text-[#B94F43]"
             />
-            <span>{expanded ? "Hide" : "Customize"}</span>
+            <span>{expanded ? "Hide" : "Settings"}</span>
           </button>
           <button
             type="button"
             onClick={() => saveChoice("granted")}
             className={`${actionClass} bg-[#282524] text-white shadow-sm hover:bg-[#403B38]`}
           >
-            Accept
+            Continue
           </button>
           <button
             type="button"
-            aria-label="Essential only and close cookie settings"
+            aria-label="Disable analytics"
             onClick={() => saveChoice("denied")}
-            className={`${actionClass} text-[#AAA39E] hover:bg-[#F1ECE6] hover:text-[#282524]`}
+            className={`${actionClass} border border-[#B94F43] text-[#98443B] hover:bg-[#F1ECE6] hover:text-[#282524]`}
           >
-            <X aria-hidden="true" className="size-4" />
+            Disable analytics
           </button>
         </div>
       </div>
@@ -251,8 +270,7 @@ export function AnalyticsConsent({ measurementId }: AnalyticsConsentProps) {
                     Minimal Analytics
                   </h3>
                   <p className="mt-1 max-w-3xl text-sm leading-relaxed text-[#716B66] sm:text-xs">
-                    Optional insights into page visits. Booking form contents
-                    and booking identifiers are not intentionally sent.
+                    {`Analytics is currently ${analyticsSelected ? "on" : "off"}. Limited statistics help improve the public website.`}
                   </p>
                 </div>
                 <button
@@ -287,10 +305,12 @@ export function AnalyticsConsent({ measurementId }: AnalyticsConsentProps) {
             <div className="flex flex-wrap justify-end gap-3">
               <button
                 type="button"
-                onClick={() => saveChoice("denied")}
+                onClick={() =>
+                  saveChoice(analyticsSelected ? "denied" : "granted")
+                }
                 className={`${actionClass} border border-[#D8D1CB] bg-transparent text-[#625D59] hover:bg-[#F1ECE6]`}
               >
-                Essential Only
+                {analyticsSelected ? "Disable analytics" : "Enable analytics"}
               </button>
               <button
                 type="button"

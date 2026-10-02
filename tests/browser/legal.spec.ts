@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
-    localStorage.setItem("reembroidered.analytics-consent.v1", "denied");
+    localStorage.setItem("reembroidered.analytics-preference.v2", "disabled");
   });
 });
 

@@ -1,4 +1,4 @@
-# PR #41 — Basic Google Analytics, minimal analytics consent, and Privacy Notice update
+# PR #41 — Default-on statistical Google Analytics, analytics opt-out, and Privacy Notice update
 
 ## Repository state
 
@@ -16,387 +16,313 @@
 - PR #40 merged into `main`
 - A Google Analytics 4 property and production web data stream
 - Existing legal-document infrastructure in `src/data/legal.ts`, `LegalLink` and `LegalModal`
+- Existing PR #41 analytics implementation
 - No new npm package is required
+- Production GA4 configuration must satisfy the restricted statistical-analytics requirements in this specification before default-on analytics is enabled
 
 ### Read first
 
-Before making changes, read the repository guidance relevant to this task:
+Before making changes, read:
 
 - `AGENTS.md`
 - `.codex/tasks/TEMPLATE.md`
 - `.codex/tasks/025-legal-documents-company-privacy-disclosure-ui.md`
+- `.codex/tasks/041-google-analytics-consent.md`
 - `package.json`
 - `.env.example`
 - `README.md`
 - `playwright.config.ts`
 - `.github/workflows/ci.yml`
+- `src/app/page.tsx`
+- `src/components/AnalyticsConsent.tsx`
+- `src/components/AnalyticsSettingsButton.tsx`
+- `src/components/Footer.tsx`
+- `src/lib/analytics.ts`
+- `src/data/legal.ts`
+- `tests/analytics-consent.test.mjs`
+- `tests/legal-content.test.mjs`
+- `tests/browser/analytics-consent.spec.ts`
+- `tests/browser/legal.spec.ts`
 
 There is currently no more narrowly scoped `AGENTS.md`.
 
-### Primary change area
+## Primary change area
 
-Public homepage analytics, analytics-consent UI and the Privacy Notice.
+Public homepage statistical analytics, analytics opt-out/settings UI and the Privacy Notice.
 
-The implementation must add basic Google Analytics measurement without extending analytics into private booking-management, payment-return, booking-success, admin or API surfaces.
+The implementation must change PR #41 from an **opt-in consent model** to a **default-on statistical analytics model with a simple persistent opt-out**.
 
-### Canonical implementation examples
+Analytics must remain excluded from private booking-management, payment-return, booking-success, admin, API and visual-fixture surfaces.
 
-Treat these as the preferred implementation references:
+## Regulatory model
+
+This implementation is intended to rely on the UK PECR **statistical purposes exception**, rather than prior analytics consent.
+
+The product configuration and implementation must therefore remain narrowly limited to aggregate statistical information used to understand and improve the public website.
+
+This PR must not expand analytics into:
+
+- individual visitor tracking;
+- profiling;
+- advertising;
+- remarketing;
+- audience creation;
+- conversion measurement;
+- cross-service tracking;
+- booking-funnel analytics;
+- user-level business decisions.
+
+Users must receive clear information about analytics and a simple, free way to object.
+
+Where the analytics processing involves personal data, the Privacy Notice must state the applicable UK GDPR lawful basis. For this implementation, use legitimate interests only if the business has completed and retained an appropriate legitimate-interests assessment covering the restricted analytics configuration.
+
+Default-on production analytics must not be enabled until the external GA4 configuration requirements in this specification have been confirmed.
+
+This specification does not establish that the same default-on approach is appropriate for every non-UK jurisdiction. Do not add geographic detection in this PR. If the service intentionally targets jurisdictions requiring prior analytics consent, that requires separate legal/product review.
+
+---
+
+## Canonical implementation examples
+
+Use these as the preferred implementation references:
 
 - `src/app/page.tsx`
   - public homepage composition
-  - appropriate ownership point for homepage-only analytics
+  - ownership boundary for homepage-only analytics
 - `src/app/layout.tsx`
-  - global layout; inspect it, but do **not** mount Google Analytics globally because it also wraps sensitive routes
+  - inspect but do not mount GA globally
+- `src/components/AnalyticsConsent.tsx`
+  - current analytics preference implementation
+  - rename to a more accurate `AnalyticsPreference`, `AnalyticsNotice` or equivalent if doing so remains a small coherent change
+- `src/components/AnalyticsSettingsButton.tsx`
+  - persistent visitor control
 - `src/components/Footer.tsx`
-  - existing persistent legal/settings surface
+  - existing persistent settings surface
 - `src/components/LegalLink.tsx`
-  - canonical way to open legal documents
+  - canonical legal-document launcher
 - `src/components/LegalModal.tsx`
-  - existing accessible Privacy Notice presentation
+  - accessible Privacy Notice presentation
 - `src/data/legal.ts`
-  - canonical Terms, Privacy Notice and company metadata
-- `tests/legal-content.test.mjs`
-  - canonical legal-copy regression coverage
-- `tests/browser/legal.spec.ts`
-  - canonical legal, footer, responsive and visual-regression coverage
-- `playwright.config.ts`
-  - deterministic public browser-test configuration
-- `.github/workflows/ci.yml`
-  - authoritative production build used by browser tests in CI
+  - canonical legal content
+- `src/lib/analytics.ts`
+  - analytics preference parsing and Measurement ID validation
+- `tests/browser/analytics-consent.spec.ts`
+  - analytics behaviour and visual coverage
 
-### Relevant symbols
+Do not introduce a general analytics framework.
 
-Inspect before editing:
-
-- `RootLayout`
-- `Home`
-- `Footer`
-- `LegalLink`
-- `LegalModal`
-- `PRIVACY_NOTICE`
-- `LEGAL_DOCUMENTS`
-- `LegalDocument`
-- Playwright homepage/legal test setup
-
-New symbols may include narrowly scoped equivalents of:
-
-- `AnalyticsConsent`
-- `AnalyticsSettingsButton`
-- `GoogleAnalytics`
-- analytics measurement-ID validation
-- analytics-consent preference helpers/constants
-
-Do not introduce a general analytics framework for this PR.
-
-### Expected change surface
+## Expected change surface
 
 Expected changes include:
 
 ```text
 .codex/tasks/041-google-analytics-consent.md
-.env.example
 README.md
 src/app/page.tsx
 src/components/AnalyticsConsent.tsx
 src/components/AnalyticsSettingsButton.tsx
 src/components/Footer.tsx
 src/data/legal.ts
+src/lib/analytics.ts
+tests/analytics-consent.test.mjs
 tests/legal-content.test.mjs
 tests/browser/analytics-consent.spec.ts
 tests/browser/legal.spec.ts
-tests/browser/homepage-booking-picker.spec.ts
-tests/browser/migration-smoke.spec.ts
-playwright.config.ts
-.github/workflows/ci.yml
 ```
 
-A small `src/lib/analytics.*` helper may be added if it materially improves validation or testability.
+If the analytics component is renamed, update its imports/tests accordingly.
 
-Existing reviewed visual snapshots may change only where this PR intentionally changes the rendered Privacy Notice, footer or analytics-consent component.
+Existing reviewed visual snapshots may change only where the analytics notice or Privacy Notice intentionally changes.
 
-If additional files are required, explain why.
+Do not regenerate unrelated snapshots.
 
-### Excluded areas
+## Excluded areas
 
 Do not change:
 
-- booking lifecycle or availability
-- booking form data submitted to the server
-- Stripe behaviour
-- Google Calendar or Google Meet behaviour
-- confirmation email behaviour
-- database schema or migrations
-- booking-management capabilities
-- cancellation or rescheduling
-- Mux configuration
-- existing Turnstile behaviour
-- Terms and Conditions, except shared type metadata if required to permit the new Privacy Notice version
-- customer identity or booking-data persistence
-- Google Ads
-- Google Tag Manager
-- advertising conversion tracking
-- remarketing
-- Google Signals
-- enhanced conversions
-- User-ID
-- user-provided-data features
-- custom booking-funnel analytics events
-- a third-party Consent Management Platform
-- a wider cookie-management platform
-- unrelated homepage redesign
-
-### Unknowns Codex must verify
-
-Before implementation, verify:
-
-- the exact Google Analytics Measurement ID is **not** already present elsewhere in the repository;
-- the final environment-variable naming is consistent with repository conventions;
-- Google Analytics is not already injected through hosting or another external mechanism;
-- the current GA4 production property/web stream configuration before making precise retention claims in public copy;
-- the production property is not configured for advertising, user-provided data or other analytics features outside this PR;
-- whether any CSP or security-header configuration added since this spec was written must permit the Google Analytics script/collection hosts;
-- which existing homepage browser tests need a deterministic stored analytics preference so that the new banner does not cause unrelated visual baseline churn.
-
-Do not guess these values or behaviours when they can be verified.
+- booking lifecycle or availability;
+- booking form submission;
+- Stripe behaviour;
+- Google Calendar or Meet behaviour;
+- confirmation email behaviour;
+- database schema or migrations;
+- cancellation or rescheduling;
+- Mux configuration;
+- Turnstile behaviour;
+- Terms and Conditions except shared legal metadata types;
+- customer identity persistence;
+- Google Ads;
+- Google Tag Manager;
+- advertising conversion tracking;
+- remarketing;
+- audiences;
+- cross-domain measurement;
+- Google Signals / advertising functionality;
+- enhanced conversions;
+- User-ID;
+- user-provided-data features;
+- custom booking-funnel events;
+- conversion events;
+- a third-party CMP;
+- unrelated homepage redesign.
 
 ---
 
 ## Objective
 
-Add basic Google Analytics 4 measurement to the public Re-Embroidered Conversations homepage with a minimal, accessible opt-in analytics preference.
+Change the existing GA4 implementation so limited statistical analytics is enabled by default on the public homepage after the application has checked that the visitor has not previously opted out.
 
-Google Analytics must be **off by default**.
+Do **not** treat this as implied consent.
 
-Before a visitor allows analytics:
+The application is relying on a statistical-analytics exception and giving visitors an objection/opt-out mechanism.
 
-- do not load the Google Analytics tag;
-- do not make requests to Google Analytics or Google Tag Manager hosts for this integration;
-- do not create Google Analytics cookies;
-- do not send a consent ping to Google.
+### First visit with no existing preference
 
-After the visitor selects **Allow analytics**:
+After hydration and after checking stored analytics preferences:
 
-- persist that preference locally;
-- load the Google Analytics tag once;
-- initialise the configured GA4 measurement;
-- collect only the basic site measurement required by this PR.
+- initialise GA automatically;
+- load the Google tag;
+- collect only the restricted statistical measurements allowed by this specification;
+- display a compact analytics notice explaining that limited analytics is used;
+- provide an immediately available **Disable analytics** control;
+- provide a **Privacy Notice** link;
+- provide a non-consent acknowledgement such as **Continue** or **Got it** to dismiss the notice.
 
-If the visitor selects **Reject analytics**:
+Do not label the acknowledgement:
 
-- persist that choice;
-- keep Google Analytics completely blocked;
-- do not repeatedly ask on every page load.
+```text
+Allow analytics
+Accept
+I consent
+Agree
+```
 
-Provide a persistent **Analytics settings** control in the homepage footer so the visitor can revisit and change the choice.
+because analytics is not being activated on the basis of that action.
 
-Update the Privacy Notice to accurately describe:
+### Visitor disables analytics
 
-- Google Analytics;
-- the consent-based activation model;
-- the analytics information/storage involved;
-- Google as a recipient/provider;
-- how analytics can be refused or later disabled;
-- the small first-party preference stored to remember that choice.
+Immediately:
 
-Version the Privacy Notice as **Version 1.1, effective 1 October 2026**.
+- persist the disabled preference;
+- set application analytics to disabled;
+- stop subsequent analytics collection;
+- clear accessible first-party `_ga` / `_ga_*` cookies created by this integration;
+- ensure subsequent reloads do not load the Google tag.
 
-Keep the existing Terms at Version 1.2.
+### Visitor keeps analytics enabled
 
----
+Acknowledge/dismiss the notice and persist that analytics remains enabled.
 
-## Current architecture
+Subsequent visits:
 
-The application uses the Next.js App Router.
+- analytics loads after the saved preference has been read;
+- the first-visit notice is not repeatedly shown.
 
-`src/app/layout.tsx` is the root layout and therefore applies to:
+### Persistent controls
 
-- `/`
-- `/booking/success`
-- `/booking/manage/[capability]`
-- `/admin/google-calendar/result`
-- redirect/compatibility routes
-- visual fixtures and other application routes
+Keep **Analytics settings** in the homepage footer.
 
-This makes the root layout an inappropriate place for indiscriminate analytics loading.
+It must allow:
 
-In particular:
+- enabled → disabled;
+- disabled → enabled.
 
-- `/booking/manage/[capability]` contains a private capability in the URL path;
-- `/booking/success` accepts internal `booking_id` and Stripe `session_id` query parameters;
-- administrative routes are not public marketing surfaces.
-
-Google Analytics must therefore **not** be injected globally through `RootLayout`.
-
-The public homepage is assembled in `src/app/page.tsx`. It contains the marketing experience, booking UI, footer and `LegalModal`. The analytics-consent component should remain scoped to this public surface.
-
-Legal documents are structured data in `src/data/legal.ts` and rendered through the existing URL-backed `LegalModal`.
-
-The footer already contains Terms and Privacy Notice links and is the appropriate persistent location for an analytics-settings control.
-
-The repository uses:
-
-- Node's built-in test runner for unit/content tests;
-- Playwright for browser behaviour;
-- Playwright screenshot assertions for material visual changes.
+The current status must be clearly shown.
 
 ---
 
-## External integrations affected
+## Preference migration
 
-### Google Analytics 4
+The current PR #41 implementation uses:
 
-**Operation performed**
+```text
+reembroidered.analytics-consent.v1
+```
 
-After explicit analytics permission, load the Google tag for the configured GA4 web data stream and initialise basic measurement.
+with:
 
-**Ownership**
+```text
+granted
+denied
+```
 
-Browser-side, scoped to the public homepage.
+Do not silently discard an existing visitor's rejection.
 
-**Authentication or authorization**
+Introduce a new semantic preference key, for example:
 
-None.
+```text
+reembroidered.analytics-preference.v2
+```
 
-The GA Measurement ID is intentionally public and is not a credential or secret.
+Preferred values:
 
-**API scopes or permissions**
+```text
+enabled
+disabled
+```
 
-None.
+Do not use `granted` to describe the new default-on model.
 
-**Webhooks**
+On first read of the new preference:
 
-None.
+### Existing `v2=disabled`
 
-**Retry behaviour**
+- keep analytics off;
+- do not load Google;
+- do not show the first-visit notice unless the visitor explicitly opens Analytics settings.
 
-Do not implement application-level retries.
+### Existing `v2=enabled`
 
-If the Google script or collection endpoint is unavailable:
+- enable analytics;
+- do not show the first-visit notice.
 
-- the homepage must continue functioning normally;
-- booking must remain unaffected;
-- no user-facing application error is required;
-- consent preference must remain intact;
-- analytics failure must never block rendering or interaction.
+### No v2 value + old `v1=denied`
 
-Do not introduce a backend proxy for Google Analytics.
+- migrate to `v2=disabled`;
+- preserve the visitor's previous rejection;
+- do not load analytics.
+
+### No v2 value + old `v1=granted`
+
+- migrate to `v2=enabled`;
+- analytics may load.
+
+### No previous preference
+
+- default to analytics enabled;
+- show the first-visit information/opt-out notice.
+
+### Corrupt/unknown preference
+
+- treat as no valid current preference;
+- use the new default-on behaviour;
+- show the notice so the visitor has a clear opportunity to object.
+
+After a successful migration, remove the obsolete v1 preference where appropriate.
+
+Do not load the Google tag before this preference/migration check completes. This prevents a previously opted-out visitor from generating a transient analytics request before their stored choice is applied.
 
 ---
 
-## Configuration and data changes
+## External integration — Google Analytics 4
 
-### Environment variables
+### Operation
 
-Add:
+Load GA4 on the public homepage by default unless the visitor has opted out.
+
+Continue using the existing public Measurement ID:
 
 ```text
 NEXT_PUBLIC_GOOGLE_ANALYTICS_ID
 ```
 
-Classification:
+The Measurement ID is not a secret.
 
-- **Public/client-visible:** yes
-- **Secret:** no
-- **Production:** required to enable analytics
-- **Development/test:** optional except where deterministic browser tests explicitly supply a test value
+### Route scope
 
-Expected format:
+Analytics must remain homepage-only.
 
-```text
-G-...
-```
-
-The application must fail closed for analytics if the value is absent or malformed:
-
-- no tag load;
-- no Google Analytics requests;
-- preferably no analytics-consent prompt when there is no functional analytics integration to consent to.
-
-Document the variable in:
-
-- `.env.example`
-- `README.md`
-- Railway production environment-variable instructions
-
-Do not place any Google API credential or secret in a `NEXT_PUBLIC_*` variable.
-
-Because `NEXT_PUBLIC_*` values are incorporated into the client build, ensure the deterministic browser-test Measurement ID is present during the authoritative CI **build**, not merely when `next start` runs.
-
-Update `.github/workflows/ci.yml` and `playwright.config.ts` consistently if required so browser tests exercise the same built bundle locally and in CI.
-
-### Database or schema
-
-None.
-
-Do not persist analytics consent to PostgreSQL.
-
-### Webhooks
-
-None.
-
-### OAuth and permissions
-
-None.
-
-### Deployment configuration
-
-Add the production GA4 Measurement ID to the Railway web service:
-
-```text
-NEXT_PUBLIC_GOOGLE_ANALYTICS_ID=G-...
-```
-
-No cron, domain, redirect or database changes are required.
-
-Configure the GA4 web property conservatively for this PR:
-
-- no Google Ads functionality;
-- no remarketing;
-- no enhanced conversions;
-- no User-ID;
-- no user-provided-data collection;
-- no custom booking/customer dimensions.
-
-Do not configure analytics to capture booking form field values.
-
-### Migration or backfill
-
-None.
-
-Analytics begins only after deployment and visitor consent. No historical analytics data is created or backfilled.
-
----
-
-## Security and privacy considerations
-
-Google Analytics introduces a new third-party browser integration.
-
-The implementation must preserve the existing privacy boundary between public website usage and private booking data.
-
-### Analytics must not receive booking identity
-
-Never intentionally send any of the following to Google Analytics:
-
-- customer name;
-- email address;
-- form field values;
-- booking ID;
-- Stripe Checkout Session ID;
-- Stripe PaymentIntent ID;
-- booking-management capability;
-- Google Calendar event ID;
-- Google Meet URL;
-- availability details tied to an individual;
-- private booking status;
-- free-form customer information;
-- authentication/OAuth information.
-
-Do not derive analytics identifiers from any of those values.
-
-### Sensitive routes
-
-Do not mount the Google Analytics integration on:
+Do not load it on:
 
 ```text
 /booking/manage/[capability]
@@ -408,180 +334,222 @@ Do not mount the Google Analytics integration on:
 /visual-fixtures/**
 ```
 
-The safest implementation for this PR is to mount it only on the public homepage rather than maintain an exclusion list in the global layout.
+Do not move analytics into `RootLayout`.
 
-A previously granted analytics preference must **not** cause Google Analytics to appear on those routes.
+### Basic measurement
 
-### Consent preference storage
+Retain the existing narrow configuration:
 
-Persist only the minimum first-party preference necessary to remember the visitor's decision.
-
-Use a versioned key such as:
-
-```text
-reembroidered.analytics-consent.v1
-```
-
-Allowed values:
+- one homepage `page_view`;
+- page title;
+- homepage location;
+- host-only analytics cookies using:
 
 ```text
-granted
-denied
+cookie_domain: "none"
 ```
 
-Do not store:
+Advertising-related consent/settings must remain denied.
 
-- a user identifier;
-- IP address;
-- analytics client identifier;
-- booking identifier;
+Do not add custom booking events.
+
+---
+
+## Required external GA4 configuration
+
+Default-on analytics is conditional on this configuration.
+
+Before production enablement, verify and record the following.
+
+### Enhanced Measurement
+
+Use only:
+
+```text
+Page views: ON
+Scrolls: ON
+
+Outbound clicks: OFF
+Site search: OFF
+Form interactions: OFF
+Video engagement: OFF
+File downloads: OFF
+```
+
+Do not enable additional Enhanced Measurement categories without separately reviewing whether they remain within the statistical-purpose scope.
+
+### Advertising and identity features
+
+Confirm:
+
+```text
+Google Ads linkage: none
+Remarketing: off
+Advertising audiences: off
+User-ID: not implemented
+User-provided data: off
+Enhanced conversions: off
+Cross-domain measurement: off
+Custom booking/customer dimensions: none
+```
+
+Do not send:
+
+- name;
 - email;
-- unnecessary timestamps or metadata.
+- booking identifiers;
+- payment identifiers;
+- booking-management capability;
+- Calendar IDs;
+- Meet URLs;
+- form values;
+- free-form customer information.
 
-The versioned key allows a future materially different analytics policy to deliberately request a fresh choice instead of silently reusing an incompatible old preference.
+### Google data sharing
 
-### Google Analytics storage
+For this restricted configuration, turn optional Analytics account data-sharing settings off.
 
-Before consent is granted, there must be no `_ga` or related GA cookies created by this integration.
+In particular:
 
-If a visitor changes an existing choice from granted to denied:
+```text
+Google products & services: OFF
+```
 
-- update the analytics consent state immediately;
-- stop further application analytics;
-- remove first-party Google Analytics cookies that the integration created, including `_ga` and `_ga_*` cookies where accessible;
-- persist `denied`;
-- subsequent navigation/page loads must not reload the Google tag.
+Do not allow Analytics data from this property to be reused for Google's independent product-development, advertising or other separate purposes.
 
-Do not require the visitor to find browser settings to withdraw analytics permission.
+Prefer all optional account-level data-sharing settings to be disabled unless each enabled setting has been separately confirmed as compatible with the statistical-purpose model.
 
-### Analytics feature scope
+Document the production state in the PR completion report.
 
-This PR is for basic site measurement only.
+### Data retention
 
-Do not add:
+Set GA4 user/event-level retention to the minimum available production setting:
 
-- custom `booking_started`;
-- slot selection;
-- form completion;
-- checkout conversion;
-- customer email;
-- transaction identity;
-- cancellation;
-- rescheduling;
-- payment-value;
-- marketing audience
+```text
+2 months
+```
 
-events or dimensions.
+Do not enable reset-on-new-activity if doing so would extend individual-level retention beyond the configured window.
 
-Those require a separate privacy and product decision.
+Before relying on default-on analytics in production, record why the chosen raw/user-level retention is necessary and proportionate for the aggregation/improvement purpose.
+
+If the production owner cannot reasonably justify the provider's individual-level retention for the statistical aggregation process, retain the existing opt-in model instead of enabling default-on analytics.
+
+Standard aggregate reports may be retained independently of the raw/user-level retention setting.
+
+---
+
+## Security and privacy considerations
+
+### Analytics must remain statistical
+
+Analytics is permitted only to understand aggregate use of the public website and make improvements to it.
+
+Examples within scope include:
+
+- page-view totals;
+- aggregate scroll behaviour;
+- general device/browser categories;
+- aggregate performance or navigation patterns where provided by the permitted basic measurement.
+
+Do not use analytics to:
+
+- identify a visitor;
+- reconstruct an individual's browsing history;
+- profile visitors;
+- segment people for targeting;
+- target site content to particular people;
+- measure advertising;
+- create marketing audiences;
+- connect a visitor identifier to a booking;
+- determine whether a particular customer booked;
+- make decisions about an individual.
+
+### Existing booking privacy boundary
+
+Never intentionally send any of the following to GA:
+
+- customer name;
+- email;
+- booking ID;
+- Stripe identifiers;
+- booking-management capability;
+- form field values;
+- Calendar event IDs;
+- Meet URLs;
+- private booking state;
+- free-form customer information.
+
+### Opt-out
+
+Opt-out must be:
+
+- immediately available;
+- free;
+- understandable;
+- available without requiring a Google account;
+- available without browser-settings instructions;
+- available persistently through the site's own footer.
+
+### Cookie removal
+
+Continue using host-only GA cookies:
+
+```text
+cookie_domain: "none"
+```
+
+When analytics is disabled:
+
+- set `ga-disable-<measurement-id>` appropriately;
+- queue/update analytics storage as denied where applicable;
+- clear accessible `_ga` / `_ga_*` cookies;
+- persist `disabled`.
 
 ---
 
 ## Required implementation
 
-### 1. Add minimal Google Analytics integration
+### 1. Change from opt-in to default-on after preference check
 
-Implement the Google tag without adding an analytics npm dependency unless repository inspection demonstrates one is genuinely necessary.
+Current behaviour waits for:
 
-Prefer the existing Next.js primitives, such as `next/script`, and a narrow Client Component.
+```text
+Allow analytics
+```
 
-When consent is not granted:
+before loading GA.
 
-- render no Google tag script;
-- execute no `gtag` initialisation;
-- make no analytics request.
+Replace it with:
 
-When consent becomes granted:
+```text
+read preference
+→ preserve/migrate any previous opt-out
+→ if not disabled, start analytics
+→ show first-visit information/opt-out notice when no current preference exists
+```
 
-1. initialise `window.dataLayer`;
-2. load the configured `gtag.js` resource once;
-3. configure analytics consent appropriately;
-4. initialise the configured GA4 Measurement ID;
-5. allow the standard basic page measurement required by this PR.
+Do not insert GA server-side or before stored preference state has been resolved.
 
-Advertising-related consent/settings must remain denied/not enabled.
+### 2. Replace consent language
 
-Do not initialise the same measurement stream twice after React rerenders or repeated preference interactions.
+The public UI must not describe the new mechanism as obtaining analytics consent.
 
-### 2. Keep analytics off global application routes
+Use language such as:
 
-Do **not** put unconditional GA scripts in `src/app/layout.tsx`.
+> We use limited Google Analytics statistics to understand how this public website is used and improve it. You can disable analytics at any time.
 
-Render analytics through the public homepage ownership boundary.
+Controls:
 
-A visitor who previously selected `granted` and later opens a private booking-management URL must not cause the Google tag to load on that route.
+```text
+Disable analytics
+Continue
+Privacy Notice
+```
 
-### 3. Add the minimal consent component
+`Continue` is an acknowledgement/dismiss action, not consent.
 
-Create a narrow client-side analytics consent component.
-
-On the first homepage visit where:
-
-- a valid GA Measurement ID exists; and
-- no valid saved choice exists;
-
-show a compact, fixed, responsive consent panel.
-
-Suggested content:
-
-> We use optional Google Analytics to understand how this site is used. Analytics stays off unless you allow it.
-
-Include:
-
-- **Allow analytics**
-- **Reject analytics**
-- a **Privacy Notice** link using the existing `LegalLink` pattern
-
-Both choices must be immediately available. Do not make rejection require an additional settings screen.
-
-The panel must:
-
-- fit the existing Re-Embroidered Conversations visual language;
-- not block use of the site;
-- not obscure essential mobile controls;
-- be keyboard accessible;
-- expose a meaningful heading/accessible name;
-- retain visible keyboard focus;
-- not trap focus because it is not a modal;
-- work at the existing desktop and mobile test widths.
-
-Choosing either option closes the panel.
-
-### 4. Persist the choice
-
-Read the versioned first-party preference after hydration.
-
-Behaviour:
-
-**No choice**
-
-- show consent panel;
-- analytics remains off.
-
-**`granted`**
-
-- do not show the first-visit panel;
-- initialise analytics.
-
-**`denied`**
-
-- do not show the first-visit panel;
-- do not initialise analytics.
-
-**Unknown/corrupt value**
-
-- treat it as no valid choice;
-- analytics remains off until a valid choice is made.
-
-Do not allow hydration mismatch to flash an enabled Google tag before the stored preference has been read.
-
-### 5. Add persistent analytics settings
-
-Add an **Analytics settings** control to the footer's existing Legal area.
-
-It must be a button/action rather than pretending to navigate to another page.
-
-Activating it reopens the analytics-preference panel and makes the current state clear, for example:
+When settings are reopened:
 
 ```text
 Analytics is currently on.
@@ -593,140 +561,139 @@ or:
 Analytics is currently off.
 ```
 
-The visitor can then choose either state again.
-
-Changing from allowed to rejected must apply the withdrawal behaviour described above.
-
-Keep the client boundary narrow; do not convert the whole footer or homepage into a Client Component merely for this button.
-
-### 6. Update the Privacy Notice
-
-Update `PRIVACY_NOTICE` from:
+Provide:
 
 ```text
-Version 1.0
-Effective 22 September 2026
+Enable analytics
+Disable analytics
+```
+
+as appropriate.
+
+### 3. Keep the UI non-modal
+
+The first-visit notice remains:
+
+- compact;
+- fixed;
+- non-blocking;
+- responsive;
+- keyboard accessible;
+- outside normal page flow;
+- non-modal;
+- directly actionable.
+
+Do not make disabling less prominent or materially harder than continuing.
+
+### 4. Keep legal modal integration
+
+The notice's Privacy Notice link must continue to use the existing `LegalLink`/`LegalModal`.
+
+Keep the analytics component within `#site-content` so the legal dialog's existing `inert` handling applies to it.
+
+### 5. External failure handling
+
+If Google Analytics is:
+
+- blocked;
+- unavailable;
+- slow;
+- rejected by an extension;
+- subject to DNS/network failure;
+
+the homepage and booking flow must continue normally.
+
+No user-facing analytics failure is required.
+
+---
+
+## Privacy Notice
+
+The current Version 1.1 describes analytics as opt-in.
+
+That wording becomes inaccurate once analytics is default-on.
+
+Update:
+
+```text
+Privacy Notice Version 1.1
+Effective 1 October 2026
 ```
 
 to:
 
 ```text
-Version 1.1
-Effective 1 October 2026
+Privacy Notice Version 1.2
+Effective 2 October 2026
 ```
 
-Do not change the Terms version.
+Keep Terms at:
 
-Update the legal metadata types as necessary to allow the new version/date.
+```text
+Version 1.2
+Effective 24 September 2026
+```
 
-The updated Privacy Notice must accurately explain at least:
+### Analytics description
 
-#### Information collected / analytics
+Explain that:
 
-State that optional Google Analytics is used to understand use of the public website after the visitor permits analytics.
+- limited GA statistics operate by default on the public homepage;
+- they are used solely to understand website usage and make improvements;
+- analytics is not used for advertising, profiling or booking/customer identification;
+- visitors may disable analytics at any time.
 
-Describe analytics information at an appropriately high level without implying that customer booking form contents are sent.
+Do not say analytics is activated only after `Allow analytics`.
 
-#### Purposes and lawful bases
+### PECR model
 
-Distinguish Google Analytics from the existing Mux cookie-less video analytics.
+Explain that the site relies on the statistical-purpose exception for the storage/access used by this restricted analytics configuration.
 
-Google Analytics must be described as operating only following the visitor's analytics choice/consent.
+Explain the user's ability to object using:
 
-Do not silently change the existing stated basis for unrelated booking, security or Mux processing.
+```text
+Analytics settings
+```
 
-#### Processors and recipients
+Do not describe this objection mechanism as withdrawal of consent.
 
-Add Google Analytics/Google as an analytics provider distinctly from the existing Google Calendar and Google Meet processing.
+### UK GDPR basis
 
-#### Cookies and browser storage
+Where the processing involves personal data, state the confirmed UK GDPR lawful basis.
+
+If relying on legitimate interests, describe the interest narrowly as producing aggregate statistics necessary to understand and improve the public website.
+
+Do not publish a legitimate-interests claim until the corresponding assessment has been completed.
+
+### Provider disclosure
+
+Continue to identify Google Analytics separately from Google Calendar and Google Meet.
+
+Explain that Google acts as the analytics service provider for this restricted implementation.
+
+Do not state or imply that Google receives booking form contents or customer booking identifiers.
+
+### Cookies and storage
 
 Explain:
 
-- the small first-party preference used to remember `granted` or `denied`;
-- Google Analytics storage is not created before analytics is allowed;
-- when allowed, Google Analytics may use first-party `_ga` and related `_ga_*` cookies;
-- the visitor can later change the choice through **Analytics settings**.
+- GA may create host-only first-party `_ga` / `_ga_*` cookies while analytics is enabled;
+- analytics operates by default under the statistical-purpose model;
+- the visitor can disable it through Analytics settings;
+- disabling removes accessible GA cookies and prevents subsequent application analytics;
+- a small first-party preference records whether analytics is enabled or disabled.
 
-Do not claim the entire site is cookie-free.
+Do not describe that preference as a consent record.
 
-#### International transfers
+### Retention
 
-Confirm the existing general transfer wording remains sufficient after adding Google Analytics, or make the minimum accurate amendment required.
+Do not make unsupported guarantees.
 
-#### Changes and document version
+If the production GA4 property is confirmed at the two-month user/event retention setting, the notice may state that configuration accurately, while distinguishing raw/user-level retention from aggregate reporting.
 
-Update the version paragraph to:
+### International transfers
 
-```text
-Version 1.1, effective 1 October 2026
-```
-
-Do not make unsupported promises about Google's exact processing or retention configuration. If public copy states an exact GA property retention period, verify that setting against the actual production property first.
-
-### 7. Preserve existing legal behaviour
-
-The existing:
-
-- legal deep links;
-- modal history;
-- search;
-- print;
-- focus management;
-- mobile navigation;
-- Terms content
-
-must continue working.
-
-Opening the Privacy Notice from the consent component must use the existing legal-document mechanism rather than creating a second privacy modal.
-
-### 8. No dependency for a simple tag
-
-Do not add `@next/third-parties`, a CMP, analytics wrapper or other dependency merely to insert a Google tag.
-
-A dependency is acceptable only if repository inspection identifies a concrete requirement that cannot reasonably be met with the installed Next.js/React primitives, and the completion report must explain it.
-
-### External-service failure handling
-
-If Google Analytics:
-
-- is blocked by the browser;
-- is blocked by an extension;
-- fails DNS/network loading;
-- returns a script error;
-- has an invalid/unavailable remote endpoint;
-
-the website and booking experience must continue normally.
-
-Analytics must remain a non-critical, optional side effect.
-
-Do not surface an application error to the customer because analytics failed.
-
----
-
-## UI implementation requirements
-
-Preserve the existing Re-Embroidered Conversations visual language.
-
-The consent component should be intentionally small rather than a large generic cookie-management interface.
-
-Requirements:
-
-- compact bottom panel/banner;
-- desktop and mobile responsive;
-- readable over the existing page;
-- no layout reflow from inserting it into normal document flow;
-- clear Allow and Reject controls;
-- Privacy Notice link;
-- visible focus styles;
-- semantic heading/region;
-- no focus trap;
-- no dark-pattern treatment that hides or materially disadvantages rejection;
-- respect current typography, spacing, borders and palette.
-
-The footer receives only the small **Analytics settings** addition.
-
-The Privacy Notice modal should retain its existing structure and visual design.
+Recheck the existing international-transfer wording after the legal-basis change and make the minimum accurate amendment if necessary.
 
 ---
 
@@ -734,181 +701,206 @@ The Privacy Notice modal should retain its existing structure and visual design.
 
 ### Behaviour
 
-- [ ] PR number is #41 and the task spec is stored as `.codex/tasks/041-google-analytics-consent.md`.
-- [ ] A valid production GA4 Measurement ID can be configured without exposing a secret.
-- [ ] Google Analytics is scoped to the public homepage rather than the global root layout.
-- [ ] With no saved preference, analytics remains off and the consent component is shown.
-- [ ] No Google Analytics/Google tag network request occurs before the visitor allows analytics.
-- [ ] No Google Analytics cookie is created by this integration before consent.
-- [ ] **Allow analytics** persists `granted` and loads GA once.
-- [ ] The granted preference survives a reload.
-- [ ] **Reject analytics** persists `denied` and keeps the Google tag blocked.
-- [ ] The denied preference survives a reload without repeatedly showing the banner.
-- [ ] Invalid/corrupt stored preference fails closed.
-- [ ] Missing/invalid Measurement ID fails closed.
-- [ ] The footer exposes **Analytics settings**.
-- [ ] Analytics settings allow a previously granted choice to be withdrawn.
-- [ ] Withdrawal stops analytics and clears accessible first-party `_ga*` cookies created by the integration.
-- [ ] A previous grant does not cause analytics to load on private booking-management, booking-success or admin surfaces.
-- [ ] Analytics failure never prevents use of the site or booking flow.
-- [ ] No custom booking/conversion analytics events are introduced.
-- [ ] Existing booking, payment and lifecycle behaviour is unchanged.
+- [ ] PR #41 spec reflects default-on statistical analytics rather than opt-in analytics.
+- [ ] Homepage remains statically renderable.
+- [ ] Analytics remains scoped to the public homepage.
+- [ ] Analytics preference is read before GA is loaded.
+- [ ] A previous v1 `denied` preference is preserved and prevents GA loading.
+- [ ] With no previous preference, GA loads automatically after preference resolution.
+- [ ] First-time visitors see clear analytics information and an immediate Disable analytics control.
+- [ ] The notice does not describe Continue/Got it as consent.
+- [ ] Continue dismisses the notice and records `enabled`.
+- [ ] Disable analytics records `disabled`.
+- [ ] Disabled state survives reload.
+- [ ] Disabled state blocks all subsequent GA tag requests.
+- [ ] Re-enabling through Analytics settings works.
+- [ ] Disabling through Analytics settings works.
+- [ ] Withdrawal clears accessible `_ga` / `_ga_*` cookies.
+- [ ] Host-only `cookie_domain: "none"` remains configured.
+- [ ] Missing/malformed Measurement ID fails closed.
+- [ ] GA failure does not affect the site.
+- [ ] Sensitive routes never load GA.
+- [ ] No custom booking or conversion event is introduced.
+
+### External GA4 configuration
+
+- [ ] Page views enabled.
+- [ ] Scrolls enabled.
+- [ ] Outbound clicks disabled.
+- [ ] Site search disabled.
+- [ ] Form interactions disabled.
+- [ ] Video engagement disabled.
+- [ ] File downloads disabled.
+- [ ] Google products & services data sharing disabled.
+- [ ] Optional data-sharing settings reviewed and preferably disabled.
+- [ ] No Google Ads linkage.
+- [ ] No remarketing.
+- [ ] No advertising audiences.
+- [ ] No User-ID.
+- [ ] No enhanced conversions.
+- [ ] No user-provided-data collection.
+- [ ] No custom booking/customer dimensions.
+- [ ] User/event-level data retention set to two months.
+- [ ] Retention justification/privacy assessment recorded before default-on production enablement.
 
 ### Privacy Notice
 
-- [ ] Privacy Notice is Version 1.1, effective 1 October 2026.
+- [ ] Privacy Notice is Version 1.2, effective 2 October 2026.
 - [ ] Terms remain Version 1.2, effective 24 September 2026.
-- [ ] Google Analytics is disclosed.
-- [ ] Analytics activation is described as optional and dependent on the visitor's choice.
-- [ ] The analytics preference storage is disclosed.
-- [ ] GA first-party cookies/storage are described accurately.
-- [ ] Google Analytics is included in the relevant provider/recipient disclosure.
-- [ ] Visitors are told how to change/withdraw the analytics choice.
-- [ ] Existing booking, Stripe, Calendar/Meet, Resend, Turnstile, Mux and Railway disclosures remain accurate.
-- [ ] The notice does not claim booking/customer identity is sent to GA.
+- [ ] Old opt-in wording is removed.
+- [ ] Default-on statistical analytics is disclosed.
+- [ ] Statistical-purpose model is explained.
+- [ ] The applicable UK GDPR lawful basis is accurately stated.
+- [ ] Visitor objection/opt-out is explained.
+- [ ] Google Analytics provider role is disclosed.
+- [ ] GA cookie/storage behaviour is described.
+- [ ] Analytics preference storage is described as a preference, not a consent record.
+- [ ] No statement suggests booking form/customer identity is intentionally sent to GA.
 - [ ] No unsupported retention promise is added.
-
-### External integration
-
-- [ ] Only the configured GA4 Measurement ID is exposed to browser code.
-- [ ] No credential or secret is introduced.
-- [ ] No GA request occurs from rejected/unresolved consent state.
-- [ ] Google Ads, remarketing and user-provided-data features are outside this implementation.
-- [ ] Production environment configuration is documented.
-- [ ] CI uses a deterministic non-production Measurement ID when exercising consent behaviour.
 
 ### UI
 
-- [ ] Consent component works on supported desktop and mobile widths.
-- [ ] Allow, Reject, Privacy Notice and Analytics settings are keyboard accessible.
-- [ ] Rejection is directly available without opening another settings layer.
-- [ ] Legal modal remains accessible when opened from the consent component.
-- [ ] Dedicated browser coverage verifies the new interaction.
-- [ ] Dedicated visual regression coverage exists for the consent component.
-- [ ] Footer and Privacy Notice snapshots change only where expected.
-- [ ] Existing unrelated homepage snapshots are protected from banner-induced churn by setting a deterministic test preference.
+- [ ] First-visit analytics notice works at desktop and mobile widths.
+- [ ] Disable analytics is directly available.
+- [ ] Continue/Got it does not use consent language.
+- [ ] Privacy Notice is keyboard accessible.
+- [ ] Analytics settings remains available in the footer.
+- [ ] Legal modal correctly makes the analytics notice inert while open.
+- [ ] Existing legal focus restoration continues working.
 
 ### Code quality
 
-- [ ] Existing repository conventions are followed.
+- [ ] No unnecessary dependency added.
+- [ ] No RootLayout analytics injection.
+- [ ] No unrelated refactor.
 - [ ] Client boundaries remain narrow.
-- [ ] No unnecessary dependency is added.
-- [ ] No unrelated refactor is included.
-- [ ] Type safety is preserved.
-- [ ] Formatting passes.
 - [ ] Type checking passes.
+- [ ] Formatting passes.
 - [ ] Node tests pass.
 - [ ] Browser tests pass.
 - [ ] Production build passes.
-- [ ] Dependency audit remains clean.
+- [ ] Security audit passes.
 - [ ] `git diff --check` passes.
 
 ---
 
-## Tests to add or update
+## Tests to add/update
 
-### Unit/content tests
+### Unit tests
 
-Update:
+Update `tests/analytics-consent.test.mjs`.
+
+Cover preference parsing/migration for:
 
 ```text
-tests/legal-content.test.mjs
+v2 enabled
+v2 disabled
+v1 granted → v2 enabled
+v1 denied → v2 disabled
+no preference
+corrupt preference
 ```
+
+Ensure an old explicit denial always wins over the new default.
+
+Continue testing Measurement ID validation.
+
+### Legal-content tests
+
+Update `tests/legal-content.test.mjs`.
 
 Verify:
 
-- Privacy Notice Version 1.1;
-- effective date 1 October 2026;
-- Terms remain Version 1.2;
-- Privacy Notice names Google Analytics;
-- Analytics is described as optional/choice-based;
-- analytics preference storage is disclosed;
-- Google Analytics cookies/storage are disclosed;
-- withdrawal/settings are disclosed;
-- booking identity is not described as being intentionally supplied to Analytics;
-- existing Mux, Stripe, Google Calendar/Meet, Resend, Cloudflare and Railway assertions remain valid.
-
-If measurement-ID validation or consent-value parsing is extracted into a pure helper, add focused Node tests for:
-
-- valid `G-...` values;
-- empty value;
-- malformed value;
-- `granted`;
-- `denied`;
-- unknown stored preference.
-
-Do not create abstractions solely to manufacture unit-test targets.
-
-### Integration tests
-
-N/A.
-
-There is no new server route, persistence boundary, webhook or database integration.
+- Privacy Notice Version 1.2;
+- effective date 2 October 2026;
+- Terms unchanged;
+- old `Allow analytics` / prior-consent language is absent;
+- default statistical analytics is disclosed;
+- Analytics settings opt-out is disclosed;
+- applicable lawful-basis language is present;
+- Google Analytics is disclosed distinctly;
+- booking form contents/identifiers are not described as being intentionally sent;
+- existing provider disclosures remain accurate.
 
 ### Browser tests
 
-Add:
+Update `tests/browser/analytics-consent.spec.ts`.
 
-```text
-tests/browser/analytics-consent.spec.ts
-```
+Use only the deterministic CI Measurement ID and intercept Google endpoints.
 
-Use a deterministic fake GA Measurement ID and intercept Google network endpoints. Do not send browser-test traffic to a real Analytics property.
+Cover:
 
-Cover at least:
+1. **First visit / no preference**
+   - preference read completes;
+   - GA tag loads automatically;
+   - analytics notice is visible;
+   - Disable analytics is visible;
+   - Continue/Got it is visible;
+   - Privacy Notice link is visible.
 
-1. **No prior choice**
-   - consent component visible;
-   - no Google tag request before interaction.
+2. **Continue**
+   - stores `enabled`;
+   - closes notice;
+   - reload keeps analytics enabled;
+   - notice does not repeatedly appear.
 
-2. **Allow**
-   - click Allow;
-   - preference stored as `granted`;
-   - Google tag request occurs only afterwards;
-   - tag is initialised at most once.
+3. **Immediate disable**
+   - stores `disabled`;
+   - clears `_ga*`;
+   - reload does not request the Google tag.
 
-3. **Granted reload**
-   - banner stays closed;
-   - analytics loads.
+4. **Existing v1 denied**
+   - no Google request occurs;
+   - migrates to v2 disabled.
 
-4. **Reject**
-   - no Google tag request;
-   - `denied` is persisted.
+5. **Existing v1 granted**
+   - migrates to enabled;
+   - GA loads.
 
-5. **Denied reload**
-   - banner remains closed;
-   - Google tag remains blocked.
-
-6. **Invalid stored value**
-   - analytics stays off;
-   - visitor is asked for a valid choice.
+6. **Corrupt preference**
+   - falls back to default-on;
+   - notice is visible so objection is immediately available.
 
 7. **Analytics settings**
-   - footer control reopens preferences;
-   - current state is represented;
-   - allowed → denied works;
-   - `_ga`/`_ga_*` first-party cookies created for the test are removed where applicable.
+   - reports current on/off status;
+   - enabled → disabled works;
+   - disabled → enabled works.
 
-8. **Privacy Notice**
-   - Privacy link opens the canonical existing legal modal;
-   - closing it restores usable consent controls.
+8. **Cookie configuration**
+   - queued `config` contains:
 
-9. **Missing/invalid analytics configuration**
-   - no Google script;
-   - no misleading active analytics behaviour.
+```text
+cookie_domain: "none"
+```
+
+9. **Privacy Notice**
+   - canonical legal modal opens;
+   - analytics notice is within inert background;
+   - controls work after close.
 
 10. **Sensitive routes**
-    - pre-seed `granted`;
-    - visit a representative `/booking/manage/[capability]` route and `/booking/success` state;
-    - confirm no Google Analytics tag/network request occurs.
+    - even an enabled preference does not load GA outside the homepage.
 
 11. **Script failure**
-    - fail/intercept the Google tag request;
-    - confirm the homepage remains usable.
+    - homepage/booking UI remains usable.
 
-Update existing homepage/browser test setup so tests unrelated to consent pre-seed a deterministic `denied` preference before navigation.
+12. **Missing/invalid Measurement ID**
+    - fail closed through existing unit coverage or a clean browser fixture;
+    - do not introduce test-only query parameters into the production homepage.
 
-At minimum inspect/update:
+### Existing unrelated browser tests
+
+Because analytics is now enabled by default, tests unrelated to analytics should pre-seed:
+
+```text
+reembroidered.analytics-preference.v2=disabled
+```
+
+before homepage navigation unless that test specifically exercises analytics.
+
+This keeps unrelated browser tests and screenshots deterministic and prevents CI from generating Google requests.
+
+Update at minimum:
 
 ```text
 tests/browser/homepage-booking-picker.spec.ts
@@ -916,50 +908,42 @@ tests/browser/legal.spec.ts
 tests/browser/migration-smoke.spec.ts
 ```
 
-Do not blindly update existing snapshots to include the banner.
+### Visual regression
 
-### Visual regression tests
+Replace the old opt-in consent screenshots with the new default-on information/opt-out notice.
 
-Add deterministic screenshots for the consent panel at:
+Maintain reviewed:
 
-- desktop width;
-- mobile width.
+```text
+desktop macOS
+mobile macOS
+desktop Linux
+mobile Linux
+```
 
-Update only intentionally affected existing snapshots:
+baselines.
 
-- Privacy Notice desktop;
-- Privacy Notice mobile;
-- footer desktop.
+Update Privacy Notice snapshots because Version 1.2/legal-basis wording changes.
 
-Terms snapshots should not change unless an unavoidable shared rendering change is documented.
-
-Keep animations disabled and external GA requests intercepted.
+Do not change Terms snapshots unless a shared rendering change genuinely requires it.
 
 ---
 
-## Verification commands
+## Verification
 
-Run formatting first as required by `AGENTS.md`:
+Run:
 
 ```bash
 npm run format
-```
 
-Run focused legal tests:
+node --conditions=react-server --experimental-test-module-mocks --test \
+  tests/analytics-consent.test.mjs \
+  tests/legal-content.test.mjs
 
-```bash
-node --conditions=react-server --experimental-test-module-mocks --test tests/legal-content.test.mjs
-```
+npx playwright test \
+  tests/browser/analytics-consent.spec.ts \
+  tests/browser/legal.spec.ts
 
-Run focused browser tests:
-
-```bash
-npx playwright test tests/browser/analytics-consent.spec.ts tests/browser/legal.spec.ts
-```
-
-Then run the complete repository verification:
-
-```bash
 npm run security:audit
 npm run format:check
 npm run lint
@@ -969,67 +953,86 @@ npm run test:browser
 git diff --check
 ```
 
-Browser tests must use only the deterministic non-production GA Measurement ID.
+All commands must pass.
 
-Do not send CI traffic into the real production Analytics property.
+The production build should continue to report the homepage as statically rendered.
 
-If any required command cannot run, document:
-
-1. the exact command;
-2. why it could not run;
-3. what was verified instead.
+Browser tests must never send traffic to the real production GA property.
 
 ---
 
 ## Completion report
 
-When implementation is complete, provide:
-
 ### Changed
 
-Summarise:
+Report:
 
-- GA4 integration;
-- consent behaviour;
-- preference persistence;
-- footer analytics settings;
-- route scoping;
-- Privacy Notice Version 1.1;
-- environment/CI documentation.
+- default-on statistical analytics behaviour;
+- old-preference migration;
+- new analytics notice wording;
+- persistent opt-out;
+- Privacy Notice Version 1.2;
+- updated tests and snapshots.
+
+### External configuration
+
+Explicitly record the verified production state for:
+
+```text
+Enhanced Measurement
+Google products & services data sharing
+other optional Analytics data-sharing settings
+Google Ads/product links
+User-provided data
+advertising functionality
+data retention
+```
+
+Also state:
+
+```text
+GA4 Enhanced Measurement → Form interactions: disabled externally.
+```
+
+### Legal/privacy prerequisites
+
+Confirm:
+
+- statistical-purpose use is limited to aggregate service-improvement analytics;
+- the UK GDPR lawful basis has been confirmed;
+- any required legitimate-interests assessment has been completed;
+- the two-month GA4 user/event-level retention has been assessed as necessary/proportionate for this use.
+
+If those prerequisites are not confirmed, default-on production analytics must not be enabled and the existing opt-in implementation must remain in place.
 
 ### Tests
 
 List:
 
-- tests added/updated;
-- visual snapshots intentionally updated;
-- verification commands;
-- pass/fail results.
-
-### External configuration
-
-Document:
-
-- the Railway `NEXT_PUBLIC_GOOGLE_ANALYTICS_ID`;
-- the production GA4 property/web stream;
-- any required GA4 property privacy settings;
-- confirmation that CI uses a non-production Measurement ID.
+- focused test results;
+- full Node test result;
+- full Playwright count;
+- build result;
+- audit result;
+- `git diff --check` result.
 
 ### Deviations
 
-Explain any meaningful deviation from this specification and why it was necessary.
+Explain any deviation from this specification.
 
-Use `None` if there were none.
+Use `None` if there are none.
 
 ### Remaining issues
 
-Call out any future work explicitly excluded from this PR, such as:
+Keep the following outside this PR:
 
-- booking-funnel custom events;
+- booking-funnel analytics;
 - conversion measurement;
-- aggregated business dashboards;
+- advertising;
+- audiences;
+- cross-service tracking;
 - server-side analytics;
-- additional consent categories;
-- a full CMP.
+- EEA-specific consent handling;
+- full CMP implementation.
 
-Use `None` if no unresolved issue remains within this PR's scope.
+Use `None` if there are no other unresolved issues within scope.
