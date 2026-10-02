@@ -185,59 +185,52 @@ export function AnalyticsConsent({ measurementId }: AnalyticsConsentProps) {
       aria-live="polite"
       className="fixed inset-x-3 bottom-3 z-[60] mx-auto max-w-[110rem] border border-[#E8DFD5] bg-[#FAF8F5] text-[#282524] shadow-[0_10px_34px_rgba(40,37,36,0.18)] sm:inset-x-2 sm:bottom-2 rounded-[14px] px-3 py-2"
     >
-      <div className="flex flex-col gap-2 lg:flex-row lg:items-center justify-between">
-        <div className="min-w-0 flex flex-col">
-          <h2
-            id="analytics-consent-title"
-            className="font-serif text-xl font-bold leading-snug sm:text-base"
-          >
-            Quiet Privacy &amp; Cookies:
-          </h2>{" "}
-          <p className="text-sm leading-relaxed text-[#625D59] sm:text-xs">
-            We use limited Google Analytics statistics to understand how this
-            public website is used and improve it. You can disable analytics at
-            any time.{" "}
-          </p>
-        </div>
+      {!expanded && (
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center justify-between">
+          <div className="min-w-0 flex flex-col">
+            <h2
+              id="analytics-consent-title"
+              className="font-serif text-xl font-bold leading-snug sm:text-base"
+            >
+              Quiet Privacy &amp; Cookies:
+            </h2>{" "}
+            <p className="text-sm leading-relaxed text-[#625D59] sm:text-xs">
+              We use cookies to understand how this website is used and improve
+              it. You can disable analytics at any time.{" "}
+            </p>
+          </div>
 
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-          <LegalLink
-            document="privacy"
-            section="cookies-browser-storage"
-            className="text-sm font-medium text-[#B94F43] underline-offset-4 hover:underline sm:text-xs"
-          >
-            Learn more
-          </LegalLink>
-          <button
-            type="button"
-            aria-expanded={expanded}
-            aria-controls="analytics-preferences"
-            onClick={() => setExpanded((value) => !value)}
-            className={`${actionClass} text-[#6D6763] hover:text-[#282524]`}
-          >
-            <SlidersHorizontal
-              aria-hidden="true"
-              className="size-4 text-[#B94F43]"
-            />
-            <span>{expanded ? "Hide" : "Settings"}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => saveChoice("granted")}
-            className={`${actionClass} bg-[#282524] text-white shadow-sm hover:bg-[#403B38]`}
-          >
-            Continue
-          </button>
-          <button
-            type="button"
-            aria-label="Disable analytics"
-            onClick={() => saveChoice("denied")}
-            className={`${actionClass} border border-[#B94F43] text-[#98443B] hover:bg-[#F1ECE6] hover:text-[#282524]`}
-          >
-            Disable analytics
-          </button>
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            <LegalLink
+              document="privacy"
+              section="cookies-browser-storage"
+              className="text-sm font-medium text-[#B94F43] underline-offset-4 hover:underline sm:text-xs"
+            >
+              Learn more
+            </LegalLink>
+            <button
+              type="button"
+              aria-expanded={expanded}
+              aria-controls="analytics-preferences"
+              onClick={() => setExpanded((value) => !value)}
+              className={`${actionClass} text-[#6D6763] hover:text-[#282524]`}
+            >
+              <SlidersHorizontal
+                aria-hidden="true"
+                className="size-4 text-[#B94F43]"
+              />
+              <span>{expanded ? "Hide" : "Settings"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => saveChoice("granted")}
+              className={`${actionClass} bg-[#282524] text-white shadow-sm hover:bg-[#403B38]`}
+            >
+              Accept
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {expanded && (
         <div id="analytics-preferences" className="pt-1">
@@ -305,21 +298,23 @@ export function AnalyticsConsent({ measurementId }: AnalyticsConsentProps) {
             <div className="flex flex-wrap justify-end gap-3">
               <button
                 type="button"
-                onClick={() =>
-                  saveChoice(analyticsSelected ? "denied" : "granted")
-                }
-                className={`${actionClass} border border-[#D8D1CB] bg-transparent text-[#625D59] hover:bg-[#F1ECE6]`}
+                aria-expanded={expanded}
+                aria-controls="analytics-preferences"
+                onClick={() => setExpanded((value) => !value)}
+                className={`${actionClass} text-[#6D6763] hover:text-[#282524]`}
               >
-                {analyticsSelected ? "Disable analytics" : "Enable analytics"}
+                <SlidersHorizontal
+                  aria-hidden="true"
+                  className="size-4 text-[#B94F43]"
+                />
+                <span>Hide</span>
               </button>
               <button
                 type="button"
-                onClick={() =>
-                  saveChoice(analyticsSelected ? "granted" : "denied")
-                }
-                className={`${actionClass} bg-[#282524] text-white hover:bg-[#403B38]`}
+                onClick={() => saveChoice("denied")}
+                className={`${actionClass} border border-[#D8D1CB] bg-transparent text-[#625D59] hover:bg-[#F1ECE6]`}
               >
-                Save Preferences
+                Necessary Only
               </button>
             </div>
           </div>
