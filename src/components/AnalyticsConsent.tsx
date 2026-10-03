@@ -4,12 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 import { ShieldCheck, SlidersHorizontal } from "lucide-react";
 import { LegalLink } from "@/components/LegalLink";
 import {
-  ANALYTICS_CONSENT_KEY,
   ANALYTICS_PREFERENCE_KEY,
   ANALYTICS_SETTINGS_EVENT,
   isValidAnalyticsMeasurementId,
+  parseAnalyticsPreferenceCookie,
   resolveAnalyticsPreference,
-  type AnalyticsConsentChoice,
+  serializeAnalyticsPreferenceCookie,
+  type AnalyticsPreference,
+  LEGACY_ANALYTICS_CONSENT_KEY,
 } from "@/lib/analytics";
 
 declare global {
@@ -36,7 +38,7 @@ function disableAnalytics(measurementId: string) {
 
   for (const cookie of document.cookie.split(";")) {
     const name = cookie.trim().split("=", 1)[0];
-    if (name.startsWith("_ga")) {
+    if (name === "_ga" || name.startsWith("_ga_")) {
       document.cookie = `${name}=; Max-Age=0; Path=/; SameSite=Lax`;
     }
   }
@@ -46,42 +48,137 @@ export function AnalyticsConsent({ measurementId }: AnalyticsConsentProps) {
   const validMeasurementId = isValidAnalyticsMeasurementId(measurementId)
     ? measurementId
     : undefined;
-  const [choice, setChoice] = useState<AnalyticsConsentChoice | null>(null);
+  const [preference, setPreferenceState] = useState<AnalyticsPreference | null>(
+    null,
+  );
   const [preferenceRead, setPreferenceRead] = useState(false);
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [analyticsSelected, setAnalyticsSelected] = useState(false);
+  const [openedFromSettings, setOpenedFromSettings] = useState(false);
+  const analyticsSelected = preference === "enabled";
+
+  const persistPreference = useCallback(
+    (nextPreference: AnalyticsPreference) => {
+      let localStorageSaved = false;
+      let cookieSaved = false;
+
+      try {
+        localStorage.setItem(ANALYTICS_PREFERENCE_KEY, nextPreference);
+        localStorage.removeItem(LEGACY_ANALYTICS_CONSENT_KEY);
+        localStorageSaved = true;
+      } catch {
+        // The first-party cookie below can preserve the preference instead.
+      }
+
+      try {
+        document.cookie = serializeAnalyticsPreferenceCookie(
+          nextPreference,
+          window.location.protocol === "https:",
+        );
+        cookieSaved =
+          parseAnalyticsPreferenceCookie(document.cookie) === nextPreference;
+      } catch {
+        // Keep the effective choice for this page even when storage is blocked.
+      }
+
+      if (localStorageSaved || cookieSaved) {
+        try {
+          localStorage.removeItem(LEGACY_ANALYTICS_CONSENT_KEY);
+        } catch {
+          // Migration cleanup is best-effort after a current preference is saved.
+        }
+      }
+
+      return localStorageSaved || cookieSaved;
+    },
+    [],
+  );
+
+  const setPreference = useCallback(
+    (nextPreference: AnalyticsPreference) => {
+      if (!validMeasurementId) return;
+      if (nextPreference === "disabled") disableAnalytics(validMeasurementId);
+      else window[`ga-disable-${validMeasurementId}`] = false;
+
+      persistPreference(nextPreference);
+      setPreferenceState(nextPreference);
+    },
+    [persistPreference, validMeasurementId],
+  );
+
+  const savePreference = useCallback(
+    (nextPreference: AnalyticsPreference) => {
+      setPreference(nextPreference);
+      setSettingsOpen(false);
+      setNoticeOpen(false);
+      setOpenedFromSettings(false);
+    },
+    [setPreference],
+  );
+
+  const continueFromNotice = useCallback(() => {
+    if (openedFromSettings) {
+      setSettingsOpen(false);
+      setNoticeOpen(false);
+      setOpenedFromSettings(false);
+      return;
+    }
+    savePreference("enabled");
+  }, [openedFromSettings, savePreference]);
 
   useEffect(() => {
     if (!validMeasurementId) return;
-    let savedChoice: AnalyticsConsentChoice = "granted";
+    let storedPreference: string | null = null;
+    let legacyConsent: string | null = null;
     try {
-      const legacyConsent = localStorage.getItem(ANALYTICS_CONSENT_KEY);
-      const resolution = resolveAnalyticsPreference(
-        localStorage.getItem(ANALYTICS_PREFERENCE_KEY),
-        legacyConsent,
-      );
-      savedChoice = resolution.preference === "enabled" ? "granted" : "denied";
-      if (resolution.migrated) {
-        localStorage.setItem(ANALYTICS_PREFERENCE_KEY, resolution.preference);
-        localStorage.removeItem(ANALYTICS_CONSENT_KEY);
-      } else if (localStorage.getItem(ANALYTICS_PREFERENCE_KEY) !== null) {
-        localStorage.removeItem(ANALYTICS_CONSENT_KEY);
-      }
-      setNoticeOpen(resolution.showNotice);
+      storedPreference = localStorage.getItem(ANALYTICS_PREFERENCE_KEY);
+      legacyConsent = localStorage.getItem(LEGACY_ANALYTICS_CONSENT_KEY);
     } catch {
-      // Default-on statistics remain usable, with the opt-out still visible.
-      setNoticeOpen(true);
+      // The first-party cookie remains available when localStorage is blocked.
     }
-    setChoice(savedChoice);
-    setAnalyticsSelected(savedChoice === "granted");
+
+    const resolution = resolveAnalyticsPreference(
+      storedPreference,
+      parseAnalyticsPreferenceCookie(document.cookie),
+      legacyConsent,
+    );
+    const storedCookiePreference = parseAnalyticsPreferenceCookie(
+      document.cookie,
+    );
+    setPreferenceState(resolution.preference);
+    setNoticeOpen(resolution.showNotice);
+    if (
+      resolution.migrated ||
+      storedPreference !== null ||
+      storedCookiePreference !== null
+    ) {
+      try {
+        localStorage.setItem(ANALYTICS_PREFERENCE_KEY, resolution.preference);
+      } catch {
+        // The first-party cookie still preserves the migrated preference.
+      }
+      try {
+        document.cookie = serializeAnalyticsPreferenceCookie(
+          resolution.preference,
+          window.location.protocol === "https:",
+        );
+      } catch {
+        // Migration is still effective in memory for this page.
+      }
+      try {
+        localStorage.removeItem(LEGACY_ANALYTICS_CONSENT_KEY);
+      } catch {
+        // Migration cleanup is best-effort.
+      }
+    }
     setPreferenceRead(true);
   }, [validMeasurementId]);
 
   useEffect(() => {
     if (!validMeasurementId) return;
     const openSettings = () => {
+      setOpenedFromSettings(true);
       setSettingsOpen(true);
       setExpanded(true);
     };
@@ -90,32 +187,11 @@ export function AnalyticsConsent({ measurementId }: AnalyticsConsentProps) {
       window.removeEventListener(ANALYTICS_SETTINGS_EVENT, openSettings);
   }, [validMeasurementId]);
 
-  const saveChoice = useCallback(
-    (nextChoice: AnalyticsConsentChoice) => {
-      if (!validMeasurementId) return;
-      try {
-        localStorage.setItem(
-          ANALYTICS_PREFERENCE_KEY,
-          nextChoice === "granted" ? "enabled" : "disabled",
-        );
-        localStorage.removeItem(ANALYTICS_CONSENT_KEY);
-      } catch {
-        // Keep the choice for this page without blocking site use.
-      }
-      setChoice(nextChoice);
-      setAnalyticsSelected(nextChoice === "granted");
-      setSettingsOpen(false);
-      setNoticeOpen(false);
-      if (nextChoice === "denied") disableAnalytics(validMeasurementId);
-    },
-    [validMeasurementId],
-  );
-
   useEffect(() => {
     if (!validMeasurementId || !preferenceRead) return;
 
-    if (choice !== "granted") {
-      if (choice === "denied") disableAnalytics(validMeasurementId);
+    if (preference !== "enabled") {
+      if (preference === "disabled") disableAnalytics(validMeasurementId);
       return;
     }
 
@@ -164,7 +240,7 @@ export function AnalyticsConsent({ measurementId }: AnalyticsConsentProps) {
     return () => {
       window[`ga-disable-${validMeasurementId}`] = true;
     };
-  }, [choice, preferenceRead, validMeasurementId]);
+  }, [preference, preferenceRead, validMeasurementId]);
 
   if (
     !validMeasurementId ||
@@ -223,7 +299,7 @@ export function AnalyticsConsent({ measurementId }: AnalyticsConsentProps) {
             </button>
             <button
               type="button"
-              onClick={() => saveChoice("granted")}
+              onClick={continueFromNotice}
               className={`${actionClass} bg-[#282524] text-white shadow-sm hover:bg-[#403B38]`}
             >
               Accept
@@ -271,7 +347,9 @@ export function AnalyticsConsent({ measurementId }: AnalyticsConsentProps) {
                   role="switch"
                   aria-checked={analyticsSelected}
                   aria-label="Minimal Analytics"
-                  onClick={() => setAnalyticsSelected((value) => !value)}
+                  onClick={() =>
+                    setPreference(analyticsSelected ? "disabled" : "enabled")
+                  }
                   className={`mt-0.5 inline-flex h-5 w-8 shrink-0 items-center rounded-full p-1 transition-colors ${focusClass} ${analyticsSelected ? "bg-[#B94F43]" : "bg-[#D8D1CB]"}`}
                 >
                   <span
@@ -311,10 +389,17 @@ export function AnalyticsConsent({ measurementId }: AnalyticsConsentProps) {
               </button>
               <button
                 type="button"
-                onClick={() => saveChoice("denied")}
+                onClick={() => savePreference("disabled")}
                 className={`${actionClass} border border-[#D8D1CB] bg-transparent text-[#625D59] hover:bg-[#F1ECE6]`}
               >
                 Necessary Only
+              </button>
+              <button
+                type="button"
+                onClick={() => savePreference(preference)}
+                className={`${actionClass} bg-[#282524] text-white shadow-sm hover:bg-[#403B38]`}
+              >
+                Save preferences
               </button>
             </div>
           </div>

@@ -72,6 +72,49 @@ Leave it unset if Cloudflare is used only for Turnstile or the DNS record is **D
 
 `NEXT_PUBLIC_MUX_PLAYBACK_ID` is optional and may remain unset.
 
+### Google Analytics 4 production configuration
+
+The production Measurement ID is public configuration. Keep GA4 restricted to
+statistical measurement of the public homepage. The production owner has
+verified these property settings:
+
+```text
+Google products & services data sharing: OFF
+Modelling contributions & business insights: OFF
+Technical support: OFF
+Recommendations for your business: OFF
+Google Ads linkage: none
+Form interactions: OFF
+Event data retention: 2 months
+User data retention: 14 months
+Reset on new user activity: OFF
+```
+
+Maintain or confirm the remaining restricted settings in GA4:
+
+```text
+Enhanced Measurement
+  Page views: ON
+    Page changes based on browser history events: OFF
+  Scrolls: ON
+  Outbound clicks: OFF
+  Site search: OFF
+  Video engagement: OFF
+  File downloads: OFF
+
+User-ID: absent
+User-provided data: OFF
+Enhanced conversions: OFF
+Remarketing, advertising audiences and cross-domain measurement: OFF
+Custom booking/customer dimensions: none
+```
+
+The 14-month user-level retention period is not a legal requirement. Its
+justification and completion/retention of the required legitimate-interests
+assessment remain production prerequisites. Do not enable default-on analytics
+in production until these prerequisites and the remaining GA4 restrictions are
+confirmed.
+
 ## Generate production secrets
 
 Generate independent production-only secrets for:

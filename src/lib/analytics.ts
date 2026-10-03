@@ -1,9 +1,12 @@
-export const ANALYTICS_CONSENT_KEY = "reembroidered.analytics-consent.v1";
 export const ANALYTICS_PREFERENCE_KEY = "reembroidered.analytics-preference.v2";
+export const ANALYTICS_PREFERENCE_COOKIE =
+  "reembroidered_analytics_preference_v2";
+export const LEGACY_ANALYTICS_CONSENT_KEY =
+  "reembroidered.analytics-consent.v1";
 export const ANALYTICS_SETTINGS_EVENT = "reembroidered:analytics-settings";
 
-export type AnalyticsConsentChoice = "granted" | "denied";
 export type AnalyticsPreference = "enabled" | "disabled";
+type LegacyAnalyticsConsent = "granted" | "denied";
 
 export function parseAnalyticsPreference(
   value: string | null,
@@ -13,6 +16,7 @@ export function parseAnalyticsPreference(
 
 export function resolveAnalyticsPreference(
   preference: string | null,
+  cookiePreference: string | null,
   legacyConsent: string | null,
 ): { preference: AnalyticsPreference; showNotice: boolean; migrated: boolean } {
   const parsedPreference = parseAnalyticsPreference(preference);
@@ -20,11 +24,20 @@ export function resolveAnalyticsPreference(
     return { preference: parsedPreference, showNotice: false, migrated: false };
   }
 
-  if (!parsedPreference && legacyConsent === "denied") {
+  const parsedCookiePreference = parseAnalyticsPreference(cookiePreference);
+  if (parsedCookiePreference) {
+    return {
+      preference: parsedCookiePreference,
+      showNotice: false,
+      migrated: false,
+    };
+  }
+
+  if (legacyConsent === "denied") {
     return { preference: "disabled", showNotice: false, migrated: true };
   }
 
-  if (preference === null && legacyConsent === "granted") {
+  if (legacyConsent === "granted") {
     return { preference: "enabled", showNotice: false, migrated: true };
   }
 
@@ -37,8 +50,34 @@ export function isValidAnalyticsMeasurementId(
   return typeof value === "string" && /^G-[A-Z0-9]{6,}$/.test(value);
 }
 
-export function parseAnalyticsConsent(
+export function parseLegacyAnalyticsConsent(
   value: string | null,
-): AnalyticsConsentChoice | null {
+): LegacyAnalyticsConsent | null {
   return value === "granted" || value === "denied" ? value : null;
+}
+
+export function parseAnalyticsPreferenceCookie(
+  cookieString: string,
+): AnalyticsPreference | null {
+  const encodedName = `${ANALYTICS_PREFERENCE_COOKIE}=`;
+  const item = cookieString
+    .split(";")
+    .map((cookie) => cookie.trim())
+    .find((cookie) => cookie.startsWith(encodedName));
+  if (!item) return null;
+
+  try {
+    return parseAnalyticsPreference(
+      decodeURIComponent(item.slice(encodedName.length)),
+    );
+  } catch {
+    return null;
+  }
+}
+
+export function serializeAnalyticsPreferenceCookie(
+  preference: AnalyticsPreference,
+  secure: boolean,
+): string {
+  return `${ANALYTICS_PREFERENCE_COOKIE}=${preference}; Path=/; Max-Age=31536000; SameSite=Lax${secure ? "; Secure" : ""}`;
 }

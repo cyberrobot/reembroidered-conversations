@@ -38,6 +38,8 @@ const availability = {
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem("reembroidered.analytics-preference.v2", "disabled");
+    document.cookie =
+      "reembroidered_analytics_preference_v2=disabled; Path=/; SameSite=Lax";
     window.turnstile = {
       render(container: HTMLElement, options: Record<string, unknown>) {
         Object.assign(window, {

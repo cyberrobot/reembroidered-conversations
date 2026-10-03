@@ -143,7 +143,7 @@ test("Privacy Notice describes actual data flows without inventing consent or de
   );
   assert.match(privacy, /statistical-purposes exception under PECR/i);
   assert.match(privacy, /UK GDPR lawful basis is legitimate interests/i);
-  assert.match(
+  assert.doesNotMatch(
     privacy,
     /completed and retained a legitimate-interests assessment/i,
   );
@@ -155,7 +155,14 @@ test("Privacy Notice describes actual data flows without inventing consent or de
     privacy,
     /preference stores enabled or disabled.*not a consent record/i,
   );
-  assert.match(privacy, /two months, the minimum available setting/i);
+  assert.match(
+    privacy,
+    /event-level data for 2 months and user-level data for up to 14 months/i,
+  );
+  assert.match(
+    privacy,
+    /Reset on new user activity is disabled, so new activity does not continually extend the user-level retention period/i,
+  );
   assert.match(privacy, /Aggregate reports may be retained independently/i);
   assert.doesNotMatch(
     privacy,

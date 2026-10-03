@@ -3,6 +3,8 @@ import { expect, test, type Page } from "@playwright/test";
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem("reembroidered.analytics-preference.v2", "disabled");
+    document.cookie =
+      "reembroidered_analytics_preference_v2=disabled; Path=/; SameSite=Lax";
   });
 });
 

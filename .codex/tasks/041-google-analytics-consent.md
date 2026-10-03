@@ -184,15 +184,14 @@ After hydration and after checking stored analytics preferences:
 - load the Google tag;
 - collect only the restricted statistical measurements allowed by this specification;
 - display a compact analytics notice explaining that limited analytics is used;
-- provide an immediately available **Disable analytics** control;
+- provide the existing Analytics settings control, where disabling takes effect immediately through the existing switch;
 - provide a **Privacy Notice** link;
-- provide a non-consent acknowledgement such as **Continue** or **Got it** to dismiss the notice.
+- preserve the existing acknowledgement control and its label to dismiss the notice.
 
-Do not label the acknowledgement:
+Do not change the existing acknowledgement label as part of this behaviour-only update. Its action must only acknowledge/dismiss the notice; analytics is already on by default and is not enabled on the basis of that action. Do not introduce new consent-oriented labels such as:
 
 ```text
 Allow analytics
-Accept
 I consent
 Agree
 ```
@@ -363,10 +362,12 @@ Before production enablement, verify and record the following.
 
 ### Enhanced Measurement
 
-Use only:
+Maintain or confirm this restricted configuration:
 
 ```text
 Page views: ON
+  Advanced settings:
+    Page changes based on browser history events: OFF
 Scrolls: ON
 
 Outbound clicks: OFF
@@ -377,6 +378,12 @@ File downloads: OFF
 ```
 
 Do not enable additional Enhanced Measurement categories without separately reviewing whether they remain within the statistical-purpose scope.
+
+`Form interactions: OFF` has been confirmed externally. Do not claim that the
+other Enhanced Measurement settings have been externally verified unless the
+production owner confirms them. The browser-history page-view restriction is
+required because the application uses browser history for legal-document
+navigation while emitting one explicit homepage `page_view`.
 
 ### Advertising and identity features
 
@@ -405,33 +412,41 @@ Do not send:
 - form values;
 - free-form customer information.
 
-### Google data sharing
+### Google data sharing — verified externally
 
-For this restricted configuration, turn optional Analytics account data-sharing settings off.
-
-In particular:
+The production owner has verified that all optional Analytics account
+data-sharing settings are off:
 
 ```text
 Google products & services: OFF
+Modelling contributions & business insights: OFF
+Technical support: OFF
+Recommendations for your business: OFF
 ```
 
 Do not allow Analytics data from this property to be reused for Google's independent product-development, advertising or other separate purposes.
 
-Prefer all optional account-level data-sharing settings to be disabled unless each enabled setting has been separately confirmed as compatible with the statistical-purpose model.
+### Google Ads linkage — verified externally
 
-Document the production state in the PR completion report.
+```text
+Google Ads linkage: none
+```
 
 ### Data retention
 
-Set GA4 user/event-level retention to the minimum available production setting:
+The verified production retention configuration is:
 
 ```text
-2 months
+Event data retention: 2 months
+User data retention: 14 months
+Reset on new user activity: OFF
 ```
 
-Do not enable reset-on-new-activity if doing so would extend individual-level retention beyond the configured window.
+The production owner records this justification:
 
-Before relying on default-on analytics in production, record why the chosen raw/user-level retention is necessary and proportionate for the aggregation/improvement purpose.
+> Event-level data is retained for 2 months. User-level data is retained for up to 14 months to permit analysis across an annual usage cycle where user-level Analytics exploration is genuinely required. Reset on new user activity is disabled, so subsequent activity does not continually extend the retention period. Analytics is not used for advertising, profiling, booking identification, marketing audiences or individual decision-making. Standard aggregated Analytics reports may be retained independently of these user/event retention controls.
+
+Do not describe 14 months as legally required or necessary merely because it is a GA default. Completion and retention of a legitimate-interests assessment covering this configuration remains a production prerequisite.
 
 If the production owner cannot reasonably justify the provider's individual-level retention for the statistical aggregation process, retain the existing opt-in model instead of enabling default-on analytics.
 
@@ -539,15 +554,10 @@ Use language such as:
 
 > We use limited Google Analytics statistics to understand how this public website is used and improve it. You can disable analytics at any time.
 
-Controls:
-
-```text
-Disable analytics
-Continue
-Privacy Notice
-```
-
-`Continue` is an acknowledgement/dismiss action, not consent.
+Keep the current popup controls and labels unchanged. The existing
+acknowledgement action is only an acknowledgement/dismiss action, not consent.
+Analytics is already enabled by default and the action must not change that
+state.
 
 When settings are reopened:
 
@@ -659,11 +669,14 @@ Do not describe this objection mechanism as withdrawal of consent.
 
 ### UK GDPR basis
 
-Where the processing involves personal data, state the confirmed UK GDPR lawful basis.
+Where this processing involves personal data, state the lawful basis accurately
+without claiming that supporting documentation is complete:
 
-If relying on legitimate interests, describe the interest narrowly as producing aggregate statistics necessary to understand and improve the public website.
+> Where this processing involves personal data, our UK GDPR lawful basis is legitimate interests: producing limited statistics needed to understand and improve the public website.
 
-Do not publish a legitimate-interests claim until the corresponding assessment has been completed.
+Completion and retention of an appropriate legitimate-interests assessment
+remains a production prerequisite. Do not claim in the Privacy Notice that the
+assessment has already been completed or retained.
 
 ### Provider disclosure
 
@@ -689,7 +702,10 @@ Do not describe that preference as a consent record.
 
 Do not make unsupported guarantees.
 
-If the production GA4 property is confirmed at the two-month user/event retention setting, the notice may state that configuration accurately, while distinguishing raw/user-level retention from aggregate reporting.
+State the verified configuration accurately: event-level data is retained for
+2 months, user-level data for up to 14 months, and reset on new user activity is
+disabled. Explain that aggregate reports may be retained independently. Do not
+imply that 14 months is legally required.
 
 ### International transfers
 
@@ -707,15 +723,20 @@ Recheck the existing international-transfer wording after the legal-basis change
 - [ ] Analytics preference is read before GA is loaded.
 - [ ] A previous v1 `denied` preference is preserved and prevents GA loading.
 - [ ] With no previous preference, GA loads automatically after preference resolution.
-- [ ] First-time visitors see clear analytics information and an immediate Disable analytics control.
-- [ ] The notice does not describe Continue/Got it as consent.
-- [ ] Continue dismisses the notice and records `enabled`.
+- [ ] First-time visitors see clear analytics information; the existing Settings control opens the switch, which disables analytics immediately when turned off.
+- [ ] The existing acknowledgement action only dismisses the notice and does not describe analytics as consent.
+- [ ] The existing acknowledgement dismisses the initial notice and records `enabled`.
+- [ ] The existing acknowledgement from Analytics settings closes the panel without changing the existing preference.
 - [ ] Disable analytics records `disabled`.
 - [ ] Disabled state survives reload.
 - [ ] Disabled state blocks all subsequent GA tag requests.
 - [ ] Re-enabling through Analytics settings works.
 - [ ] Disabling through Analytics settings works.
+- [ ] The expanded Minimal Analytics switch immediately applies and persists either preference.
+- [ ] Status text always reflects the effective analytics state.
 - [ ] Withdrawal clears accessible `_ga` / `_ga_*` cookies.
+- [ ] A first-party preference cookie persists the choice when localStorage is unavailable.
+- [ ] A disabled preference cookie prevents GA loading before interaction.
 - [ ] Host-only `cookie_domain: "none"` remains configured.
 - [ ] Missing/malformed Measurement ID fails closed.
 - [ ] GA failure does not affect the site.
@@ -724,24 +745,30 @@ Recheck the existing international-transfer wording after the legal-basis change
 
 ### External GA4 configuration
 
+- [x] Google products & services data sharing disabled.
+- [x] Modelling contributions & business insights disabled.
+- [x] Technical support data sharing disabled.
+- [x] Recommendations for your business disabled.
+- [x] No Google Ads linkage.
+- [x] Form interactions disabled externally.
+- [x] Event data retention is 2 months.
+- [x] User data retention is 14 months.
+- [x] Reset on new user activity is off.
 - [ ] Page views enabled.
+- [ ] Page changes based on browser history events disabled.
 - [ ] Scrolls enabled.
 - [ ] Outbound clicks disabled.
 - [ ] Site search disabled.
-- [ ] Form interactions disabled.
 - [ ] Video engagement disabled.
 - [ ] File downloads disabled.
-- [ ] Google products & services data sharing disabled.
-- [ ] Optional data-sharing settings reviewed and preferably disabled.
-- [ ] No Google Ads linkage.
 - [ ] No remarketing.
 - [ ] No advertising audiences.
 - [ ] No User-ID.
 - [ ] No enhanced conversions.
 - [ ] No user-provided-data collection.
 - [ ] No custom booking/customer dimensions.
-- [ ] User/event-level data retention set to two months.
-- [ ] Retention justification/privacy assessment recorded before default-on production enablement.
+- [ ] Remaining restricted-statistics settings confirmed by the production owner.
+- [ ] Retention justification and legitimate-interests assessment completed and retained before default-on production enablement.
 
 ### Privacy Notice
 
@@ -751,18 +778,21 @@ Recheck the existing international-transfer wording after the legal-basis change
 - [ ] Default-on statistical analytics is disclosed.
 - [ ] Statistical-purpose model is explained.
 - [ ] The applicable UK GDPR lawful basis is accurately stated.
+- [ ] The notice does not claim that a legitimate-interests assessment has been completed or retained.
 - [ ] Visitor objection/opt-out is explained.
 - [ ] Google Analytics provider role is disclosed.
 - [ ] GA cookie/storage behaviour is described.
 - [ ] Analytics preference storage is described as a preference, not a consent record.
+- [ ] The notice distinguishes the site's preference storage from GA cookies.
+- [ ] The notice states event retention of 2 months, user retention up to 14 months, reset disabled, and aggregate report retention independently.
 - [ ] No statement suggests booking form/customer identity is intentionally sent to GA.
 - [ ] No unsupported retention promise is added.
 
 ### UI
 
 - [ ] First-visit analytics notice works at desktop and mobile widths.
-- [ ] Disable analytics is directly available.
-- [ ] Continue/Got it does not use consent language.
+- [ ] The existing Settings control immediately exposes the current analytics preference switch; changing it disables analytics at once.
+- [ ] The existing acknowledgement control and its visual label are unchanged.
 - [ ] Privacy Notice is keyboard accessible.
 - [ ] Analytics settings remains available in the footer.
 - [ ] Legal modal correctly makes the analytics notice inert while open.
@@ -805,6 +835,10 @@ Ensure an old explicit denial always wins over the new default.
 
 Continue testing Measurement ID validation.
 
+Test preference-cookie parsing and serialization for valid `enabled` and
+`disabled` values, missing/corrupt cookies, localStorage precedence, cookie
+fallback and legacy migration.
+
 ### Legal-content tests
 
 Update `tests/legal-content.test.mjs`.
@@ -821,6 +855,12 @@ Verify:
 - Google Analytics is disclosed distinctly;
 - booking form contents/identifiers are not described as being intentionally sent;
 - existing provider disclosures remain accurate.
+- event-level retention is 2 months;
+- user-level retention is up to 14 months;
+- reset on new activity is disabled;
+- aggregate reports may be retained independently;
+- no completed/retained legitimate-interests assessment is claimed;
+- the first-party preference is not described as a consent record.
 
 ### Browser tests
 
@@ -834,11 +874,11 @@ Cover:
    - preference read completes;
    - GA tag loads automatically;
    - analytics notice is visible;
-   - Disable analytics is visible;
-   - Continue/Got it is visible;
+   - the existing Settings control is visible and opens the analytics preference switch;
+   - the existing acknowledgement control is visible;
    - Privacy Notice link is visible.
 
-2. **Continue**
+2. **Existing acknowledgement control**
    - stores `enabled`;
    - closes notice;
    - reload keeps analytics enabled;
@@ -862,9 +902,12 @@ Cover:
    - notice is visible so objection is immediately available.
 
 7. **Analytics settings**
-   - reports current on/off status;
-   - enabled → disabled works;
-   - disabled → enabled works.
+   - switch immediately applies and persists enabled → disabled;
+   - disabled status is accurate and accessible GA cookies are removed;
+   - reload keeps the visitor disabled and makes no Google request;
+   - switch immediately applies and persists disabled → enabled;
+   - status reflects the effective state;
+   - the existing acknowledgement control from settings closes without changing a disabled preference.
 
 8. **Cookie configuration**
    - queued `config` contains:
@@ -884,7 +927,12 @@ cookie_domain: "none"
 11. **Script failure**
     - homepage/booking UI remains usable.
 
-12. **Missing/invalid Measurement ID**
+12. **Unavailable localStorage**
+    - disabling analytics writes the first-party preference cookie;
+    - reload remains disabled with no Google request;
+    - a pre-existing disabled cookie blocks Analytics before interaction.
+
+13. **Missing/invalid Measurement ID**
     - fail closed through existing unit coverage or a clean browser fixture;
     - do not introduce test-only query parameters into the production homepage.
 
@@ -900,6 +948,9 @@ before homepage navigation unless that test specifically exercises analytics.
 
 This keeps unrelated browser tests and screenshots deterministic and prevents CI from generating Google requests.
 
+Pre-seed the v2 disabled preference cookie alongside localStorage where those
+tests use fresh browser contexts.
+
 Update at minimum:
 
 ```text
@@ -910,7 +961,10 @@ tests/browser/migration-smoke.spec.ts
 
 ### Visual regression
 
-Replace the old opt-in consent screenshots with the new default-on information/opt-out notice.
+Preserve existing analytics screenshots. Do not regenerate baselines for
+behavioral/state-management changes. If an unavoidable copy change causes a
+visible difference, update only directly affected analytics snapshots after
+reviewing actual/diff images; keep layout, spacing and styling unchanged.
 
 Maintain reviewed:
 
@@ -923,7 +977,8 @@ mobile Linux
 
 baselines.
 
-Update Privacy Notice snapshots because Version 1.2/legal-basis wording changes.
+Update Privacy Notice snapshots only if changed legal wording causes a direct
+visual difference. Do not regenerate Terms or unrelated snapshots.
 
 Do not change Terms snapshots unless a shared rendering change genuinely requires it.
 
@@ -963,76 +1018,82 @@ Browser tests must never send traffic to the real production GA property.
 
 ## Completion report
 
-### Changed
+### Spec changes
 
 Report:
 
-- default-on statistical analytics behaviour;
-- old-preference migration;
-- new analytics notice wording;
-- persistent opt-out;
-- Privacy Notice Version 1.2;
-- updated tests and snapshots.
+- event retention changed from the old two-month user/event requirement to 2-month event and 14-month user retention;
+- Reset on new user activity is OFF;
+- browser-history page-view restriction is documented;
+- verified data-sharing and Google Ads settings are recorded;
+- LIA completion and retention remain a production prerequisite.
 
-### External configuration
+### Implementation changes
 
-Explicitly record the verified production state for:
+Report:
 
-```text
-Enhanced Measurement
-Google products & services data sharing
-other optional Analytics data-sharing settings
-Google Ads/product links
-User-provided data
-advertising functionality
-data retention
-```
+- active preference model uses `enabled` / `disabled`;
+- existing settings switch immediately changes effective preference;
+- the acknowledgement action from settings does not change a disabled preference;
+- first-party preference-cookie fallback and localStorage-failure behaviour;
+- Privacy Notice retention and storage wording corrected.
 
-Also state:
+### UI preservation
+
+Record:
 
 ```text
-GA4 Enhanced Measurement → Form interactions: disabled externally.
+Analytics UI layout/styling changed: yes/no
+Analytics UI copy changed: yes/no
+Analytics visual snapshots regenerated: yes/no
 ```
 
-### Legal/privacy prerequisites
-
-Confirm:
-
-- statistical-purpose use is limited to aggregate service-improvement analytics;
-- the UK GDPR lawful basis has been confirmed;
-- any required legitimate-interests assessment has been completed;
-- the two-month GA4 user/event-level retention has been assessed as necessary/proportionate for this use.
-
-If those prerequisites are not confirmed, default-on production analytics must not be enabled and the existing opt-in implementation must remain in place.
+Expected: layout/styling unchanged and snapshots unchanged. Explain any necessary
+copy or snapshot change.
 
 ### Tests
 
-List:
+Report migration unit tests, immediate-switch behaviour, acknowledgement behaviour,
+storage fallback, cookie clearing, focused Playwright result, full Playwright
+count, Node test result, production build result, security audit result, and
+`git diff --check` result.
 
-- focused test results;
-- full Node test result;
-- full Playwright count;
-- build result;
-- audit result;
-- `git diff --check` result.
+### External configuration
 
-### Deviations
+Verified externally:
 
-Explain any deviation from this specification.
+```text
+Google products & services: OFF
+Modelling contributions & business insights: OFF
+Technical support: OFF
+Recommendations for your business: OFF
+Google Ads linkage: none
+Form interactions: OFF
+Event retention: 2 months
+User retention: 14 months
+Reset on new user activity: OFF
+```
 
-Use `None` if there are none.
+Do not claim other Enhanced Measurement settings as externally verified
+without confirmation.
 
-### Remaining issues
+### Remaining production prerequisites
 
-Keep the following outside this PR:
+List every item still awaiting manual confirmation, especially:
 
-- booking-funnel analytics;
-- conversion measurement;
-- advertising;
-- audiences;
-- cross-service tracking;
-- server-side analytics;
-- EEA-specific consent handling;
-- full CMP implementation.
+```text
+LIA completed and retained: <confirm before production enablement>
+Page views → Page changes based on browser history events: OFF
+Remaining Enhanced Measurement restrictions confirmed
+User-ID / user-provided data / enhanced conversions absent
+Any other outstanding restricted-statistics prerequisites
+```
 
-Use `None` if there are no other unresolved issues within scope.
+Use `None` only if each prerequisite has actually been confirmed.
+
+### Deviations and remaining issues
+
+Explain meaningful deviations and unresolved in-scope issues. Keep booking-funnel
+analytics, conversion measurement, advertising, audiences, cross-service
+tracking, server-side analytics, EEA-specific consent handling, and a full CMP
+outside this PR. Use `None` when no additional issue remains.

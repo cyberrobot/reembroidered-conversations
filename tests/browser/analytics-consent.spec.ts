@@ -1,18 +1,21 @@
 import { expect, test, type Page } from "@playwright/test";
 
 const preferenceKey = "reembroidered.analytics-preference.v2";
+const preferenceCookie = "reembroidered_analytics_preference_v2";
 const consentKey = "reembroidered.analytics-consent.v1";
 
 async function clearAnalyticsPreference(page: Page) {
   await page.addInitScript(
-    ({ preferenceKey, consentKey, marker }) => {
+    ({ preferenceKey, preferenceCookie, consentKey, marker }) => {
       if (sessionStorage.getItem(marker) === "done") return;
       localStorage.removeItem(preferenceKey);
       localStorage.removeItem(consentKey);
+      document.cookie = `${preferenceCookie}=; Path=/; Max-Age=0; SameSite=Lax`;
       sessionStorage.setItem(marker, "done");
     },
     {
       preferenceKey,
+      preferenceCookie,
       consentKey,
       marker: "reembroidered.analytics-test-clean-once",
     },
@@ -29,26 +32,28 @@ function trackGoogleRequests(page: Page) {
   return requests;
 }
 
-test("first visit loads limited analytics and shows the responsive opt-out notice", async ({
-  page,
-}) => {
-  const requests = trackGoogleRequests(page);
+async function stubGoogleTag(page: Page) {
   await page.route("https://www.googletagmanager.com/**", (route) =>
     route.fulfill({
       contentType: "application/javascript",
       body: "window.__testGoogleTagLoaded = true;",
     }),
   );
+}
+
+test("first visit loads limited analytics and shows the responsive notice", async ({
+  page,
+}) => {
+  const requests = trackGoogleRequests(page);
+  await stubGoogleTag(page);
   await clearAnalyticsPreference(page);
   await page.goto("/");
 
   const panel = page.getByRole("region", { name: "Analytics settings" });
   await expect(panel).toBeVisible();
-  await expect(panel).toContainText("limited Google Analytics statistics");
-  await expect(panel.getByRole("button", { name: "Continue" })).toBeVisible();
-  await expect(
-    panel.getByRole("button", { name: "Disable analytics" }).first(),
-  ).toBeVisible();
+  await expect(panel).toContainText("You can disable analytics at any time.");
+  await expect(panel.getByRole("button", { name: "Accept" })).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Settings" })).toBeVisible();
   await expect(panel.getByRole("link", { name: "Learn more" })).toBeVisible();
   await expect.poll(() => requests.length).toBe(1);
   await expect
@@ -88,27 +93,26 @@ test("first visit loads limited analytics and shows the responsive opt-out notic
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(panel).toHaveScreenshot(
     "analytics-consent-expanded-mobile.png",
-    {
-      animations: "disabled",
-    },
+    { animations: "disabled" },
   );
 });
 
-test("Continue acknowledges the notice, persists enabled and hides it after reload", async ({
+test("notice acknowledgement persists enabled and hides the notice", async ({
   page,
 }) => {
   const requests = trackGoogleRequests(page);
-  await page.route("https://www.googletagmanager.com/**", (route) =>
-    route.fulfill({ contentType: "application/javascript", body: "" }),
-  );
+  await stubGoogleTag(page);
   await clearAnalyticsPreference(page);
   await page.goto("/");
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await page.getByRole("button", { name: "Accept", exact: true }).click();
   await expect
     .poll(() =>
       page.evaluate((key) => localStorage.getItem(key), preferenceKey),
     )
     .toBe("enabled");
+  await expect
+    .poll(() => page.evaluate(() => document.cookie))
+    .toContain(`${preferenceCookie}=enabled`);
   await expect(
     page.getByRole("region", { name: "Analytics settings" }),
   ).toBeHidden();
@@ -119,33 +123,136 @@ test("Continue acknowledges the notice, persists enabled and hides it after relo
   await expect.poll(() => requests.length).toBe(2);
 });
 
-test("disable immediately clears GA cookies and remains disabled after reload", async ({
+test("settings switch applies and persists both preference directions immediately", async ({
   page,
 }) => {
   const requests = trackGoogleRequests(page);
-  await page.route("https://www.googletagmanager.com/**", (route) =>
-    route.fulfill({ contentType: "application/javascript", body: "" }),
+  await stubGoogleTag(page);
+  await page.addInitScript(
+    ({ key, marker }) => {
+      if (sessionStorage.getItem(marker) === "done") return;
+      localStorage.setItem(key, "enabled");
+      sessionStorage.setItem(marker, "done");
+    },
+    { key: preferenceKey, marker: "reembroidered.analytics-switch-seeded" },
   );
-  await clearAnalyticsPreference(page);
   await page.goto("/");
   await page.evaluate(() => {
     document.cookie = "_ga=browser-test; Path=/; SameSite=Lax";
     document.cookie = "_ga_TEST=browser-test; Path=/; SameSite=Lax";
   });
-  await page.getByRole("button", { name: "Disable analytics" }).first().click();
+
+  const footerSettings = page
+    .locator("footer")
+    .getByRole("button", { name: "Analytics settings" });
+  await footerSettings.scrollIntoViewIfNeeded();
+  await footerSettings.click();
+  const panel = page.getByRole("region", { name: "Analytics settings" });
+  const toggle = panel.getByRole("switch", { name: "Minimal Analytics" });
+  await expect(panel).toContainText("Analytics is currently on.");
+  await toggle.click();
+
+  await expect(toggle).toHaveAttribute("aria-checked", "false");
+  await expect(panel).toContainText("Analytics is currently off.");
   await expect
     .poll(() =>
       page.evaluate((key) => localStorage.getItem(key), preferenceKey),
     )
     .toBe("disabled");
+  await expect
+    .poll(() => page.evaluate(() => document.cookie))
+    .toContain(`${preferenceCookie}=disabled`);
   expect(
     await page.evaluate(() =>
       document.cookie
         .split(";")
         .map((cookie) => cookie.trim().split("=", 1)[0])
-        .filter((name) => name.startsWith("_ga")),
+        .filter((name) => name === "_ga" || name.startsWith("_ga_")),
     ),
   ).toEqual([]);
+  expect(await page.evaluate(() => window[`ga-disable-G-TEST000001`])).toBe(
+    true,
+  );
+
+  await page.reload();
+  expect(requests).toHaveLength(1);
+  await footerSettings.click();
+  const reloadedPanel = page.getByRole("region", {
+    name: "Analytics settings",
+  });
+  const reloadedToggle = reloadedPanel.getByRole("switch", {
+    name: "Minimal Analytics",
+  });
+  await expect(reloadedPanel).toContainText("Analytics is currently off.");
+  await reloadedToggle.click();
+  await expect(reloadedToggle).toHaveAttribute("aria-checked", "true");
+  await expect(reloadedPanel).toContainText("Analytics is currently on.");
+  await expect
+    .poll(() =>
+      page.evaluate((key) => localStorage.getItem(key), preferenceKey),
+    )
+    .toBe("enabled");
+  expect(await page.evaluate(() => window[`ga-disable-G-TEST000001`])).toBe(
+    false,
+  );
+  expect(requests).toHaveLength(2);
+});
+
+test("settings acknowledgement closes without enabling disabled analytics", async ({
+  page,
+}) => {
+  const requests = trackGoogleRequests(page);
+  await stubGoogleTag(page);
+  await page.addInitScript(
+    (key) => localStorage.setItem(key, "disabled"),
+    preferenceKey,
+  );
+  await page.goto("/");
+  const footerSettings = page
+    .locator("footer")
+    .getByRole("button", { name: "Analytics settings" });
+  await footerSettings.scrollIntoViewIfNeeded();
+  await footerSettings.click();
+  const panel = page.getByRole("region", { name: "Analytics settings" });
+  await expect(panel).toContainText("Analytics is currently off.");
+  await panel.getByRole("button", { name: "Hide" }).click();
+  await panel.getByRole("button", { name: "Accept", exact: true }).click();
+  await expect(panel).toBeHidden();
+  await expect
+    .poll(() =>
+      page.evaluate((key) => localStorage.getItem(key), preferenceKey),
+    )
+    .toBe("disabled");
+  expect(requests).toEqual([]);
+});
+
+test("a disabled preference cookie works when localStorage is unavailable", async ({
+  page,
+}) => {
+  const requests = trackGoogleRequests(page);
+  await stubGoogleTag(page);
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      get() {
+        throw new DOMException("Storage unavailable", "SecurityError");
+      },
+    });
+  });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
+  const footerSettings = page
+    .locator("footer")
+    .getByRole("button", { name: "Analytics settings" });
+  await footerSettings.scrollIntoViewIfNeeded();
+  await footerSettings.click();
+  const panel = page.getByRole("region", { name: "Analytics settings" });
+  await panel.getByRole("switch", { name: "Minimal Analytics" }).click();
+  await expect(panel).toContainText("Analytics is currently off.");
+  await expect
+    .poll(() => page.evaluate(() => document.cookie))
+    .toContain(`${preferenceCookie}=disabled`);
+  expect(requests).toHaveLength(1);
   await page.reload();
   await expect(
     page.getByRole("region", { name: "Analytics settings" }),
@@ -153,13 +260,26 @@ test("disable immediately clears GA cookies and remains disabled after reload", 
   expect(requests).toHaveLength(1);
 });
 
+test("a disabled fallback cookie prevents analytics before interaction", async ({
+  page,
+}) => {
+  const requests = trackGoogleRequests(page);
+  await stubGoogleTag(page);
+  await page.addInitScript((cookieName) => {
+    document.cookie = `${cookieName}=disabled; Path=/; SameSite=Lax`;
+  }, preferenceCookie);
+  await page.goto("/");
+  await expect(
+    page.getByRole("region", { name: "Analytics settings" }),
+  ).toBeHidden();
+  expect(requests).toEqual([]);
+});
+
 test("legacy v1 denial and grant migrate before analytics loads", async ({
   page,
 }) => {
   const requests = trackGoogleRequests(page);
-  await page.route("https://www.googletagmanager.com/**", (route) =>
-    route.fulfill({ contentType: "application/javascript", body: "" }),
-  );
+  await stubGoogleTag(page);
   await page.addInitScript(
     ({ key, marker }) => {
       if (sessionStorage.getItem(marker) === "done") return;
@@ -183,11 +303,12 @@ test("legacy v1 denial and grant migrate before analytics loads", async ({
   ).toBeNull();
 
   await page.evaluate(
-    ({ preferenceKey, consentKey }) => {
+    ({ preferenceKey, consentKey, preferenceCookie }) => {
       localStorage.removeItem(preferenceKey);
       localStorage.setItem(consentKey, "granted");
+      document.cookie = `${preferenceCookie}=; Path=/; Max-Age=0; SameSite=Lax`;
     },
-    { preferenceKey, consentKey },
+    { preferenceKey, consentKey, preferenceCookie },
   );
   await page.reload();
   await expect
@@ -202,65 +323,19 @@ test("corrupt preferences default on with the objection notice visible", async (
   page,
 }) => {
   const requests = trackGoogleRequests(page);
+  await stubGoogleTag(page);
   await page.addInitScript(
     (key) => localStorage.setItem(key, "maybe"),
     preferenceKey,
-  );
-  await page.route("https://www.googletagmanager.com/**", (route) =>
-    route.fulfill({ contentType: "application/javascript", body: "" }),
   );
   await page.goto("/");
   await expect(
     page.getByRole("region", { name: "Analytics settings" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Disable analytics" }).first(),
+    page.getByRole("button", { name: "Accept", exact: true }),
   ).toBeVisible();
   await expect.poll(() => requests.length).toBe(1);
-});
-
-test("footer settings show status and allow enabled/disabled changes", async ({
-  page,
-}) => {
-  const requests = trackGoogleRequests(page);
-  await page.route("https://www.googletagmanager.com/**", (route) =>
-    route.fulfill({ contentType: "application/javascript", body: "" }),
-  );
-  await page.addInitScript(
-    (key) => localStorage.setItem(key, "enabled"),
-    preferenceKey,
-  );
-  await page.goto("/");
-  const settings = page
-    .locator("footer")
-    .getByRole("button", { name: "Analytics settings" });
-  await settings.scrollIntoViewIfNeeded();
-  await settings.click();
-  const panel = page.getByRole("region", { name: "Analytics settings" });
-  await expect(panel).toContainText("Analytics is currently on.");
-  await panel
-    .locator("#analytics-preferences")
-    .getByRole("button", { name: "Disable analytics", exact: true })
-    .click();
-  await expect
-    .poll(() =>
-      page.evaluate((key) => localStorage.getItem(key), preferenceKey),
-    )
-    .toBe("disabled");
-  await settings.click();
-  await expect(panel).toContainText("Analytics is currently off.");
-  await panel
-    .getByRole("button", { name: "Enable analytics", exact: true })
-    .click();
-  await expect
-    .poll(() =>
-      page.evaluate((key) => localStorage.getItem(key), preferenceKey),
-    )
-    .toBe("enabled");
-  expect(requests.length).toBe(1);
-  expect(await page.evaluate(() => window[`ga-disable-G-TEST000001`])).toBe(
-    false,
-  );
 });
 
 test("Privacy Notice uses the canonical legal modal and inert background", async ({
@@ -276,15 +351,11 @@ test("Privacy Notice uses the canonical legal modal and inert background", async
     dialog.getByText("Version 1.2", { exact: false }).first(),
   ).toBeVisible();
   await expect(page.locator("#site-content")).toHaveAttribute("inert", "");
-  await expect(
-    panel.getByRole("button", { name: "Disable analytics" }).first(),
-  ).toBeEnabled();
+  await expect(panel.getByRole("button", { name: "Accept" })).toBeEnabled();
   await dialog.getByRole("button", { name: "Close legal document" }).click();
   await expect(dialog).toBeHidden();
   await expect(page.locator("#site-content")).not.toHaveAttribute("inert", "");
-  await expect(
-    panel.getByRole("button", { name: "Disable analytics" }).first(),
-  ).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Accept" })).toBeVisible();
 });
 
 test("enabled preference never loads analytics on sensitive routes", async ({
