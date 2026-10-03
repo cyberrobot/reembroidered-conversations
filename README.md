@@ -9,7 +9,8 @@ booking prototype one-to-one listening sessions with Shahd Karaeen.
 
 1. Install dependencies with `npm install`.
 2. Copy `.env.example` to `.env`. Set the server-only `DATABASE_URL` to a
-   PostgreSQL connection string. `NEXT_PUBLIC_MUX_PLAYBACK_ID` remains optional.
+   PostgreSQL connection string. `NEXT_PUBLIC_MUX_PLAYBACK_ID` and
+   `NEXT_PUBLIC_GOOGLE_ANALYTICS_ID` remain optional.
 3. Apply the committed database migrations with `npm run db:migrate:deploy`.
 4. Start development with `npm run dev`, then open <http://localhost:3000>.
 
@@ -34,29 +35,30 @@ Configure the production web service in Railway with the following environment v
 
 Configure these on the Railway **web service**.
 
-| Variable                          | Production value                                                       |
-| --------------------------------- | ---------------------------------------------------------------------- |
-| `DATABASE_URL`                    | Railway production PostgreSQL connection string                        |
-| `APP_URL`                         | `https://example.com`                                                  |
-| `STRIPE_SECRET_KEY`               | Stripe live secret/restricted API key                                  |
-| `STRIPE_WEBHOOK_SECRET`           | Production Stripe webhook signing secret (`whsec_...`)                 |
-| `GOOGLE_OAUTH_CLIENT_ID`          | Production Google OAuth client ID                                      |
-| `GOOGLE_OAUTH_CLIENT_SECRET`      | Production Google OAuth client secret                                  |
-| `GOOGLE_ADMIN_EMAIL`              | Dedicated booking Google account permitted to connect                  |
-| `GOOGLE_AVAILABILITY_CALENDAR_ID` | Personal practitioner calendar ID queried for FreeBusy only            |
-| `GOOGLE_TOKEN_ENCRYPTION_KEY`     | Base64 encoding of exactly 32 random bytes                             |
-| `ADMIN_SESSION_SECRET`            | High-entropy secret, minimum 32 bytes                                  |
-| `RESEND_API_KEY`                  | Production Resend API key                                              |
-| `BOOKING_EMAIL_FROM`              | Verified production sender                                             |
-| `BOOKING_CHANGES_URL`             | `https://example.com/booking/manage`                                   |
-| `BOOKING_MANAGEMENT_SECRET`       | High-entropy booking-management signing secret                         |
-| `NEXT_PUBLIC_TURNSTILE_SITE_KEY`  | Production Cloudflare Turnstile site key                               |
-| `TURNSTILE_SECRET_KEY`            | Production Turnstile secret                                            |
-| `TURNSTILE_EXPECTED_HOSTNAME`     | Production hostname only, e.g. `example.com`                           |
-| `TRUSTED_CLIENT_IP_HEADER`        | `cf-connecting-ip` when traffic is securely proxied through Cloudflare |
-| `ABUSE_PROTECTION_HMAC_SECRET`    | High-entropy secret, minimum 32 bytes                                  |
-| `BOOKING_RECONCILIATION_SECRET`   | High-entropy shared reconciliation secret                              |
-| `NEXT_PUBLIC_MUX_PLAYBACK_ID`     | Optional Mux playback ID override                                      |
+| Variable                          | Production value                                                                                                   |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `DATABASE_URL`                    | Railway production PostgreSQL connection string                                                                    |
+| `APP_URL`                         | `https://example.com`                                                                                              |
+| `STRIPE_SECRET_KEY`               | Stripe live secret/restricted API key                                                                              |
+| `STRIPE_WEBHOOK_SECRET`           | Production Stripe webhook signing secret (`whsec_...`)                                                             |
+| `GOOGLE_OAUTH_CLIENT_ID`          | Production Google OAuth client ID                                                                                  |
+| `GOOGLE_OAUTH_CLIENT_SECRET`      | Production Google OAuth client secret                                                                              |
+| `GOOGLE_ADMIN_EMAIL`              | Dedicated booking Google account permitted to connect                                                              |
+| `GOOGLE_AVAILABILITY_CALENDAR_ID` | Personal practitioner calendar ID queried for FreeBusy only                                                        |
+| `GOOGLE_TOKEN_ENCRYPTION_KEY`     | Base64 encoding of exactly 32 random bytes                                                                         |
+| `ADMIN_SESSION_SECRET`            | High-entropy secret, minimum 32 bytes                                                                              |
+| `RESEND_API_KEY`                  | Production Resend API key                                                                                          |
+| `BOOKING_EMAIL_FROM`              | Verified production sender                                                                                         |
+| `BOOKING_CHANGES_URL`             | `https://example.com/booking/manage`                                                                               |
+| `BOOKING_MANAGEMENT_SECRET`       | High-entropy booking-management signing secret                                                                     |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY`  | Production Cloudflare Turnstile site key                                                                           |
+| `TURNSTILE_SECRET_KEY`            | Production Turnstile secret                                                                                        |
+| `TURNSTILE_EXPECTED_HOSTNAME`     | Production hostname only, e.g. `example.com`                                                                       |
+| `TRUSTED_CLIENT_IP_HEADER`        | `cf-connecting-ip` when traffic is securely proxied through Cloudflare                                             |
+| `ABUSE_PROTECTION_HMAC_SECRET`    | High-entropy secret, minimum 32 bytes                                                                              |
+| `BOOKING_RECONCILIATION_SECRET`   | High-entropy shared reconciliation secret                                                                          |
+| `NEXT_PUBLIC_MUX_PLAYBACK_ID`     | Optional Mux playback ID override                                                                                  |
+| `NEXT_PUBLIC_GOOGLE_ANALYTICS_ID` | Optional public GA4 Measurement ID (`G-...`); restricted statistical analytics defaults on unless visitors opt out |
 
 Never expose server secrets using a `NEXT_PUBLIC_` variable.
 
@@ -69,6 +71,49 @@ TRUSTED_CLIENT_IP_HEADER=cf-connecting-ip
 Leave it unset if Cloudflare is used only for Turnstile or the DNS record is **DNS only**.
 
 `NEXT_PUBLIC_MUX_PLAYBACK_ID` is optional and may remain unset.
+
+### Google Analytics 4 production configuration
+
+The production Measurement ID is public configuration. Keep GA4 restricted to
+statistical measurement of the public homepage. The production owner has
+verified these property settings:
+
+```text
+Google products & services data sharing: OFF
+Modelling contributions & business insights: OFF
+Technical support: OFF
+Recommendations for your business: OFF
+Google Ads linkage: none
+Form interactions: OFF
+Event data retention: 2 months
+User data retention: 14 months
+Reset on new user activity: OFF
+```
+
+Maintain or confirm the remaining restricted settings in GA4:
+
+```text
+Enhanced Measurement
+  Page views: ON
+    Page changes based on browser history events: OFF
+  Scrolls: ON
+  Outbound clicks: OFF
+  Site search: OFF
+  Video engagement: OFF
+  File downloads: OFF
+
+User-ID: absent
+User-provided data: OFF
+Enhanced conversions: OFF
+Remarketing, advertising audiences and cross-domain measurement: OFF
+Custom booking/customer dimensions: none
+```
+
+The 14-month user-level retention period is not a legal requirement. Its
+justification and completion/retention of the required legitimate-interests
+assessment remain production prerequisites. Do not enable default-on analytics
+in production until these prerequisites and the remaining GA4 restrictions are
+confirmed.
 
 ## Generate production secrets
 

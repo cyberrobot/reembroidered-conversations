@@ -71,6 +71,7 @@ jobs:
       - name: Build production application
         env:
           NEXT_PUBLIC_MUX_PLAYBACK_ID: invalid-playback-id-for-browser-smoke
+          NEXT_PUBLIC_GOOGLE_ANALYTICS_ID: G-TEST000001
         run: npm run build
 
       - name: Install Playwright Chromium
