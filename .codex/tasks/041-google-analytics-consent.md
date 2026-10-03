@@ -132,7 +132,9 @@ tests/browser/legal.spec.ts
 
 If the analytics component is renamed, update its imports/tests accordingly.
 
-Existing reviewed visual snapshots may change only where the analytics notice or Privacy Notice intentionally changes.
+The analytics notice/settings layout currently implemented in this PR is intentional and in scope. Treat that current layout as the approved PR #41 target rather than as a regression against an earlier analytics layout.
+
+Analytics visual baselines may be updated to match this approved layout. Privacy Notice snapshots may also change where the legal wording changes.
 
 Do not regenerate unrelated snapshots.
 
@@ -580,7 +582,7 @@ Disable analytics
 
 as appropriate.
 
-### 3. Keep the UI non-modal
+### 3. Keep the UI non-modal and preserve the approved PR #41 layout
 
 The first-visit notice remains:
 
@@ -592,6 +594,19 @@ The first-visit notice remains:
 - outside normal page flow;
 - non-modal;
 - directly actionable.
+
+The layout currently implemented in PR #41 is intentional and is the visual target for this PR. In particular:
+
+- the compact notice is a fixed bottom banner;
+- the compact state presents the explanatory copy with **Learn more**, **Settings** and the existing acknowledgement action;
+- the expanded state presents separate **Strictly Necessary** and **Minimal Analytics** cards;
+- **Minimal Analytics** uses the existing switch and effective-status copy;
+- the expanded action area retains the current Privacy Notice link, **Hide**, **Necessary Only** and **Save preferences** controls;
+- the responsive desktop and mobile arrangements currently represented by the PR's analytics snapshots are approved.
+
+Do not revert these layout/styling changes merely to match pre-change snapshots.
+
+Further unrelated redesign remains out of scope.
 
 Do not make disabling less prominent or materially harder than continuing.
 
@@ -791,6 +806,9 @@ Recheck the existing international-transfer wording after the legal-basis change
 ### UI
 
 - [ ] First-visit analytics notice works at desktop and mobile widths.
+- [ ] The current PR #41 analytics notice/settings layout is treated as intentional and approved, not as a regression against the earlier analytics layout.
+- [ ] Compact state uses the approved bottom-banner layout with **Learn more**, **Settings** and the existing acknowledgement action.
+- [ ] Expanded state uses the approved **Strictly Necessary** / **Minimal Analytics** card layout with the current switch and action row.
 - [ ] The existing Settings control immediately exposes the current analytics preference switch; changing it disables analytics at once.
 - [ ] The existing acknowledgement control and its visual label are unchanged.
 - [ ] Privacy Notice is keyboard accessible.
@@ -961,12 +979,11 @@ tests/browser/migration-smoke.spec.ts
 
 ### Visual regression
 
-Preserve existing analytics screenshots. Do not regenerate baselines for
-behavioral/state-management changes. If an unavoidable copy change causes a
-visible difference, update only directly affected analytics snapshots after
-reviewing actual/diff images; keep layout, spacing and styling unchanged.
+The analytics layout/styling changes currently present in PR #41 are intentional. Update the analytics visual baselines to represent that approved layout rather than requiring the implementation to match the earlier analytics snapshots.
 
-Maintain reviewed:
+Before accepting a changed baseline, review the actual/diff image and confirm that it represents the intended PR #41 analytics layout rather than an accidental rendering change.
+
+Maintain reviewed baselines for:
 
 ```text
 desktop macOS
@@ -975,10 +992,9 @@ desktop Linux
 mobile Linux
 ```
 
-baselines.
+Once the approved PR #41 baselines are committed, further unexplained layout, spacing or styling differences are regressions.
 
-Update Privacy Notice snapshots only if changed legal wording causes a direct
-visual difference. Do not regenerate Terms or unrelated snapshots.
+Update Privacy Notice snapshots where changed legal wording causes a direct visual difference. Do not regenerate Terms or unrelated snapshots.
 
 Do not change Terms snapshots unless a shared rendering change genuinely requires it.
 
@@ -1038,7 +1054,7 @@ Report:
 - first-party preference-cookie fallback and localStorage-failure behaviour;
 - Privacy Notice retention and storage wording corrected.
 
-### UI preservation
+### UI / visual baseline
 
 Record:
 
@@ -1048,8 +1064,9 @@ Analytics UI copy changed: yes/no
 Analytics visual snapshots regenerated: yes/no
 ```
 
-Expected: layout/styling unchanged and snapshots unchanged. Explain any necessary
-copy or snapshot change.
+For PR #41, the current analytics layout/styling changes are intentional and accepted. It is therefore valid for the first and third values to be `yes` when they reflect the approved compact and expanded layouts described in this specification.
+
+Explain any additional visible change beyond that approved PR #41 layout.
 
 ### Tests
 
