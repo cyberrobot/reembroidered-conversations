@@ -69,6 +69,21 @@ test("analytics preference migration preserves explicit legacy choices", () => {
     showNotice: false,
     migrated: true,
   });
+  assert.deepEqual(resolveAnalyticsPreference("corrupt", "disabled", null), {
+    preference: "disabled",
+    showNotice: false,
+    migrated: false,
+  });
+  assert.deepEqual(resolveAnalyticsPreference("enabled", "corrupt", null), {
+    preference: "enabled",
+    showNotice: false,
+    migrated: false,
+  });
+  assert.deepEqual(resolveAnalyticsPreference("corrupt", "unknown", null), {
+    preference: "enabled",
+    showNotice: true,
+    migrated: false,
+  });
 });
 
 test("disabled wins when valid current preference stores conflict", () => {

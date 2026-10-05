@@ -349,6 +349,10 @@ On first read of the new preference:
 - treat as no valid current preference;
 - use the new default-on behaviour;
 - show the notice so the visitor has a clear opportunity to object.
+- do not persist default `enabled` merely because an invalid raw v2 value
+  exists; it remains an unacknowledged first visit until the visitor explicitly
+  acknowledges or selects a valid preference;
+- after reload without interaction, continue showing the notice.
 
 After a successful migration, remove the obsolete v1 preference where appropriate.
 
@@ -783,6 +787,8 @@ Recheck the existing international-transfer wording after the legal-basis change
 - [ ] A previous v1 `denied` preference is preserved and prevents GA loading.
 - [ ] With no previous preference, GA loads automatically after preference resolution.
 - [ ] No stored preference defaults to analytics `enabled` and displays the information notice.
+- [ ] A corrupt current preference does not silently become persisted `enabled`.
+- [ ] Reloading an unacknowledged corrupt-preference visit shows the information notice again.
 - [ ] The approved compact banner displays `Quiet Privacy & Cookies:`, the current explanatory text, and `Learn more`, `Settings`, `Accept` in the current layout/order.
 - [ ] `Learn more` opens the Privacy Notice; `Settings` expands the analytics controls.
 - [ ] `Accept` acknowledges/dismisses the notice and persists the current effective preference; it is not described as consent.
@@ -795,7 +801,9 @@ Recheck the existing international-transfer wording after the legal-basis change
 - [ ] The Minimal Analytics switch applies preference changes immediately.
 - [ ] `Hide` collapses without changing the effective preference.
 - [ ] `Necessary Only` persists `disabled`, disables analytics, clears accessible GA cookies and closes the panel.
+- [ ] `Necessary Only` has direct browser regression coverage, including reload blocking further GA requests.
 - [ ] `Save preferences` persists the current effective state and closes the panel.
+- [ ] `Save preferences` has direct browser regression coverage for both effective switch states.
 - [ ] Current footer `Analytics settings` opens the expanded layout directly.
 - [ ] A valid disabled v2 preference in either current store wins a conflict.
 - [ ] Conflicting current stores are normalized to the resolved value.
@@ -987,24 +995,34 @@ Cover:
    - GA loads.
 
 7. **Corrupt preference**
-   - falls back to default-on;
-   - notice is visible so objection is immediately available.
+   - falls back to default-on and shows the information notice;
+   - does not create a valid enabled preference in either current store;
+   - reload without interaction still shows the notice and follows default-on analytics behaviour;
+   - explicit `Accept` persists enabled, and the notice stays hidden after reload.
+8. **Necessary Only**
+   - starts from enabled analytics, then disables it from expanded footer settings;
+   - verifies both stores, the GA disable flag, accessible cookie removal and panel closure;
+   - reloads without another GA request.
+9. **Save preferences**
+   - turns analytics off and saves the already-effective disabled value;
+   - reopens settings, turns analytics on and saves the already-effective enabled value;
+   - verifies that saving closes the panel without reinterpreting either switch state.
 
-8. **Analytics settings**
-   - switch immediately applies and persists enabled → disabled;
-   - disabled status is accurate and accessible GA cookies are removed;
-   - reload keeps the visitor disabled and makes no Google request;
-   - switch immediately applies and persists disabled → enabled;
-   - status reflects the effective state;
-   - the existing acknowledgement control from settings closes without changing a disabled preference.
+10. **Analytics settings**
+    - switch immediately applies and persists enabled → disabled;
+    - disabled status is accurate and accessible GA cookies are removed;
+    - reload keeps the visitor disabled and makes no Google request;
+    - switch immediately applies and persists disabled → enabled;
+    - status reflects the effective state;
+    - the existing acknowledgement control from settings closes without changing a disabled preference.
 
-9. **Conflicting v2 stores**
-   - seed localStorage `enabled` and the preference cookie `disabled` before homepage startup;
-   - verify no Google request occurs before or after resolving the preference;
-   - verify the first-visit notice is not shown;
-   - verify both current stores are normalized to `disabled`.
+11. **Conflicting v2 stores**
+    - seed localStorage `enabled` and the preference cookie `disabled` before homepage startup;
+    - verify no Google request occurs before or after resolving the preference;
+    - verify the first-visit notice is not shown;
+    - verify both current stores are normalized to `disabled`.
 
-10. **Cookie configuration**
+12. **Cookie configuration**
 
 - queued `config` contains:
 

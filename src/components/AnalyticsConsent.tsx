@@ -7,6 +7,7 @@ import {
   ANALYTICS_PREFERENCE_KEY,
   ANALYTICS_SETTINGS_EVENT,
   isValidAnalyticsMeasurementId,
+  parseAnalyticsPreference,
   parseAnalyticsPreferenceCookie,
   resolveAnalyticsPreference,
   serializeAnalyticsPreferenceCookie,
@@ -141,11 +142,10 @@ export function AnalyticsConsent({ measurementId }: AnalyticsConsentProps) {
     );
     setPreferenceState(resolution.preference);
     setNoticeOpen(resolution.showNotice);
-    if (
-      resolution.migrated ||
-      storedPreference !== null ||
-      storedCookiePreference !== null
-    ) {
+    const hasValidCurrentPreference =
+      parseAnalyticsPreference(storedPreference) !== null ||
+      parseAnalyticsPreference(storedCookiePreference) !== null;
+    if (resolution.migrated || hasValidCurrentPreference) {
       try {
         localStorage.setItem(ANALYTICS_PREFERENCE_KEY, resolution.preference);
       } catch {
