@@ -185,12 +185,13 @@ After hydration and after checking stored analytics preferences:
 - initialise GA automatically;
 - load the Google tag;
 - collect only the restricted statistical measurements allowed by this specification;
-- display a compact analytics notice explaining that limited analytics is used;
-- provide the existing Analytics settings control, where disabling takes effect immediately through the existing switch;
-- provide a **Privacy Notice** link;
-- preserve the existing acknowledgement control and its label to dismiss the notice.
+- display the approved compact, fixed, non-modal banner near the bottom of the viewport in its responsive desktop/mobile layout;
+- preserve the heading `Quiet Privacy & Cookies:` and the current explanatory text: `We use cookies to understand how this website is used and improve it. You can disable analytics at any time.`;
+- preserve the current controls and order: `Learn more`, `Settings`, `Accept`;
+- make `Learn more` open the Privacy Notice and `Settings` expand the analytics controls;
+- make `Accept` persist the current effective preference and dismiss the notice.
 
-Do not change the existing acknowledgement label as part of this behaviour-only update. Its action must only acknowledge/dismiss the notice; analytics is already on by default and is not enabled on the basis of that action. Do not introduce new consent-oriented labels such as:
+`Accept` is an acknowledgement/dismissal action. It is not the legal basis for analytics and must never re-enable analytics when the current effective preference is disabled. Do not introduce new consent-oriented labels such as:
 
 ```text
 Allow analytics
@@ -199,6 +200,36 @@ Agree
 ```
 
 because analytics is not being activated on the basis of that action.
+
+### Approved expanded settings layout
+
+The expanded desktop/mobile layout is canonical and must remain visually unchanged. It contains two cards:
+
+```text
+Strictly Necessary
+Always active
+Minimal Analytics
+Analytics is currently on/off. Limited statistics help improve the public website.
+```
+
+The Strictly Necessary card explains support for security, payment and booking flows, including Turnstile. The Minimal Analytics card contains the accessible switch `role="switch"`, `aria-label="Minimal Analytics"`; changing it immediately changes the effective preference.
+
+The expanded action row remains:
+
+```text
+Privacy Notice (Cookies & browser storage)
+Hide
+Necessary Only
+Save preferences
+```
+
+- `Hide` collapses settings without changing the effective preference.
+- `Necessary Only` persists `disabled`, disables analytics, removes accessible GA cookies and closes the settings panel.
+- `Save preferences` persists the current effective switch state and closes the panel. It is safe and idempotent; the switch has already taken effect immediately.
+
+The homepage footer retains `Analytics settings`. Opening it displays the expanded settings layout directly. Keep the analytics panel inside `#site-content` so the existing legal modal `inert` handling applies.
+
+The current compact and expanded desktop/mobile layouts are approved. Do not change layout, spacing, typography, button order or styling for the state/persistence fixes in this specification.
 
 ### Visitor disables analytics
 
@@ -229,6 +260,8 @@ It must allow:
 - disabled → enabled.
 
 The current status must be clearly shown.
+
+Opening footer `Analytics settings` displays the approved expanded settings layout directly.
 
 ---
 
@@ -263,6 +296,24 @@ disabled
 ```
 
 Do not use `granted` to describe the new default-on model.
+
+The current v2 preference is stored in both:
+
+```text
+localStorage: reembroidered.analytics-preference.v2
+cookie: reembroidered_analytics_preference_v2
+```
+
+The cookie is a fallback when localStorage is unavailable. When both current v2 stores contain valid but conflicting preferences, `disabled` wins. This conflict rule protects an opt-out that was recorded while localStorage was unavailable; it does not prevent a later explicit re-enable because normal explicit actions write both current stores to the same value. After resolving a conflict, synchronize accessible current stores to the resolved preference. Use a valid value from either v2 store; consult v1 only when neither v2 store has a valid value.
+
+| localStorage v2 | Cookie v2       | Resolved preference |
+| --------------- | --------------- | ------------------- |
+| `disabled`      | `enabled`       | `disabled`          |
+| `enabled`       | `disabled`      | `disabled`          |
+| `enabled`       | `enabled`       | `enabled`           |
+| `disabled`      | `disabled`      | `disabled`          |
+| valid value     | missing/invalid | that valid value    |
+| missing/invalid | valid value     | that valid value    |
 
 On first read of the new preference:
 
@@ -529,39 +580,39 @@ When analytics is disabled:
 
 ### 1. Change from opt-in to default-on after preference check
 
-Current behaviour waits for:
+The current approved behaviour is:
 
 ```text
-Allow analytics
-```
-
-before loading GA.
-
-Replace it with:
-
-```text
-read preference
-→ preserve/migrate any previous opt-out
-→ if not disabled, start analytics
-→ show first-visit information/opt-out notice when no current preference exists
+read and resolve valid v2 localStorage/cookie preferences
+→ let disabled win if valid v2 stores conflict
+→ consult legacy v1 only if neither v2 store is valid
+→ if not disabled, start analytics after preference resolution
+→ show the first-visit information notice only when there is no valid preference
 ```
 
 Do not insert GA server-side or before stored preference state has been resolved.
 
-### 2. Replace consent language
+### 2. Preserve the approved analytics UI and acknowledgement semantics
 
 The public UI must not describe the new mechanism as obtaining analytics consent.
 
-Use language such as:
+Keep the current approved compact layout, explanatory copy, labels and order exactly:
 
-> We use limited Google Analytics statistics to understand how this public website is used and improve it. You can disable analytics at any time.
+```text
+Quiet Privacy & Cookies:
+We use cookies to understand how this website is used and improve it. You can disable analytics at any time.
+Learn more
+Settings
+Accept
+```
 
-Keep the current popup controls and labels unchanged. The existing
-acknowledgement action is only an acknowledgement/dismiss action, not consent.
-Analytics is already enabled by default and the action must not change that
-state.
+`Accept` persists the current effective preference and dismisses the notice. On an untouched first visit the effective preference is `enabled`, so it persists `enabled`. If the visitor has already switched analytics off, `Accept` preserves and persists `disabled`. It never grants analytics consent or re-enables analytics by itself.
 
-When settings are reopened:
+The expanded settings layout is the current approved two-card layout (`Strictly Necessary` / `Always active` and `Minimal Analytics` with the accessible switch), followed by the Privacy Notice link and the `Hide`, `Necessary Only` and `Save preferences` actions. The switch applies changes immediately. `Hide` collapses without changing state, `Necessary Only` persists `disabled` and closes, and `Save preferences` persists the current effective state and closes.
+
+The homepage footer keeps `Analytics settings`; opening it displays the expanded layout directly. The analytics panel remains inside `#site-content` for legal-dialog inert behaviour.
+
+When settings are displayed:
 
 ```text
 Analytics is currently on.
@@ -573,14 +624,7 @@ or:
 Analytics is currently off.
 ```
 
-Provide:
-
-```text
-Enable analytics
-Disable analytics
-```
-
-as appropriate.
+Do not add separate `Enable analytics` or `Disable analytics` buttons. They are not part of the approved UI.
 
 ### 3. Keep the UI non-modal and preserve the approved PR #41 layout
 
@@ -738,16 +782,29 @@ Recheck the existing international-transfer wording after the legal-basis change
 - [ ] Analytics preference is read before GA is loaded.
 - [ ] A previous v1 `denied` preference is preserved and prevents GA loading.
 - [ ] With no previous preference, GA loads automatically after preference resolution.
-- [ ] First-time visitors see clear analytics information; the existing Settings control opens the switch, which disables analytics immediately when turned off.
-- [ ] The existing acknowledgement action only dismisses the notice and does not describe analytics as consent.
-- [ ] The existing acknowledgement dismisses the initial notice and records `enabled`.
-- [ ] The existing acknowledgement from Analytics settings closes the panel without changing the existing preference.
-- [ ] Disable analytics records `disabled`.
+- [ ] No stored preference defaults to analytics `enabled` and displays the information notice.
+- [ ] The approved compact banner displays `Quiet Privacy & Cookies:`, the current explanatory text, and `Learn more`, `Settings`, `Accept` in the current layout/order.
+- [ ] `Learn more` opens the Privacy Notice; `Settings` expands the analytics controls.
+- [ ] `Accept` acknowledges/dismisses the notice and persists the current effective preference; it is not described as consent.
+- [ ] Untouched first-visit `Accept` persists `enabled`.
+- [ ] If analytics was disabled before `Accept`, `Accept` preserves `disabled`.
+- [ ] Footer-opened settings dismissal never changes the effective preference.
+- [ ] The approved expanded two-card layout and all current control labels/order are preserved.
+- [ ] The Strictly Necessary card says `Always active` and describes security, payment and booking flows including Turnstile.
+- [ ] Minimal Analytics has its current-state text and accessible `role="switch"`, `aria-label="Minimal Analytics"` control.
+- [ ] The Minimal Analytics switch applies preference changes immediately.
+- [ ] `Hide` collapses without changing the effective preference.
+- [ ] `Necessary Only` persists `disabled`, disables analytics, clears accessible GA cookies and closes the panel.
+- [ ] `Save preferences` persists the current effective state and closes the panel.
+- [ ] Current footer `Analytics settings` opens the expanded layout directly.
+- [ ] A valid disabled v2 preference in either current store wins a conflict.
+- [ ] Conflicting current stores are normalized to the resolved value.
+- [ ] A resolved disabled conflict prevents GA loading before interaction.
+- [ ] A valid current v2 preference supersedes stale legacy state; v1 is consulted only when neither v2 store is valid.
 - [ ] Disabled state survives reload.
 - [ ] Disabled state blocks all subsequent GA tag requests.
 - [ ] Re-enabling through Analytics settings works.
 - [ ] Disabling through Analytics settings works.
-- [ ] The expanded Minimal Analytics switch immediately applies and persists either preference.
 - [ ] Status text always reflects the effective analytics state.
 - [ ] Withdrawal clears accessible `_ga` / `_ga_*` cookies.
 - [ ] A first-party preference cookie persists the choice when localStorage is unavailable.
@@ -805,15 +862,18 @@ Recheck the existing international-transfer wording after the legal-basis change
 
 ### UI
 
-- [ ] First-visit analytics notice works at desktop and mobile widths.
-- [ ] The current PR #41 analytics notice/settings layout is treated as intentional and approved, not as a regression against the earlier analytics layout.
-- [ ] Compact state uses the approved bottom-banner layout with **Learn more**, **Settings** and the existing acknowledgement action.
-- [ ] Expanded state uses the approved **Strictly Necessary** / **Minimal Analytics** card layout with the current switch and action row.
-- [ ] The existing Settings control immediately exposes the current analytics preference switch; changing it disables analytics at once.
-- [ ] The existing acknowledgement control and its visual label are unchanged.
+- [ ] Current compact PR #41 analytics banner is the canonical compact layout.
+- [ ] Current expanded two-card settings layout is the canonical expanded layout.
+- [ ] Current control labels and order are preserved.
+- [ ] Current responsive desktop and mobile layouts are preserved.
+- [ ] Current committed analytics snapshots are the approved baselines.
+- [ ] No snapshot regeneration is required for these behavioural/state-management fixes.
+- [ ] The approved banner is treated as intentional rather than as a regression against the earlier analytics layout.
+- [ ] The current Settings control opens the preference switch; changing it disables analytics at once.
+- [ ] The existing acknowledgement label is unchanged.
 - [ ] Privacy Notice is keyboard accessible.
 - [ ] Analytics settings remains available in the footer.
-- [ ] Legal modal correctly makes the analytics notice inert while open.
+- [ ] The analytics panel remains inside `#site-content`, and the legal modal makes it inert while open.
 - [ ] Existing legal focus restoration continues working.
 
 ### Code quality
@@ -854,8 +914,10 @@ Ensure an old explicit denial always wins over the new default.
 Continue testing Measurement ID validation.
 
 Test preference-cookie parsing and serialization for valid `enabled` and
-`disabled` values, missing/corrupt cookies, localStorage precedence, cookie
-fallback and legacy migration.
+`disabled` values, missing/corrupt cookies, both-store conflicts, single-store
+fallback and legacy migration. Verify that disabled wins each conflicting v2
+pair, matching pairs preserve their value, a valid value in either single store
+is used, and a valid v2 value supersedes stale v1 state.
 
 ### Legal-content tests
 
@@ -897,29 +959,38 @@ Cover:
    - Privacy Notice link is visible.
 
 2. **Existing acknowledgement control**
-   - stores `enabled`;
-   - closes notice;
+   - stores the current effective preference and closes the notice;
+   - an untouched first visit stores `enabled`;
    - reload keeps analytics enabled;
    - notice does not repeatedly appear.
 
-3. **Immediate disable**
+3. **Disable before first-visit acknowledgement**
+   - start on a clean visit and verify the default-on Google tag request occurs once;
+   - open `Settings` and switch Minimal Analytics off;
+   - verify localStorage and the preference cookie are `disabled`;
+   - verify `ga-disable-G-TEST000001` is true and accessible `_ga` / `_ga_*` cookies are removed;
+   - click `Hide`, then `Accept`;
+   - verify the panel closes and both preference stores remain `disabled`;
+   - reload and verify no additional Google tag request occurs.
+
+4. **Immediate disable**
    - stores `disabled`;
    - clears `_ga*`;
    - reload does not request the Google tag.
 
-4. **Existing v1 denied**
+5. **Existing v1 denied**
    - no Google request occurs;
    - migrates to v2 disabled.
 
-5. **Existing v1 granted**
+6. **Existing v1 granted**
    - migrates to enabled;
    - GA loads.
 
-6. **Corrupt preference**
+7. **Corrupt preference**
    - falls back to default-on;
    - notice is visible so objection is immediately available.
 
-7. **Analytics settings**
+8. **Analytics settings**
    - switch immediately applies and persists enabled → disabled;
    - disabled status is accurate and accessible GA cookies are removed;
    - reload keeps the visitor disabled and makes no Google request;
@@ -927,30 +998,38 @@ Cover:
    - status reflects the effective state;
    - the existing acknowledgement control from settings closes without changing a disabled preference.
 
-8. **Cookie configuration**
-   - queued `config` contains:
+9. **Conflicting v2 stores**
+   - seed localStorage `enabled` and the preference cookie `disabled` before homepage startup;
+   - verify no Google request occurs before or after resolving the preference;
+   - verify the first-visit notice is not shown;
+   - verify both current stores are normalized to `disabled`.
+
+10. **Cookie configuration**
+
+- queued `config` contains:
 
 ```text
 cookie_domain: "none"
 ```
 
-9. **Privacy Notice**
-   - canonical legal modal opens;
-   - analytics notice is within inert background;
-   - controls work after close.
+11. **Privacy Notice**
 
-10. **Sensitive routes**
+- canonical legal modal opens;
+- analytics notice is within inert background;
+- controls work after close.
+
+12. **Sensitive routes**
     - even an enabled preference does not load GA outside the homepage.
 
-11. **Script failure**
+13. **Script failure**
     - homepage/booking UI remains usable.
 
-12. **Unavailable localStorage**
+14. **Unavailable localStorage**
     - disabling analytics writes the first-party preference cookie;
     - reload remains disabled with no Google request;
     - a pre-existing disabled cookie blocks Analytics before interaction.
 
-13. **Missing/invalid Measurement ID**
+15. **Missing/invalid Measurement ID**
     - fail closed through existing unit coverage or a clean browser fixture;
     - do not introduce test-only query parameters into the production homepage.
 
@@ -979,24 +1058,33 @@ tests/browser/migration-smoke.spec.ts
 
 ### Visual regression
 
-The analytics layout/styling changes currently present in PR #41 are intentional. Update the analytics visual baselines to represent that approved layout rather than requiring the implementation to match the earlier analytics snapshots.
+The current committed PR #41 analytics snapshots are the canonical approved
+baselines. Preserve them exactly; do not regenerate analytics snapshots for
+behavioral/state-management changes. Any visual mismatch introduced by these
+fixes is a regression and must be fixed in code. Do not regenerate unrelated
+visual baselines.
 
-Before accepting a changed baseline, review the actual/diff image and confirm that it represents the intended PR #41 analytics layout rather than an accidental rendering change.
-
-Maintain reviewed baselines for:
+The approved PR #41 analytics layout/styling is intentional and is represented
+by these current snapshots. Do not require the implementation to match earlier
+analytics snapshots. Any new visual mismatch must be fixed in code; do not
+regenerate baselines for these behavioral changes.
 
 ```text
-desktop macOS
-mobile macOS
-desktop Linux
-mobile Linux
+analytics-consent-desktop-darwin.png
+analytics-consent-desktop-linux.png
+analytics-consent-mobile-darwin.png
+analytics-consent-mobile-linux.png
+analytics-consent-expanded-desktop-darwin.png
+analytics-consent-expanded-desktop-linux.png
+analytics-consent-expanded-mobile-darwin.png
+analytics-consent-expanded-mobile-linux.png
 ```
 
-Once the approved PR #41 baselines are committed, further unexplained layout, spacing or styling differences are regressions.
+The current Privacy Notice snapshots that pass CI are likewise accepted for
+the legal wording introduced by this PR. Do not regenerate them for these
+behavioral changes.
 
-Update Privacy Notice snapshots where changed legal wording causes a direct visual difference. Do not regenerate Terms or unrelated snapshots.
-
-Do not change Terms snapshots unless a shared rendering change genuinely requires it.
+Do not regenerate Terms or unrelated snapshots.
 
 ---
 
@@ -1050,7 +1138,8 @@ Report:
 
 - active preference model uses `enabled` / `disabled`;
 - existing settings switch immediately changes effective preference;
-- the acknowledgement action from settings does not change a disabled preference;
+- `Accept` persists the current effective preference, preserving a prior opt-out;
+- a valid `disabled` preference in either current v2 store wins a conflict, and accessible stores are normalized after resolution;
 - first-party preference-cookie fallback and localStorage-failure behaviour;
 - Privacy Notice retention and storage wording corrected.
 

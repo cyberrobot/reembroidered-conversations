@@ -55,7 +55,6 @@ export function AnalyticsConsent({ measurementId }: AnalyticsConsentProps) {
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [openedFromSettings, setOpenedFromSettings] = useState(false);
   const analyticsSelected = preference === "enabled";
 
   const persistPreference = useCallback(
@@ -112,20 +111,14 @@ export function AnalyticsConsent({ measurementId }: AnalyticsConsentProps) {
       setPreference(nextPreference);
       setSettingsOpen(false);
       setNoticeOpen(false);
-      setOpenedFromSettings(false);
     },
     [setPreference],
   );
 
-  const continueFromNotice = useCallback(() => {
-    if (openedFromSettings) {
-      setSettingsOpen(false);
-      setNoticeOpen(false);
-      setOpenedFromSettings(false);
-      return;
-    }
-    savePreference("enabled");
-  }, [openedFromSettings, savePreference]);
+  const acknowledgeNotice = useCallback(() => {
+    if (!preference) return;
+    savePreference(preference);
+  }, [preference, savePreference]);
 
   useEffect(() => {
     if (!validMeasurementId) return;
@@ -138,13 +131,13 @@ export function AnalyticsConsent({ measurementId }: AnalyticsConsentProps) {
       // The first-party cookie remains available when localStorage is blocked.
     }
 
-    const resolution = resolveAnalyticsPreference(
-      storedPreference,
-      parseAnalyticsPreferenceCookie(document.cookie),
-      legacyConsent,
-    );
     const storedCookiePreference = parseAnalyticsPreferenceCookie(
       document.cookie,
+    );
+    const resolution = resolveAnalyticsPreference(
+      storedPreference,
+      storedCookiePreference,
+      legacyConsent,
     );
     setPreferenceState(resolution.preference);
     setNoticeOpen(resolution.showNotice);
@@ -178,7 +171,6 @@ export function AnalyticsConsent({ measurementId }: AnalyticsConsentProps) {
   useEffect(() => {
     if (!validMeasurementId) return;
     const openSettings = () => {
-      setOpenedFromSettings(true);
       setSettingsOpen(true);
       setExpanded(true);
     };
@@ -299,7 +291,7 @@ export function AnalyticsConsent({ measurementId }: AnalyticsConsentProps) {
             </button>
             <button
               type="button"
-              onClick={continueFromNotice}
+              onClick={acknowledgeNotice}
               className={`${actionClass} bg-[#282524] text-white shadow-sm hover:bg-[#403B38]`}
             >
               Accept

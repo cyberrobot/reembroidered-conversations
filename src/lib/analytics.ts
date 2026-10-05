@@ -20,24 +20,25 @@ export function resolveAnalyticsPreference(
   legacyConsent: string | null,
 ): { preference: AnalyticsPreference; showNotice: boolean; migrated: boolean } {
   const parsedPreference = parseAnalyticsPreference(preference);
-  if (parsedPreference) {
-    return { preference: parsedPreference, showNotice: false, migrated: false };
-  }
-
   const parsedCookiePreference = parseAnalyticsPreference(cookiePreference);
-  if (parsedCookiePreference) {
+  if (parsedPreference || parsedCookiePreference) {
+    const resolvedPreference =
+      parsedPreference === "disabled" || parsedCookiePreference === "disabled"
+        ? "disabled"
+        : "enabled";
     return {
-      preference: parsedCookiePreference,
+      preference: resolvedPreference,
       showNotice: false,
       migrated: false,
     };
   }
 
-  if (legacyConsent === "denied") {
+  const parsedLegacyConsent = parseLegacyAnalyticsConsent(legacyConsent);
+  if (parsedLegacyConsent === "denied") {
     return { preference: "disabled", showNotice: false, migrated: true };
   }
 
-  if (legacyConsent === "granted") {
+  if (parsedLegacyConsent === "granted") {
     return { preference: "enabled", showNotice: false, migrated: true };
   }
 

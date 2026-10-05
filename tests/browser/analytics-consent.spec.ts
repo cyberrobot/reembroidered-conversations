@@ -123,6 +123,65 @@ test("notice acknowledgement persists enabled and hides the notice", async ({
   await expect.poll(() => requests.length).toBe(2);
 });
 
+test("Accept preserves an opt-out made in first-visit settings", async ({
+  page,
+}) => {
+  const requests = trackGoogleRequests(page);
+  await stubGoogleTag(page);
+  await clearAnalyticsPreference(page);
+  await page.goto("/");
+
+  const panel = page.getByRole("region", { name: "Analytics settings" });
+  await expect(panel).toBeVisible();
+  await expect.poll(() => requests.length).toBe(1);
+  await page.evaluate(() => {
+    document.cookie = "_ga=browser-test; Path=/; SameSite=Lax";
+    document.cookie = "_ga_TEST=browser-test; Path=/; SameSite=Lax";
+  });
+
+  await panel.getByRole("button", { name: "Settings" }).click();
+  const toggle = panel.getByRole("switch", { name: "Minimal Analytics" });
+  await expect(toggle).toHaveAttribute("aria-checked", "true");
+  await toggle.click();
+
+  await expect(toggle).toHaveAttribute("aria-checked", "false");
+  await expect
+    .poll(() =>
+      page.evaluate((key) => localStorage.getItem(key), preferenceKey),
+    )
+    .toBe("disabled");
+  await expect
+    .poll(() => page.evaluate(() => document.cookie))
+    .toContain(`${preferenceCookie}=disabled`);
+  expect(await page.evaluate(() => window[`ga-disable-G-TEST000001`])).toBe(
+    true,
+  );
+  expect(
+    await page.evaluate(() =>
+      document.cookie
+        .split(";")
+        .map((cookie) => cookie.trim().split("=", 1)[0])
+        .filter((name) => name === "_ga" || name.startsWith("_ga_")),
+    ),
+  ).toEqual([]);
+
+  await panel.getByRole("button", { name: "Hide" }).click();
+  await panel.getByRole("button", { name: "Accept", exact: true }).click();
+  await expect(panel).toBeHidden();
+  await expect
+    .poll(() =>
+      page.evaluate((key) => localStorage.getItem(key), preferenceKey),
+    )
+    .toBe("disabled");
+  await expect
+    .poll(() => page.evaluate(() => document.cookie))
+    .toContain(`${preferenceCookie}=disabled`);
+
+  await page.reload();
+  await expect(panel).toBeHidden();
+  expect(requests).toHaveLength(1);
+});
+
 test("settings switch applies and persists both preference directions immediately", async ({
   page,
 }) => {
@@ -272,6 +331,37 @@ test("a disabled fallback cookie prevents analytics before interaction", async (
   await expect(
     page.getByRole("region", { name: "Analytics settings" }),
   ).toBeHidden();
+  expect(requests).toEqual([]);
+});
+
+test("a disabled current preference wins a localStorage-cookie conflict", async ({
+  page,
+}) => {
+  const requests = trackGoogleRequests(page);
+  await stubGoogleTag(page);
+  await page.addInitScript(
+    ({ key, cookieName }) => {
+      localStorage.setItem(key, "enabled");
+      document.cookie = `${cookieName}=disabled; Path=/; SameSite=Lax`;
+    },
+    { key: preferenceKey, cookieName: preferenceCookie },
+  );
+  await page.goto("/");
+
+  await expect
+    .poll(() =>
+      page.evaluate((key) => localStorage.getItem(key), preferenceKey),
+    )
+    .toBe("disabled");
+  await expect
+    .poll(() => page.evaluate(() => document.cookie))
+    .toContain(`${preferenceCookie}=disabled`);
+  await expect(
+    page.getByRole("region", { name: "Analytics settings" }),
+  ).toBeHidden();
+  await expect(
+    page.locator('script[src*="googletagmanager.com/gtag/js"]'),
+  ).toHaveCount(0);
   expect(requests).toEqual([]);
 });
 

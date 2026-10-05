@@ -71,14 +71,39 @@ test("analytics preference migration preserves explicit legacy choices", () => {
   });
 });
 
-test("valid localStorage preference takes precedence over cookie and v1", () => {
-  assert.deepEqual(
-    resolveAnalyticsPreference("enabled", "disabled", "denied"),
-    { preference: "enabled", showNotice: false, migrated: false },
-  );
+test("disabled wins when valid current preference stores conflict", () => {
+  for (const [localStorage, cookie, expected] of [
+    ["enabled", "disabled", "disabled"],
+    ["disabled", "enabled", "disabled"],
+    ["enabled", "enabled", "enabled"],
+    ["disabled", "disabled", "disabled"],
+  ]) {
+    assert.deepEqual(
+      resolveAnalyticsPreference(localStorage, cookie, "denied"),
+      { preference: expected, showNotice: false, migrated: false },
+    );
+  }
+});
+
+test("a valid v2 preference supersedes stale legacy consent", () => {
+  assert.deepEqual(resolveAnalyticsPreference("enabled", null, "denied"), {
+    preference: "enabled",
+    showNotice: false,
+    migrated: false,
+  });
+  assert.deepEqual(resolveAnalyticsPreference(null, "enabled", "denied"), {
+    preference: "enabled",
+    showNotice: false,
+    migrated: false,
+  });
 });
 
 test("valid preference cookie is the fallback before legacy migration", () => {
+  assert.deepEqual(resolveAnalyticsPreference(null, "enabled", null), {
+    preference: "enabled",
+    showNotice: false,
+    migrated: false,
+  });
   assert.deepEqual(resolveAnalyticsPreference(null, "disabled", "granted"), {
     preference: "disabled",
     showNotice: false,
@@ -88,6 +113,19 @@ test("valid preference cookie is the fallback before legacy migration", () => {
     preference: "disabled",
     showNotice: false,
     migrated: true,
+  });
+});
+
+test("a valid localStorage preference works without a current cookie", () => {
+  assert.deepEqual(resolveAnalyticsPreference("enabled", null, null), {
+    preference: "enabled",
+    showNotice: false,
+    migrated: false,
+  });
+  assert.deepEqual(resolveAnalyticsPreference("disabled", null, null), {
+    preference: "disabled",
+    showNotice: false,
+    migrated: false,
   });
 });
 
