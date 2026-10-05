@@ -28,7 +28,11 @@ export type LegalDocument = {
   title: string;
   version: "1.0" | "1.1" | "1.2";
   effectiveDate:
-    "22 September 2026" | "23 September 2026" | "24 September 2026";
+    | "22 September 2026"
+    | "23 September 2026"
+    | "24 September 2026"
+    | "1 October 2026"
+    | "2 October 2026";
   introduction: readonly string[];
   sections: readonly LegalSection[];
 };
@@ -200,8 +204,8 @@ export const TERMS: LegalDocument = {
 export const PRIVACY_NOTICE: LegalDocument = {
   id: "privacy",
   title: "Privacy Notice",
-  version: "1.0",
-  effectiveDate: "22 September 2026",
+  version: "1.2",
+  effectiveDate: "2 October 2026",
   introduction: [
     `${PUBLIC_COMPANY.legalName} is the controller for the personal information described in this notice. It provides the service under the ${PUBLIC_COMPANY.tradingName} name.`,
     "This notice explains what the application handles, why it is used, who receives it, how retention is determined and your rights.",
@@ -220,6 +224,7 @@ export const PRIVACY_NOTICE: LegalDocument = {
         "Payment records include the Stripe Checkout Session and PaymentIntent identifiers and statuses needed to reconcile a booking. Stripe handles payment-card details; this application does not store full card details.",
         "Calendar and session administration can include your email as a Google Calendar attendee, appointment start and end time, an internal booking correlation identifier, the Google Calendar event identifier and generated Google Meet URL.",
         "Resend receives the recipient email and email content needed to send booking correspondence. We may store the provider message identifier and delivery or finalisation timestamp used by the booking lifecycle.",
+        "Limited Google Analytics statistics operate by default on the public homepage to understand website usage and make improvements. Google receives basic statistical information such as page views, scrolls and general device or browser categories. Analytics is not used for advertising, profiling or identifying customers or bookings. Booking form contents and booking identifiers are not intentionally sent to Google Analytics.",
       ],
     },
     {
@@ -244,6 +249,7 @@ export const PRIVACY_NOTICE: LegalDocument = {
         "We use data to take and administer bookings, supply the purchased session, process and reconcile payment, create and update Calendar and Meet information, send booking correspondence, and respond to cancellation or rescheduling requests. Contract, or steps requested before a contract, is generally the relevant basis for this processing.",
         "We use limited data to prevent abuse and protect service reliability and security, and to handle complaints or establish, exercise or defend legal rights, based on legitimate interests where those interests are not overridden by your rights. We retain records needed for legal, accounting and tax obligations where processing is required by law.",
         "We use Mux to deliver the introduction video and limited cookie-less playback analytics to understand video performance and maintain the reliability of the video and service. Our intended lawful basis is our legitimate interests in operating, understanding and maintaining that video and service, where those interests are not overridden by your rights and interests.",
+        "We use restricted Google Analytics only to produce limited statistics needed to understand and improve the public website. For the storage and access used by this restricted configuration, we rely on the statistical-purposes exception under PECR. We provide clear information and a simple, free way to object using Analytics settings in the homepage footer. Where this processing involves personal data, our UK GDPR lawful basis is legitimate interests: producing limited statistics needed to understand and improve the public website. Analytics is not used for advertising, profiling, identifying customers or bookings, or making decisions about a person.",
         "The boundaries acknowledgement records that you understood the service boundaries. It is not UK GDPR consent for the processing described in this notice.",
       ],
     },
@@ -251,7 +257,7 @@ export const PRIVACY_NOTICE: LegalDocument = {
       id: "processors-recipients",
       title: "Processors and recipients",
       paragraphs: [
-        "Providers include Stripe for payment and Checkout; Google for Calendar and Google Meet; Resend for transactional email; Cloudflare for Turnstile and security verification; Mux for video delivery and configured cookie-less video analytics; and Railway for production application and PostgreSQL database hosting.",
+        "Providers include Stripe for payment and Checkout; Google for Calendar and Google Meet and, separately, as the analytics service provider for this restricted Google Analytics implementation; Resend for transactional email; Cloudflare for Turnstile and security verification; Mux for video delivery and configured cookie-less video analytics; and Railway for production application and PostgreSQL database hosting. Booking form contents and customer booking identifiers are not intentionally sent to Google Analytics.",
         "We may also disclose limited information to confidential professional advisers, regulators, courts or public authorities where necessary and lawful.",
       ],
     },
@@ -259,14 +265,14 @@ export const PRIVACY_NOTICE: LegalDocument = {
       id: "international-transfers",
       title: "International transfers",
       paragraphs: [
-        "Some providers may process information outside the UK. Where applicable data-protection law treats this as a restricted transfer, appropriate transfer protections are used as required. The exact protection depends on the provider and processing arrangement.",
+        "Some providers, including Google in its separate analytics-provider role, may process information outside the UK. Where applicable data-protection law treats this as a restricted transfer, appropriate transfer protections are used as required. The exact protection depends on the provider and processing arrangement.",
       ],
     },
     {
       id: "retention",
       title: "Retention",
       paragraphs: [
-        "The application does not currently automatically delete booking rows after a fixed period. Booking, payment, Calendar and email records are retained according to operational needs and applicable accounting, legal, dispute-resolution and security requirements, taking account of whether the record remains necessary and relevant limitation periods.",
+        "The application does not currently automatically delete booking rows after a fixed period. Booking, payment, Calendar and email records are retained according to operational needs and applicable accounting, legal, dispute-resolution and security requirements, taking account of whether the record remains necessary and relevant limitation periods. The Google Analytics property is configured to retain event-level data for 2 months and user-level data for up to 14 months. Reset on new user activity is disabled, so new activity does not continually extend the user-level retention period. Aggregate reports may be retained independently of these settings.",
         "The active HOLD or temporary-reservation period is short-lived, as are abuse-protection and rate-limit permit records for their operational purpose. The associated booking row contains booking information and may remain in the booking database after the hold expires or is cancelled; expiry or cancellation does not automatically delete that row. Complaints or legal-claim records may need to be kept while a matter is active and for a reasonable period afterwards.",
       ],
     },
@@ -282,14 +288,14 @@ export const PRIVACY_NOTICE: LegalDocument = {
       id: "cookies-browser-storage",
       title: "Cookies and browser storage",
       paragraphs: [
-        "Mux is configured with Mux Data cookies disabled and with volume-preference and mute-preference persistence disabled. This does not mean the entire site is categorically cookie-free: Cloudflare Turnstile, Stripe redirects and other production integrations may process information or use storage under their own applicable configurations.",
+        "While analytics is enabled, Google Analytics may use host-only first-party _ga and related _ga_* cookies. You can disable analytics at any time in Analytics settings in the homepage footer; doing so removes accessible Google Analytics cookies and prevents subsequent application analytics. A small first-party preference stores enabled or disabled so we can remember your setting; it is a preference, not a consent record. Mux is configured with Mux Data cookies disabled and with volume-preference and mute-preference persistence disabled. This does not mean the entire site is categorically cookie-free: Cloudflare Turnstile, Stripe redirects and other production integrations may process information or use storage under their own applicable configurations.",
       ],
     },
     {
       id: "individual-rights",
       title: "Your individual rights",
       paragraphs: [
-        "Depending on the circumstances, you may have rights of access, correction, erasure, restriction, objection and portability, and a right to withdraw consent where a particular activity genuinely relies on consent. These rights are not all absolute and may be limited by lawful retention or other requirements.",
+        "Depending on the circumstances, you may have rights of access, correction, erasure, restriction, objection and portability, and a right to withdraw consent where a particular activity genuinely relies on consent. You can object to statistical analytics at any time through Analytics settings, without charge or a Google account. These rights are not all absolute and may be limited by lawful retention or other requirements.",
         `To exercise a right, write to ${PUBLIC_COMPANY.legalName} at its registered office: ${PUBLIC_REGISTERED_OFFICE}. You also have the right to complain to the Information Commissioner's Office at ico.org.uk.`,
       ],
     },
@@ -304,7 +310,7 @@ export const PRIVACY_NOTICE: LegalDocument = {
       id: "changes-version",
       title: "Changes and document version",
       paragraphs: [
-        "We may update this notice when our service, providers, processing or legal obligations change. This is Version 1.0, effective 22 September 2026.",
+        "We may update this notice when our service, providers, processing or legal obligations change. This is Version 1.2, effective 2 October 2026.",
       ],
     },
   ],

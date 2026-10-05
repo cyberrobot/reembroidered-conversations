@@ -45,6 +45,7 @@ export default defineConfig({
         env: {
           ...process.env,
           NEXT_PUBLIC_MUX_PLAYBACK_ID: invalidPlaybackId,
+          NEXT_PUBLIC_GOOGLE_ANALYTICS_ID: "G-TEST000001",
           BOOKING_MANAGEMENT_SECRET:
             process.env.BOOKING_MANAGEMENT_SECRET ?? managementTestSecret,
           BOOKING_CHANGES_URL:

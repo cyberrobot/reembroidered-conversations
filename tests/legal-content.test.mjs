@@ -24,8 +24,8 @@ test("legal documents expose stable versioned metadata and unique section IDs", 
   assert.deepEqual(Object.keys(LEGAL_DOCUMENTS), ["terms", "privacy"]);
   assert.equal(TERMS.version, "1.2");
   assert.equal(TERMS.effectiveDate, "24 September 2026");
-  assert.equal(PRIVACY_NOTICE.version, "1.0");
-  assert.equal(PRIVACY_NOTICE.effectiveDate, "22 September 2026");
+  assert.equal(PRIVACY_NOTICE.version, "1.2");
+  assert.equal(PRIVACY_NOTICE.effectiveDate, "2 October 2026");
   for (const document of Object.values(LEGAL_DOCUMENTS)) {
     const ids = document.sections.map(({ id }) => id);
     assert.equal(new Set(ids).size, ids.length);
@@ -107,6 +107,7 @@ test("Privacy Notice describes actual data flows without inventing consent or de
     "Cloudflare Turnstile",
     "keyed/HMAC pseudonymous client identifier",
     "Mux",
+    "Google Analytics",
     "Railway",
     "PostgreSQL database hosting",
   ]) {
@@ -135,6 +136,41 @@ test("Privacy Notice describes actual data flows without inventing consent or de
   assert.match(
     privacy,
     /legitimate interests in operating, understanding and maintaining/i,
+  );
+  assert.match(
+    privacy,
+    /limited Google Analytics statistics operate by default on the public homepage/i,
+  );
+  assert.match(privacy, /statistical-purposes exception under PECR/i);
+  assert.match(privacy, /UK GDPR lawful basis is legitimate interests/i);
+  assert.doesNotMatch(
+    privacy,
+    /completed and retained a legitimate-interests assessment/i,
+  );
+  assert.match(privacy, /simple, free way to object using Analytics settings/i);
+  assert.match(privacy, /without charge or a Google account/i);
+  assert.match(privacy, /Analytics is not used for advertising, profiling/i);
+  assert.match(privacy, /_ga and related _ga_\* cookies/i);
+  assert.match(
+    privacy,
+    /preference stores enabled or disabled.*not a consent record/i,
+  );
+  assert.match(
+    privacy,
+    /event-level data for 2 months and user-level data for up to 14 months/i,
+  );
+  assert.match(
+    privacy,
+    /Reset on new user activity is disabled, so new activity does not continually extend the user-level retention period/i,
+  );
+  assert.match(privacy, /Aggregate reports may be retained independently/i);
+  assert.doesNotMatch(
+    privacy,
+    /activated only after you choose Allow analytics/i,
+  );
+  assert.match(
+    privacy,
+    /booking form contents and booking identifiers are not intentionally sent/i,
   );
   assert.equal(PUBLIC_COMPANY.companyNumber, "16883201");
 });
