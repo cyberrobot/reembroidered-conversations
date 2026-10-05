@@ -2,13 +2,13 @@
 
 ## Repository state
 
-**Expected branch:**  
+**Expected branch:**
 `feature/041-google-analytics-consent`
 
-**Base branch:**  
+**Base branch:**
 `main`
 
-**Worktree:**  
+**Worktree:**
 `N/A`
 
 **Dependencies:**
