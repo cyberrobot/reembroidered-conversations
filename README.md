@@ -152,6 +152,30 @@ Use the Railway PostgreSQL service reference for `DATABASE_URL`; do not point pr
 
 Never expose server-only secrets using a `NEXT_PUBLIC_` prefix.
 
+## Dependency maintenance
+
+[Dependabot configuration](.github/dependabot.yml) monitors the root npm
+dependency graph and GitHub Actions. Routine checks run every Monday in
+`Europe/London`, at 06:00 for npm and 06:30 for Actions, with a limit of five open
+version-update PRs per ecosystem. npm minor and patch version updates are
+grouped; major upgrades receive dedicated PRs. Routine Actions updates are
+grouped into one maintenance PR where possible.
+
+Updates target the default branch, `main`, and run through the normal PR CI,
+including security auditing, application tests and browser tests. Dependabot PRs
+require human review and merge; they are not automatically merged. The existing
+daily [dependency audit](.github/workflows/dependency-audit.yml) remains enabled
+as an independent check of installed dependencies.
+
+The dependency graph, Dependabot alerts and Dependabot security updates must be
+enabled in the repository's [GitHub security settings](https://github.com/cyberrobot/reembroidered-conversations/settings/security_analysis)
+for automatic vulnerability remediation. On 6 October 2026, GitHub's API reported
+Dependabot alerts and security updates disabled; the repository owner must enable
+both and confirm the dependency graph is enabled. Security update PRs remain
+independent of the weekly version-update groups. After merging this configuration
+to `main`, check [Dependabot status](https://github.com/cyberrobot/reembroidered-conversations/network/updates)
+recognises npm at `/` and GitHub Actions without configuration errors.
+
 ## Verification
 
 Audit the complete dependency graph before merging:
