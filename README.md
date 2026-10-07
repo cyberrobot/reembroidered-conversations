@@ -167,11 +167,16 @@ require human review and merge; they are not automatically merged. The existing
 daily [dependency audit](.github/workflows/dependency-audit.yml) remains enabled
 as an independent check of installed dependencies.
 
-The dependency graph, Dependabot alerts and Dependabot security updates must be
-enabled in the repository's [GitHub security settings](https://github.com/cyberrobot/reembroidered-conversations/settings/security_analysis)
-for automatic vulnerability remediation. On 6 October 2026, GitHub's API reported
-Dependabot alerts and security updates disabled; the repository owner must enable
-both and confirm the dependency graph is enabled. Security update PRs remain
+Repository security feature status, verified on 7 October 2026:
+
+- **Dependency graph:** enabled for this public repository.
+- **Dependabot alerts:** disabled; must be enabled in
+  [GitHub security settings](https://github.com/cyberrobot/reembroidered-conversations/settings/security_analysis).
+- **Dependabot security updates:** disabled; must be enabled in the same settings
+  for automatic vulnerability remediation.
+
+Merging `.github/dependabot.yml` configures routine version updates; it does not
+enable Dependabot alerts or security updates. Security update PRs remain
 independent of the weekly version-update groups. After merging this configuration
 to `main`, check [Dependabot status](https://github.com/cyberrobot/reembroidered-conversations/network/updates)
 recognises npm at `/` and GitHub Actions without configuration errors.
