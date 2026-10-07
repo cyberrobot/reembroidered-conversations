@@ -22,14 +22,14 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
-    "@mux/mux-player-react": "^3.13.2",
+    "@mux/mux-player-react": "^3.13.4",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "dotenv": "^17.4.2",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
-    "next": "^16.3.6",
-    "pg": "^8.23.0",
+    "next": "^16.3.8",
+    "pg": "^8.23.1",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "server-only": "^0.0.1",
@@ -41,8 +41,8 @@
     "@types/node": "^22.14.0",
     "@types/pg": "^8.23.1",
     "@types/react": "19.3.0",
-    "autoprefixer": "^10.4.21",
-    "prettier": "^3.9.8",
+    "autoprefixer": "^10.6.1",
+    "prettier": "^3.9.9",
     "prisma": "^7.10.0",
     "tailwindcss": "^4.1.14",
     "typescript": "~5.8.2"
