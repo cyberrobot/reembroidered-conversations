@@ -38,10 +38,10 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7
         with:
           # The repository has no Node version pin; Node 22 is the stable line matching @types/node.
           node-version: 22
