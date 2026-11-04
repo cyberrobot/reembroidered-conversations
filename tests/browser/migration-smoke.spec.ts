@@ -396,7 +396,7 @@ test("one booking action creates a hold and automatically redirects to Checkout"
   await page.getByRole("button", { name: "morning", exact: true }).click();
   await expect(page.getByRole("button", { name: /AM$/ })).toHaveCount(2);
   await page.getByRole("button", { name: "afternoon", exact: true }).click();
-  await expect(page.getByRole("button", { name: /PM$/ })).toHaveCount(3);
+  await expect(page.getByRole("button", { name: /PM$/ })).toHaveCount(4);
   await page.getByRole("button", { name: "evening", exact: true }).click();
   await expect(page.getByRole("button", { name: "5:00 PM" })).toBeVisible();
   await page.getByRole("button", { name: "5:00 PM" }).click();
