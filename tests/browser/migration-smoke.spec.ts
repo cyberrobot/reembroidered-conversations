@@ -117,12 +117,20 @@ function availabilityFixture(now = new Date()) {
     date.setUTCDate(date.getUTCDate() + 1);
     if (date.getUTCDay() === 0 || date.getUTCDay() === 6) continue;
     const day = date.toISOString().slice(0, 10);
+    const londonHourAtNoon = Number(
+      new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Europe/London",
+        hour: "2-digit",
+        hourCycle: "h23",
+      }).format(date),
+    );
+    const offsetMinutes = (londonHourAtNoon - 12) * 60;
     days.push({
       date: day,
-      slots: [9, 9.9166667, 13, 13.9166667, 14.8333333, 16].map((hour) => {
+      slots: [9, 9.9166667, 13, 13.9166667, 14.8333333, 17].map((hour) => {
         const minutes = Math.round(hour * 60);
         const start = new Date(`${day}T00:00:00.000Z`);
-        start.setUTCMinutes(minutes);
+        start.setUTCMinutes(minutes - offsetMinutes);
         const end = new Date(start.getTime() + 55 * 60_000);
         return { startAt: start.toISOString(), endAt: end.toISOString() };
       }),
@@ -396,7 +404,7 @@ test("one booking action creates a hold and automatically redirects to Checkout"
   await page.getByRole("button", { name: "morning", exact: true }).click();
   await expect(page.getByRole("button", { name: /AM$/ })).toHaveCount(2);
   await page.getByRole("button", { name: "afternoon", exact: true }).click();
-  await expect(page.getByRole("button", { name: /PM$/ })).toHaveCount(4);
+  await expect(page.getByRole("button", { name: /PM$/ })).toHaveCount(3);
   await page.getByRole("button", { name: "evening", exact: true }).click();
   await expect(page.getByRole("button", { name: "5:00 PM" })).toBeVisible();
   await page.getByRole("button", { name: "5:00 PM" }).click();
